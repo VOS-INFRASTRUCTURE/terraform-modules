@@ -60,6 +60,7 @@ resource "aws_instance" "docker_ec2" {
                 -e MYSQL_DATABASE=${var.mysql_database} \
                 -e MYSQL_USER=${var.mysql_user} \
                 -e MYSQL_PASSWORD=${var.mysql_password} \
+                -v /home/ubuntu/mysql_data:/var/lib/mysql \
                 -p 3306:3306 \
                 --restart always \
                 mysql:8
