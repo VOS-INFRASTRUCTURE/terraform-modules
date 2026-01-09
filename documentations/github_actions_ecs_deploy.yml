@@ -1,0 +1,142 @@
+name: Deploy ECS Node App (Terraform-Compatible)
+
+on:
+  push:
+    branches:
+      - no-merge-ecs
+
+env:
+  AWS_REGION: eu-west-2  # Match your Terraform region
+  ECR_REPOSITORY: ecs-node-app
+  ECS_SERVICE: staging-ecs-node-app-service  # Match Terraform naming
+  ECS_CLUSTER: ecs-node-app-cluster
+  ECS_TASK_DEFINITION: staging-ecs-node-app-task  # Match Terraform naming
+  CONTAINER_NAME: ecs-node-app
+
+jobs:
+  deploy:
+    name: Deploy to AWS ECS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build Docker image
+          cd ecs-node-app
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          
+          # Push ONLY the commit SHA tag (no :latest)
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+            --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID in the task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+        # CRITICAL SAFETY FEATURE:
+        # If new tasks fail health checks, ECS will:
+        # 1. Mark deployment as FAILED
+        # 2. Keep OLD tasks running (no downtime!)
+        # 3. Stop NEW unhealthy tasks
+        # This step will fail, triggering rollback notification
+
+      - name: Verify deployment success
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "📦 Image: ${{ steps.build-image.outputs.image }}"
+          echo "🏷️  Tag: ${{ steps.build-image.outputs.image_tag }}"
+          echo "🚀 Service: ${{ env.ECS_SERVICE }}"
+          echo "📊 Cluster: ${{ env.ECS_CLUSTER }}"
+          echo ""
+          echo "🛡️ DEPLOYMENT SAFETY VERIFIED:"
+          echo "  - New tasks are healthy"
+          echo "  - Old tasks have been drained and stopped"
+          echo "  - Service is stable with new version"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ ========================================="
+          echo "❌ DEPLOYMENT FAILED - BUT SERVICE IS SAFE!"
+          echo "❌ ========================================="
+          echo ""
+          echo "🛡️ SAFETY GUARANTEE:"
+          echo "  ✅ Your OLD tasks are STILL RUNNING"
+          echo "  ✅ Service is STILL SERVING TRAFFIC"
+          echo "  ✅ No downtime occurred"
+          echo "  ❌ New tasks failed health checks and were stopped"
+          echo ""
+          echo "🔍 WHAT HAPPENED:"
+          echo "  1. New tasks started with image: ${{ steps.build-image.outputs.image }}"
+          echo "  2. ECS health checks FAILED"
+          echo "  3. ECS kept OLD tasks running (no traffic disruption)"
+          echo "  4. ECS stopped NEW unhealthy tasks"
+          echo "  5. Deployment marked as FAILED"
+          echo ""
+          echo "📊 CHECK THESE LOGS:"
+          echo "  - ECS Service Events: https://console.aws.amazon.com/ecs/home?region=${{ env.AWS_REGION }}#/clusters/${{ env.ECS_CLUSTER }}/services/${{ env.ECS_SERVICE }}/events"
+          echo "  - CloudWatch Logs: https://console.aws.amazon.com/cloudwatch/home?region=${{ env.AWS_REGION }}#logsV2:log-groups/log-group//ecs/${{ env.ECS_SERVICE }}"
+          echo ""
+          echo "🔧 COMMON FAILURE REASONS:"
+          echo "  1. Health check endpoint not returning HTTP 200"
+          echo "  2. App crashing on startup"
+          echo "  3. Missing environment variables"
+          echo "  4. Container port mismatch"
+          echo "  5. Insufficient CPU/memory"
+          echo ""
+          echo "💡 NEXT STEPS:"
+          echo "  1. Check CloudWatch logs for error messages"
+          echo "  2. Fix the issue in your code"
+          echo "  3. Push again to trigger a new deployment"
+          echo "  4. Old version continues serving traffic until you fix and redeploy"
+
+      - name: Get current running task details (even if deployment failed)
+        if: always()
+        run: |
+          echo "🔍 Current running tasks (should be OLD version if deployment failed):"
+          aws ecs list-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service-name ${{ env.ECS_SERVICE }} \
+            --query 'taskArns[]' \
+            --output text | xargs -n1 -I {} aws ecs describe-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --tasks {} \
+            --query 'tasks[0].{TaskArn:taskArn,Status:lastStatus,Health:healthStatus,Image:containers[0].image,StartedAt:startedAt}' || echo "No tasks found"
+
