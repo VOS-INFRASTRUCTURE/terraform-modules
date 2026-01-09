@@ -1,0 +1,34 @@
+################################################################################
+
+variable "project_id" {
+  description = "Project identifier"
+  type        = string
+}
+
+variable "env" {
+  description = "Environment name (e.g., staging, production)"
+  type        = string
+}
+
+variable "repo_name" {
+  description = "ECR repository name"
+  type        = string
+}
+
+variable "image_tag_mutability" {
+  description = "Tag mutability for ECR images"
+  type        = string
+  default     = "MUTABLE"
+}
+
+variable "scan_on_push" {
+  description = "Enable image scanning on push"
+  type        = bool
+  default     = true
+}
+
+variable "lifecycle_keep_last_count" {
+  description = "Number of most recent images to keep (older images will be deleted)"
+  type        = number
+  default     = 10
+}
