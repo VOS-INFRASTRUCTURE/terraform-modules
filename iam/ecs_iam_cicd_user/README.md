@@ -218,11 +218,10 @@ module "cicd_user_no_keys" {
 
 | Name | Description |
 |------|-------------|
-| cicd | Complete CI/CD configuration object (user, credentials, permissions, setup instructions) |
+| cicd | Complete CI/CD configuration object (user, credentials, permissions) |
 | cicd.user | IAM user details (name, arn, id) |
-| cicd.credentials | Access credentials (access_key_id, secret_access_key, encrypted_secret, warning) |
+| cicd.credentials | Access credentials (access_key_id, secret_access_key, encrypted_secret) |
 | cicd.permissions | Permissions summary (ECR repos, ECS services, log groups, etc.) |
-| cicd.github_actions_setup | GitHub Actions setup instructions with example workflow |
 
 ### Output Structure
 
@@ -239,7 +238,6 @@ output "cicd" {
       access_key_id     = "..."  # AWS Access Key ID
       secret_access_key = "..."  # Secret Access Key (plaintext or null)
       encrypted_secret  = "..."  # Secret Access Key (PGP encrypted or null)
-      warning           = "..."  # Security warning message
     }
     
     permissions = {
@@ -251,8 +249,6 @@ output "cicd" {
       logs_permissions_enabled = true   # Whether CloudWatch Logs is enabled
       log_groups               = [...]  # Log group ARNs
     }
-    
-    github_actions_setup = "..."  # Setup instructions
   }
   sensitive = true
 }
@@ -264,14 +260,15 @@ output "cicd" {
 # View complete output
 terraform output -json cicd
 
-# Get access key ID
+# Get user name
 terraform output -json cicd | jq -r '.user.name'
 
 # Get credentials
-terraform output -json cicd | jq -r '.credentials'
+terraform output -json cicd | jq -r '.credentials.access_key_id'
+terraform output -json cicd | jq -r '.credentials.secret_access_key'
 
-# View setup instructions
-terraform output cicd
+# View permissions
+terraform output -json cicd | jq -r '.permissions'
 ```
 
 ## Permissions Granted
