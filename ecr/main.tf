@@ -4,7 +4,7 @@
 ################################################################################
 
 resource "aws_ecr_repository" "this" {
-  name                 = var.repo_name
+  name                 = "${var.env}-${var.project_id}-${var.repo_suffix_name}"
   image_tag_mutability = var.image_tag_mutability
 
   image_scanning_configuration {

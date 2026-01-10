@@ -10,8 +10,8 @@ variable "env" {
   type        = string
 }
 
-variable "repo_name" {
-  description = "ECR repository name"
+variable "repo_suffix_name" {
+  description = "ECR repository suffix name"
   type        = string
 }
 
