@@ -187,11 +187,8 @@ resource "aws_ecs_task_definition" "task_definition" {
   # Note: If you need to update container config (ports, health checks, etc.),
   #       temporarily set ignore_changes_to_container_definitions = false,
   #       apply changes, then set back to true.
-  dynamic "lifecycle" {
-    for_each = var.ignore_changes_to_container_definitions ? [1] : []
-    content {
-      ignore_changes = [container_definitions]
-    }
+  lifecycle {
+    ignore_changes = [container_definitions]
   }
 
   tags = merge(

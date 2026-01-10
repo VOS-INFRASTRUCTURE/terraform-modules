@@ -187,20 +187,6 @@ variable "health_check_start_period" {
 }
 
 ################################################################################
-# Lifecycle & Deployment Configuration
-################################################################################
-
-variable "ignore_changes_to_container_definitions" {
-  description = <<-EOT
-    Whether to ignore changes to container_definitions in Terraform state.
-    Set to true to allow CI/CD to update image tags without Terraform reverting them.
-    Set to false if you need Terraform to manage all container configuration.
-  EOT
-  type        = bool
-  default     = true
-}
-
-################################################################################
 # Tagging
 ################################################################################
 
