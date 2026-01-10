@@ -1,7 +1,8 @@
 ################################################################################
 
 variable "project_id" {
-  description = "Project identifier"
+  # Use a simple, lowercase identifier without spaces or special characters
+  description = "Project identifier like myapp"
   type        = string
 }
 
@@ -11,7 +12,7 @@ variable "env" {
 }
 
 variable "repo_suffix_name" {
-  description = "ECR repository suffix name"
+  description = "ECR repository suffix name like ecs-node-app"
   type        = string
 }
 
