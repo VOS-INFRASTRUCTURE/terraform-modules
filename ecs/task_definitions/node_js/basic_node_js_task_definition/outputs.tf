@@ -2,70 +2,48 @@
 # Basic Node.js ECS Task Definition - Outputs
 #
 # Purpose: Export task definition and log group details for use in ECS services
+#
+# Usage:
+#   module.node_app_task.task.definition.arn
+#   module.node_app_task.task.definition.family
+#   module.node_app_task.task.container.name
+#   module.node_app_task.task.log_group.name
 ################################################################################
 
-output "task_definition" {
-  description = "Complete ECS Task Definition details"
+output "task" {
+  description = "Complete ECS Task Definition and related resources"
   value = {
-    arn      = aws_ecs_task_definition.task_definition.arn
-    family   = aws_ecs_task_definition.task_definition.family
-    revision = aws_ecs_task_definition.task_definition.revision
+    # Task Definition Details
+    definition = {
+      arn      = aws_ecs_task_definition.task_definition.arn               # ARN without revision
+      family   = aws_ecs_task_definition.task_definition.family            # Task definition family name
+      revision = aws_ecs_task_definition.task_definition.revision          # Current revision number
 
-    # Full ARN with revision number (use this in ECS service)
-    arn_with_revision = "${aws_ecs_task_definition.task_definition.family}:${aws_ecs_task_definition.task_definition.revision}"
+      # Full ARN with revision (use this in ECS service configuration)
+      arn_with_revision = "${aws_ecs_task_definition.task_definition.family}:${aws_ecs_task_definition.task_definition.revision}"
+    }
+
+    # Container Configuration
+    container = {
+      name  = var.container_name                                           # Container name for target group binding
+      port  = var.container_port                                           # Exposed container port
+      image = "${var.ecr_repository_url}:${var.image_tag}"                # Full container image URL with tag
+    }
+
+    # Resource Allocation
+    resources = {
+      cpu    = var.cpu                                                     # CPU units (256 = 0.25 vCPU)
+      memory = var.memory                                                  # Memory in MiB
+    }
+
+    # CloudWatch Logging
+    log_group = var.create_log_group ? {
+      name = aws_cloudwatch_log_group.ecs_task_log_group[0].name          # Log group name
+      arn  = aws_cloudwatch_log_group.ecs_task_log_group[0].arn           # Log group ARN
+    } : {
+      name = var.log_group_name                                            # External log group name
+      arn  = null                                                          # No ARN (managed externally)
+    }
   }
-}
-
-output "task_definition_arn" {
-  description = "ARN of the ECS task definition (without revision)"
-  value       = aws_ecs_task_definition.task_definition.arn
-}
-
-output "task_definition_family" {
-  description = "Family name of the ECS task definition"
-  value       = aws_ecs_task_definition.task_definition.family
-}
-
-output "task_definition_revision" {
-  description = "Revision number of the ECS task definition"
-  value       = aws_ecs_task_definition.task_definition.revision
-}
-
-output "log_group" {
-  description = "CloudWatch Log Group details (if created)"
-  value = var.create_log_group ? {
-    name = aws_cloudwatch_log_group.ecs_task_log_group[0].name
-    arn  = aws_cloudwatch_log_group.ecs_task_log_group[0].arn
-  } : null
-}
-
-output "log_group_name" {
-  description = "Name of the CloudWatch Log Group"
-  value       = var.create_log_group ? aws_cloudwatch_log_group.ecs_task_log_group[0].name : var.log_group_name
-}
-
-output "container_name" {
-  description = "Name of the container defined in the task definition"
-  value       = var.container_name
-}
-
-output "container_port" {
-  description = "Port that the container exposes"
-  value       = var.container_port
-}
-
-output "container_image" {
-  description = "Full container image URL with tag"
-  value       = "${var.ecr_repository_url}:${var.image_tag}"
-}
-
-output "cpu" {
-  description = "CPU units allocated to the task"
-  value       = var.cpu
-}
-
-output "memory" {
-  description = "Memory (MiB) allocated to the task"
-  value       = var.memory
 }
 
