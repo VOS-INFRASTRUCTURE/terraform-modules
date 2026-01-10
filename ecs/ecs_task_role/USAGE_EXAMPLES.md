@@ -512,7 +512,7 @@ aws s3 ls s3://staging-myapp-uploads/
 
 ## Related Documentation
 
-- [TaskRole.md](./TaskRole.md) - Complete module documentation
+- [TaskRole.md](TaskRole.md) - Complete module documentation
 - [ECS Task IAM Roles (AWS Docs)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html)
-- [Task Execution Role Module](../ecs_task_execution_role/)
+- [Task Execution Role Module](../ecs/ecs_task_execution_role/)
 
