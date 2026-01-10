@@ -64,9 +64,9 @@ module "github_actions_cicd_user" {
   project_id  = "node-app"
 }
 
-# Retrieve credentials (store in GitHub Secrets immediately!)
-output "cicd_credentials" {
-  value     = module.github_actions_cicd_user.credentials
+# Output the complete CI/CD configuration
+output "cicd_user" {
+  value     = module.github_actions_cicd_user.cicd
   sensitive = true
 }
 ```
@@ -218,15 +218,61 @@ module "cicd_user_no_keys" {
 
 | Name | Description |
 |------|-------------|
-| user | IAM user details (name, arn, id) |
-| user_name | IAM user name |
-| user_arn | IAM user ARN |
-| access_key_id | Access key ID (sensitive) |
-| secret_access_key | Secret access key (sensitive) |
-| encrypted_secret_access_key | Encrypted secret (if PGP key provided) |
-| credentials | Complete credentials object (sensitive) |
-| github_actions_setup_instructions | Setup instructions for GitHub Actions |
-| permissions_summary | Summary of granted permissions |
+| cicd | Complete CI/CD configuration object (user, credentials, permissions, setup instructions) |
+| cicd.user | IAM user details (name, arn, id) |
+| cicd.credentials | Access credentials (access_key_id, secret_access_key, encrypted_secret, warning) |
+| cicd.permissions | Permissions summary (ECR repos, ECS services, log groups, etc.) |
+| cicd.github_actions_setup | GitHub Actions setup instructions with example workflow |
+
+### Output Structure
+
+```hcl
+output "cicd" {
+  value = {
+    user = {
+      name = "..."  # IAM user name
+      arn  = "..."  # IAM user ARN
+      id   = "..."  # Unique user ID
+    }
+    
+    credentials = {
+      access_key_id     = "..."  # AWS Access Key ID
+      secret_access_key = "..."  # Secret Access Key (plaintext or null)
+      encrypted_secret  = "..."  # Secret Access Key (PGP encrypted or null)
+      warning           = "..."  # Security warning message
+    }
+    
+    permissions = {
+      ecr_repositories         = [...]  # ECR repository ARNs
+      ecs_permissions_enabled  = true   # Whether ECS is enabled
+      ecs_clusters             = [...]  # ECS cluster ARNs
+      ecs_services             = [...]  # ECS service ARNs
+      task_definition_prefixes = [...]  # Task definition family prefixes
+      logs_permissions_enabled = true   # Whether CloudWatch Logs is enabled
+      log_groups               = [...]  # Log group ARNs
+    }
+    
+    github_actions_setup = "..."  # Setup instructions
+  }
+  sensitive = true
+}
+```
+
+### Usage Examples
+
+```bash
+# View complete output
+terraform output -json cicd
+
+# Get access key ID
+terraform output -json cicd | jq -r '.user.name'
+
+# Get credentials
+terraform output -json cicd | jq -r '.credentials'
+
+# View setup instructions
+terraform output cicd
+```
 
 ## Permissions Granted
 
@@ -284,8 +330,12 @@ module "cicd_user_no_keys" {
 ### Step 1: Retrieve Credentials
 
 ```bash
-terraform output -json credentials | jq -r '.access_key_id'
-terraform output -json credentials | jq -r '.secret_access_key'
+# View complete output
+terraform output -json cicd
+
+# Extract specific values
+terraform output -json cicd | jq -r '.credentials.access_key_id'
+terraform output -json cicd | jq -r '.credentials.secret_access_key'
 ```
 
 ### Step 2: Add to GitHub Secrets
