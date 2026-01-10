@@ -37,12 +37,9 @@ output "task" {
     }
 
     # CloudWatch Logging
-    log_group = var.create_log_group ? {
+    log_group = {
       name = aws_cloudwatch_log_group.ecs_task_log_group[0].name          # Log group name
       arn  = aws_cloudwatch_log_group.ecs_task_log_group[0].arn           # Log group ARN
-    } : {
-      name = var.log_group_name                                            # External log group name
-      arn  = null                                                          # No ARN (managed externally)
     }
   }
 }

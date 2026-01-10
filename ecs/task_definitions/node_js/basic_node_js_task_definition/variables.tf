@@ -128,11 +128,6 @@ variable "log_group_name" {
   type        = string
 }
 
-variable "create_log_group" {
-  description = "Whether to create a CloudWatch log group for this task"
-  type        = bool
-  default     = true
-}
 
 variable "log_retention_days" {
   description = "Number of days to retain logs in CloudWatch"
