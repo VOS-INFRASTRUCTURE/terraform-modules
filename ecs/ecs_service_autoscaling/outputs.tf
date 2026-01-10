@@ -30,7 +30,12 @@ output "scaling" {
         scale_in_cooldown  = var.cpu_scale_in_cooldown
         scale_out_cooldown = var.cpu_scale_out_cooldown
       } : {
-        enabled = false
+        enabled            = false
+        name               = null
+        policy_type        = null
+        target_value       = null
+        scale_in_cooldown  = null
+        scale_out_cooldown = null
       }
 
       # Memory-Based Scaling
@@ -42,7 +47,12 @@ output "scaling" {
         scale_in_cooldown  = var.memory_scale_in_cooldown
         scale_out_cooldown = var.memory_scale_out_cooldown
       } : {
-        enabled = false
+        enabled            = false
+        name               = null
+        policy_type        = null
+        target_value       = null
+        scale_in_cooldown  = null
+        scale_out_cooldown = null
       }
 
       # Request Count-Based Scaling
@@ -54,7 +64,12 @@ output "scaling" {
         scale_in_cooldown  = var.request_count_scale_in_cooldown
         scale_out_cooldown = var.request_count_scale_out_cooldown
       } : {
-        enabled = false
+        enabled            = false
+        name               = null
+        policy_type        = null
+        target_value       = null
+        scale_in_cooldown  = null
+        scale_out_cooldown = null
       }
     }
 
@@ -65,6 +80,8 @@ output "scaling" {
       actions = var.scheduled_actions
     } : {
       enabled = false
+      count   = 0
+      actions = []
     }
 
     # CloudWatch Alarms
@@ -73,7 +90,9 @@ output "scaling" {
       max_capacity_alarm_arn = aws_cloudwatch_metric_alarm.max_capacity_alarm[0].arn
       min_capacity_alarm_arn = aws_cloudwatch_metric_alarm.min_capacity_alarm[0].arn
     } : {
-      enabled = false
+      enabled                = false
+      max_capacity_alarm_arn = null
+      min_capacity_alarm_arn = null
     }
   }
 }
