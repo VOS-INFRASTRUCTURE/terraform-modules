@@ -597,9 +597,13 @@ resource "aws_wafv2_web_acl" "cerpac_waf" {
 }
 
 ################################################################################
-# Associate Web ACL with the CERPAC Application Load Balancer
+# Associate Web ACL with Application Load Balancer
+#
+# Note: Only creates association if ALB ARN is provided
 ################################################################################
 resource "aws_wafv2_web_acl_association" "cerpac_alb_waf_assoc" {
-  resource_arn = aws_lb.cerpac_alb.arn
+  count = var.alb_arn != null ? 1 : 0
+
+  resource_arn = var.alb_arn
   web_acl_arn  = aws_wafv2_web_acl.cerpac_waf.arn
 }

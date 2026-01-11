@@ -1,5 +1,18 @@
+################################################################################
+# Kinesis Firehose IAM Role and Policy
+#
+# Purpose: Allow Firehose to write to S3, invoke Lambda, and write logs.
+#
+# Permissions:
+# - S3: Write WAF logs to bucket
+# - Lambda: Invoke log router function
+# - CloudWatch Logs: Write delivery logs
+################################################################################
+
 resource "aws_iam_role" "cerpac_waf_firehose_role" {
-  name = "${var.env}-cerpac-waf-firehose-role"
+  count = var.enable_waf_logging ? 1 : 0
+
+  name = "${var.env}-${var.project_id}-waf-firehose-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -11,15 +24,30 @@ resource "aws_iam_role" "cerpac_waf_firehose_role" {
       Action = "sts:AssumeRole"
     }]
   })
+
+  tags = merge(
+    var.tags,
+    {
+      Name        = "${var.env}-${var.project_id}-waf-firehose-role"
+      Environment = var.env
+      Project     = var.project_id
+      Purpose     = "WAF-Firehose"
+      ManagedBy   = "Terraform"
+    }
+  )
 }
 
 resource "aws_iam_role_policy" "cerpac_waf_firehose_policy" {
-  role = aws_iam_role.cerpac_waf_firehose_role.id
+  count = var.enable_waf_logging ? 1 : 0
+
+  name = "${var.env}-${var.project_id}-waf-firehose-policy"
+  role = aws_iam_role.cerpac_waf_firehose_role[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "S3Access"
         Effect = "Allow"
         Action = [
           "s3:PutObject",
@@ -28,23 +56,28 @@ resource "aws_iam_role_policy" "cerpac_waf_firehose_policy" {
           "s3:ListBucket"
         ]
         Resource = [
-          aws_s3_bucket.cerpac_waf_logs.arn,
-          "${aws_s3_bucket.cerpac_waf_logs.arn}/*"
+          aws_s3_bucket.cerpac_waf_logs[0].arn,
+          "${aws_s3_bucket.cerpac_waf_logs[0].arn}/*"
         ]
       },
       {
+        Sid    = "LambdaInvoke"
         Effect = "Allow"
         Action = [
-          "lambda:InvokeFunction"
+          "lambda:InvokeFunction",
+          "lambda:GetFunctionConfiguration"
         ]
-        Resource = aws_lambda_function.cerpac_waf_log_router.arn
+        Resource = aws_lambda_function.cerpac_waf_log_router[0].arn
       },
       {
+        Sid    = "CloudWatchLogs"
         Effect = "Allow"
         Action = [
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:CreateLogStream",
+          "logs:CreateLogGroup"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/firehose/*"
       }
     ]
   })
