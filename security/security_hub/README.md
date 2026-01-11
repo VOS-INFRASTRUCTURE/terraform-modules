@@ -60,8 +60,16 @@ module "security_hub" {
   env        = "production"
   project_id = "cerpac"
 
-  # Enable Security Hub and standards
+  # Enable Security Hub
   enable_security_hub = true
+
+  # Enable specific standards (choose what you need)
+  enable_aws_foundational_standard  = true   # AWS Best Practices
+  enable_cis_standard               = true   # CIS Benchmark
+  enable_resource_tagging_standard  = false  # Optional
+
+  # Enable GuardDuty integration
+  enable_guardduty_integration = true
 
   # Enable alerting
   enable_security_alerting = true
@@ -83,8 +91,16 @@ module "security_hub" {
   env        = "production"
   project_id = "cerpac"
 
-  # Enable all features
+  # Enable Security Hub with all standards
   enable_security_hub               = true
+  enable_aws_foundational_standard  = true
+  enable_cis_standard               = true
+  enable_resource_tagging_standard  = true
+
+  # Enable GuardDuty integration
+  enable_guardduty_integration = true
+
+  # Enable alerting features
   enable_security_alerting          = true
   enable_cloudtrail_security_alarms = true
   enable_cloudtrail_infra_alarms    = true
@@ -100,6 +116,37 @@ module "security_hub" {
 }
 ```
 
+### Selective Standards (AWS Foundational Only)
+
+```terraform
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Enable Security Hub
+  enable_security_hub = true
+
+  # Enable only AWS Foundational standard
+  enable_aws_foundational_standard  = true
+  enable_cis_standard               = false  # Disable CIS
+  enable_resource_tagging_standard  = false  # Disable tagging
+
+  # Enable GuardDuty integration
+  enable_guardduty_integration = true
+
+  # Alerting
+  enable_security_alerting          = true
+  security_alerts_sns_topic_arn     = aws_sns_topic.security_alerts.arn
+  security_alert_email              = "security@company.com"
+
+  # Disable CloudTrail alarms if not needed
+  enable_cloudtrail_security_alarms = false
+  enable_cloudtrail_infra_alarms    = false
+}
+```
+
 ### Minimal Configuration (Security Hub Only, No Alarms)
 
 ```terraform
@@ -109,8 +156,14 @@ module "security_hub" {
   env        = "production"
   project_id = "cerpac"
 
-  # Enable Security Hub only
-  enable_security_hub = true
+  # Enable Security Hub with minimal standards
+  enable_security_hub              = true
+  enable_aws_foundational_standard = true
+  enable_cis_standard              = false
+  enable_resource_tagging_standard = false
+
+  # Disable GuardDuty integration if not using GuardDuty
+  enable_guardduty_integration = false
 
   # Disable alarms and alerting
   enable_security_alerting          = false
@@ -666,7 +719,11 @@ aws lambda get-function-configuration \
 |----------|------|---------|----------|-------------|
 | `env` | string | - | Yes | Environment name |
 | `project_id` | string | - | Yes | Project identifier |
-| `enable_security_hub` | bool | `true` | No | Enable Security Hub |
+| `enable_security_hub` | bool | `true` | No | Enable Security Hub (master toggle) |
+| `enable_aws_foundational_standard` | bool | `true` | No | Enable AWS Foundational Security Best Practices v1.0.0 |
+| `enable_cis_standard` | bool | `true` | No | Enable CIS AWS Foundations Benchmark v5.0.0 |
+| `enable_resource_tagging_standard` | bool | `false` | No | Enable AWS Resource Tagging Standard v1.0.0 |
+| `enable_guardduty_integration` | bool | `true` | No | Enable GuardDuty product subscription |
 | `enable_security_alerting` | bool | `true` | No | Enable SNS/EventBridge alerting |
 | `enable_cloudtrail_security_alarms` | bool | `true` | No | Enable CIS benchmark alarms |
 | `enable_cloudtrail_infra_alarms` | bool | `true` | No | Enable infrastructure change alarms |

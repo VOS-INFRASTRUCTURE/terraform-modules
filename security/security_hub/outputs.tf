@@ -21,16 +21,16 @@ output "security_hub" {
       region     = data.aws_region.current.name
       enabled    = true
 
-      # Standards subscribed
+      # Standards subscribed (only shows enabled standards)
       standards = {
-        aws_foundational = aws_securityhub_standards_subscription.aws_foundational[0].standards_arn
-        cis_benchmark    = aws_securityhub_standards_subscription.cis_v500[0].standards_arn
-        resource_tagging = aws_securityhub_standards_subscription.resource_tagging[0].standards_arn
+        aws_foundational = var.enable_aws_foundational_standard ? aws_securityhub_standards_subscription.aws_foundational[0].standards_arn : null
+        cis_benchmark    = var.enable_cis_standard ? aws_securityhub_standards_subscription.cis_v500[0].standards_arn : null
+        resource_tagging = var.enable_resource_tagging_standard ? aws_securityhub_standards_subscription.resource_tagging[0].standards_arn : null
       }
 
-      # Product integrations
+      # Product integrations (only shows enabled integrations)
       products = {
-        guardduty = aws_securityhub_product_subscription.guardduty[0].product_arn
+        guardduty = var.enable_guardduty_integration ? aws_securityhub_product_subscription.guardduty[0].product_arn : null
       }
     } : null
 
@@ -94,12 +94,27 @@ output "security_hub" {
       module_enabled                 = true
       environment                    = var.env
       project_id                     = var.project_id
+
+      # Security Hub configuration
       security_hub_enabled           = var.enable_security_hub
+      aws_foundational_enabled       = var.enable_aws_foundational_standard
+      cis_benchmark_enabled          = var.enable_cis_standard
+      resource_tagging_enabled       = var.enable_resource_tagging_standard
+      guardduty_integration_enabled  = var.enable_guardduty_integration
+
+      # Alerting configuration
       security_alerting_enabled      = var.enable_security_alerting
       security_alarms_enabled        = var.enable_cloudtrail_security_alarms
       infrastructure_alarms_enabled  = var.enable_cloudtrail_infra_alarms
       slack_integration_enabled      = var.security_slack_webhook_url != null
       email_alerts_enabled           = var.security_alert_email != null
+
+      # Totals
+      total_standards_enabled        = (
+        (var.enable_aws_foundational_standard ? 1 : 0) +
+        (var.enable_cis_standard ? 1 : 0) +
+        (var.enable_resource_tagging_standard ? 1 : 0)
+      )
       total_alarms                   = (
         (var.enable_cloudtrail_security_alarms ? 5 : 0) +
         (var.enable_cloudtrail_infra_alarms ? 3 : 0)
