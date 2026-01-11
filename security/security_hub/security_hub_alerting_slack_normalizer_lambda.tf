@@ -4,14 +4,6 @@
 # Related: lambda/security_alert_normalizer.py, env LOG_LEVEL, SLACK_WEBHOOK_URL
 ################################################################################
 
-locals {
-  lambda_name = "${var.env}-cerpac-sns-to-slack"
-  lambda_tags = {
-    Environment = var.env
-    ManagedBy   = "Terraform"
-  }
-}
-
 ################################################################################
 # SECURITY ALERT NORMALIZER – SLACK FORWARDER LAMBDA
 ################################################################################

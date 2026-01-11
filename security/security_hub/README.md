@@ -46,7 +46,7 @@ security_hub/
 ## Prerequisites
 
 - AWS CloudTrail configured with CloudWatch Logs integration
-- CloudWatch Log Group: `/aws/cloudtrail/${env}-cerpac-audit-trail`
+- CloudWatch Log Group: `/aws/cloudtrail/${env}-audit-trail`
 - **AWS Config enabled** (required for Security Hub standards - many controls use Config Rules)
 - (Optional) Slack webhook URL for Slack notifications
 - (Optional) GuardDuty enabled for threat detection
@@ -335,7 +335,7 @@ output "security_hub" {
     # Alerting infrastructure
     alerting = {
       sns_topic_arn      = "arn:aws:sns:..."
-      sns_topic_name     = "production-cerpac-security-alerts"
+      sns_topic_name     = "production-security-alerts"
       email_subscription = "security@company.com"
       
       eventbridge = {
@@ -344,7 +344,7 @@ output "security_hub" {
       }
       
       lambda = {
-        function_name = "production-cerpac-security-alert-normalizer"
+        function_name = "production-security-alert-normalizer"
         function_arn  = "arn:aws:lambda:..."
         role_arn      = "arn:aws:iam::..."
       }
@@ -862,7 +862,7 @@ aws sts get-caller-identity
 
 # Check metric filter
 aws logs describe-metric-filters \
-  --log-group-name /aws/cloudtrail/production-cerpac-audit-trail
+  --log-group-name /aws/cloudtrail/production-audit-trail
 ```
 
 ### Lambda Not Forwarding to Slack
@@ -877,17 +877,17 @@ aws logs describe-metric-filters \
 **Fix**:
 ```bash
 # Check Lambda logs
-aws logs tail /aws/lambda/production-cerpac-security-alert-normalizer --follow
+aws logs tail /aws/lambda/production-security-alert-normalizer --follow
 
 # Test Lambda manually
 aws lambda invoke \
-  --function-name production-cerpac-security-alert-normalizer \
+  --function-name production-security-alert-normalizer \
   --payload file://test-event.json \
   response.json
 
 # Check Lambda environment variables
 aws lambda get-function-configuration \
-  --function-name production-cerpac-security-alert-normalizer
+  --function-name production-security-alert-normalizer
 ```
 
 ### High Security Hub Costs

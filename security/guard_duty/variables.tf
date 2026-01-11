@@ -62,60 +62,40 @@ variable "finding_publishing_frequency" {
 #
 # Toggle individual protection capabilities for cost optimization.
 # Each feature adds additional monitoring and costs.
+#
+# Note: All features are enabled via aws_guardduty_detector_feature resources
+#       The old datasources {} block is deprecated.
 ################################################################################
 
-variable "enable_s3_protection" {
-  description = "Enable S3 protection (monitors S3 data events for suspicious activity)"
+variable "enable_s3_data_events" {
+  description = "Enable S3 data events monitoring (monitors S3 object-level API calls for suspicious activity). Cost: ~$0.20/GB analyzed"
   type        = bool
   default     = true
 }
 
-variable "enable_eks_protection" {
-  description = "Enable EKS protection (monitors Kubernetes audit logs)"
+variable "enable_eks_audit_logs" {
+  description = "Enable EKS audit logs monitoring (analyzes Kubernetes API audit logs). Cost: ~$0.012/GB. Only enable if you have EKS clusters."
   type        = bool
   default     = false  # Only enable if you have EKS clusters
 }
 
-variable "enable_malware_protection" {
-  description = "Enable malware protection (scans EBS volumes when suspicious activity is detected)"
-  type        = bool
-  default     = true
-}
-
 variable "enable_rds_protection" {
-  description = "Enable RDS protection (monitors database login activity)"
+  description = "Enable RDS login activity monitoring (monitors database login attempts). Cost: Included in base GuardDuty pricing."
   type        = bool
   default     = true
 }
 
 variable "enable_lambda_protection" {
-  description = "Enable Lambda protection (monitors Lambda network activity)"
+  description = "Enable Lambda network activity monitoring (monitors Lambda function network activity). Cost: Included in base GuardDuty pricing."
   type        = bool
   default     = true
 }
 
-################################################################################
-# Advanced GuardDuty Features (Detector Features)
-#
-# These are advanced features that require explicit enabling via detector_feature
-# resources. They provide additional threat detection beyond the base detector.
-################################################################################
-
-variable "enable_s3_data_events" {
-  description = "Enable S3 data events monitoring (additional S3 protection beyond base S3 protection)"
-  type        = bool
-  default     = false  # Additional cost - enable if you need granular S3 monitoring
-}
-
-variable "enable_eks_audit_logs" {
-  description = "Enable EKS audit logs monitoring (requires EKS clusters)"
-  type        = bool
-  default     = false  # Only enable if you have EKS clusters
-}
-
 variable "enable_ebs_malware_protection" {
-  description = "Enable EBS malware protection (scans EBS volumes for malware)"
+  description = "Enable EBS malware protection (scans EBS volumes when suspicious activity is detected). Cost: $0.10/GB scanned (only when triggered)."
   type        = bool
-  default     = false  # Additional cost - enable for high-security environments
+  default     = true
 }
+
+
 

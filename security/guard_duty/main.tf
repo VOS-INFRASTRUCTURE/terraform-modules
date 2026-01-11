@@ -56,26 +56,9 @@ resource "aws_guardduty_detector" "this" {
   # FIFTEEN_MINUTES | SIX_HOURS | ONE_HOUR
   finding_publishing_frequency = var.finding_publishing_frequency
 
-  # Enable EBS volume scanning for malware (additional cost)
-  datasources {
-    s3 {
-      enable = var.enable_s3_protection
-    }
-
-    kubernetes {
-      audit_logs {
-        enable = var.enable_eks_protection
-      }
-    }
-
-    malware_protection {
-      scan_ec2_instance_with_findings {
-        ebs_volumes {
-          enable = var.enable_malware_protection
-        }
-      }
-    }
-  }
+  # Note: Data sources (S3, EKS, RDS, Lambda, EBS Malware) are enabled
+  #       via separate aws_guardduty_detector_feature resources below.
+  #       The old datasources {} block is deprecated.
 
   tags = merge(
     var.tags,
