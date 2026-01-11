@@ -1,0 +1,616 @@
+# AWS GuardDuty Terraform Module
+
+Terraform module to enable and configure Amazon GuardDuty for intelligent threat detection using machine learning and threat intelligence.
+
+## Overview
+
+Amazon GuardDuty is a threat detection service that continuously monitors your AWS accounts and workloads for malicious activity and unauthorized behavior.
+
+- **Machine Learning**: Analyzes billions of events to detect anomalies
+- **Threat Intelligence**: Uses AWS and third-party threat feeds
+- **Multi-Source Analysis**: CloudTrail, VPC Flow Logs, DNS logs, and more
+- **Automated Detection**: No manual configuration of rules required
+- **Real-Time Alerts**: Findings published within 15 minutes to 6 hours
+
+## Module Structure
+
+```
+guard_duty/
+├── main.tf       # GuardDuty detector and protection features
+├── variables.tf  # Input variables
+├── outputs.tf    # Module outputs (single 'guardduty' object)
+└── README.md     # This file
+```
+
+## Features
+
+✅ **Base Detector**: CloudTrail, VPC Flow Logs, DNS logs analysis  
+✅ **S3 Protection**: Monitor S3 data events for malicious activity  
+✅ **EKS Protection**: Kubernetes audit log analysis  
+✅ **RDS Protection**: Database login activity monitoring  
+✅ **Lambda Protection**: Serverless function threat detection  
+✅ **Malware Protection**: EBS volume scanning for malware  
+✅ **Configurable Frequency**: 15 minutes to 6 hours finding publication  
+
+## Prerequisites
+
+- AWS account with GuardDuty permissions
+- (Optional) EKS clusters for EKS protection
+- (Optional) RDS instances for RDS protection
+- (Optional) Lambda functions for Lambda protection
+
+## Usage
+
+### Basic Configuration (Recommended for Production)
+
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Enable GuardDuty
+  enable_guardduty = true
+
+  # Finding publication frequency
+  finding_publishing_frequency = "FIFTEEN_MINUTES"  # Real-time alerting
+
+  # Core protection features
+  enable_s3_protection       = true   # Monitor S3 for threats
+  enable_malware_protection  = true   # Scan EBS volumes for malware
+  enable_rds_protection      = true   # Monitor database logins
+  enable_lambda_protection   = true   # Monitor Lambda network activity
+
+  # EKS protection (only if you have EKS clusters)
+  enable_eks_protection = false
+
+  # Advanced features (additional cost)
+  enable_s3_data_events         = false  # Granular S3 monitoring
+  enable_eks_audit_logs         = false  # EKS Kubernetes API monitoring
+  enable_ebs_malware_protection = false  # EBS malware scanning
+
+  tags = {
+    ManagedBy   = "Terraform"
+    CostCenter  = "Security"
+    Compliance  = "Required"
+  }
+}
+```
+
+### Minimal Configuration (Development/Testing)
+
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "development"
+  project_id = "my-project"
+
+  # Basic GuardDuty only
+  enable_guardduty = true
+
+  # Longer frequency for cost savings
+  finding_publishing_frequency = "SIX_HOURS"
+
+  # Disable optional features
+  enable_s3_protection       = false
+  enable_malware_protection  = false
+  enable_rds_protection      = false
+  enable_lambda_protection   = false
+  enable_eks_protection      = false
+
+  tags = {
+    Environment = "dev"
+  }
+}
+```
+
+### Full Protection (High Security Environment)
+
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  enable_guardduty             = true
+  finding_publishing_frequency = "FIFTEEN_MINUTES"
+
+  # Enable all core protections
+  enable_s3_protection       = true
+  enable_eks_protection      = true   # If you have EKS
+  enable_malware_protection  = true
+  enable_rds_protection      = true
+  enable_lambda_protection   = true
+
+  # Enable all advanced features
+  enable_s3_data_events         = true
+  enable_eks_audit_logs         = true   # If you have EKS
+  enable_ebs_malware_protection = true
+
+  tags = {
+    ManagedBy   = "Terraform"
+    Compliance  = "SOC2-PCI-HIPAA"
+    DataClass   = "HighSecurity"
+  }
+}
+```
+
+## Outputs
+
+This module provides a single comprehensive `guardduty` output object:
+
+```terraform
+output "guardduty" {
+  value = {
+    # Detector - Core GuardDuty service
+    detector = {
+      id                           = "abc123..."
+      arn                          = "arn:aws:guardduty:eu-west-2:123456789012:detector/abc123"
+      account_id                   = "123456789012"
+      finding_publishing_frequency = "FIFTEEN_MINUTES"
+      status                       = "ENABLED"
+    }
+
+    # Data Sources - What GuardDuty monitors
+    data_sources = {
+      cloudtrail       = true   # API call monitoring
+      vpc_flow_logs    = true   # Network traffic analysis
+      dns_logs         = true   # DNS query analysis
+      s3_logs          = true   # S3 data event monitoring
+      kubernetes_logs  = false  # EKS audit logs (if enabled)
+      malware_scanning = true   # EBS malware scanning
+    }
+
+    # Protection Features - Advanced capabilities
+    features = {
+      s3_data_events         = false
+      eks_audit_logs         = false
+      rds_login_events       = true
+      lambda_network_logs    = true
+      ebs_malware_protection = false
+    }
+
+    # Configuration Summary
+    summary = {
+      module_enabled             = true
+      environment                = "production"
+      project_id                 = "cerpac"
+      total_features_enabled     = 3
+      total_data_sources_enabled = 6
+    }
+  }
+}
+```
+
+### Using Outputs
+
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+  # ...configuration...
+}
+
+# Access detector ID
+output "guardduty_detector_id" {
+  value = module.guardduty.guardduty.detector.id
+}
+
+# Use in EventBridge rules
+resource "aws_cloudwatch_event_rule" "guardduty_findings" {
+  name        = "guardduty-high-severity-findings"
+  description = "Capture high severity GuardDuty findings"
+
+  event_pattern = jsonencode({
+    source      = ["aws.guardduty"]
+    detail-type = ["GuardDuty Finding"]
+    detail = {
+      severity = [7, 8, 9]  # High severity only
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "sns" {
+  rule      = aws_cloudwatch_event_rule.guardduty_findings.name
+  target_id = "SendToSNS"
+  arn       = aws_sns_topic.security_alerts.arn
+}
+
+# Reference in Security Hub
+resource "aws_securityhub_product_subscription" "guardduty" {
+  product_arn = "arn:aws:securityhub:${data.aws_region.current.name}::product/aws/guardduty"
+  
+  depends_on = [module.guardduty]
+}
+```
+
+## Cost Estimate
+
+### Typical Production Environment
+
+| Component | Volume | Unit Cost | Monthly Cost |
+|-----------|--------|-----------|--------------|
+| **CloudTrail Analysis** | 1M events | $4.40/M events | $4.40 |
+| **VPC Flow Logs Analysis** | 50 GB | $1.18/GB | $59.00 |
+| **DNS Logs Analysis** | 5M queries | $0.40/M queries | $2.00 |
+| **S3 Protection** | 100 GB | $0.20/GB | $20.00 |
+| **RDS Protection** | Included | Free | $0.00 |
+| **Lambda Protection** | Included | Free | $0.00 |
+| **EKS Audit Logs** | 10 GB | $0.012/GB | $0.12 |
+| **EBS Malware Scanning** | 5 scans × 20 GB | $0.10/GB | $10.00 |
+| **TOTAL** | | | **~$95.52/month** |
+
+### Cost Optimization Tips
+
+1. **Adjust Finding Frequency**: Use `SIX_HOURS` in dev/test environments
+   ```terraform
+   finding_publishing_frequency = "SIX_HOURS"
+   ```
+
+2. **Disable Unused Features**: Only enable features for resources you use
+   ```terraform
+   enable_eks_protection = false  # If no EKS clusters
+   enable_s3_data_events = false  # If basic S3 protection is sufficient
+   ```
+
+3. **Use Trusted IP Lists**: Exclude known safe IPs from analysis
+   ```terraform
+   resource "aws_guardduty_ipset" "trusted_ips" {
+     activate    = true
+     detector_id = module.guardduty.guardduty.detector.id
+     format      = "TXT"
+     location    = "s3://my-bucket/trusted-ips.txt"
+     name        = "TrustedIPs"
+   }
+   ```
+
+4. **Use Threat Intel Lists**: Suppress findings for known false positives
+   ```terraform
+   resource "aws_guardduty_threatintelset" "custom_threats" {
+     activate    = true
+     detector_id = module.guardduty.guardduty.detector.id
+     format      = "TXT"
+     location    = "s3://my-bucket/threat-intel.txt"
+     name        = "CustomThreats"
+   }
+   ```
+
+## Threat Detection Capabilities
+
+### What GuardDuty Detects
+
+| Category | Threat Types | Example Findings |
+|----------|-------------|------------------|
+| **Reconnaissance** | Port scanning, unusual API calls | `Recon:EC2/PortProbeUnprotectedPort` |
+| **Instance Compromise** | Malware, backdoors, crypto mining | `CryptoCurrency:EC2/BitcoinTool.B!DNS` |
+| **Account Compromise** | Stolen credentials, unusual login | `UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration` |
+| **Bucket Compromise** | Data exfiltration, policy changes | `Exfiltration:S3/ObjectRead.Unusual` |
+| **Malware** | Trojan, rootkit, ransomware | `Trojan:EC2/BlackholeTraffic` |
+| **Backdoor** | C2 communication, unusual protocols | `Backdoor:EC2/C&CActivity.B!DNS` |
+
+### Finding Severity Levels
+
+| Severity | Score | Description | Action |
+|----------|-------|-------------|--------|
+| **Low** | 0.1 - 3.9 | Suspicious activity | Review periodically |
+| **Medium** | 4.0 - 6.9 | Potentially malicious | Investigate within 24 hours |
+| **High** | 7.0 - 8.9 | Malicious activity | Investigate immediately |
+| **Critical** | 9.0 | Active threat | Respond immediately |
+
+## Integration with Security Services
+
+### 1. Amazon SNS (Real-Time Alerts)
+
+```terraform
+# SNS topic for GuardDuty findings
+resource "aws_sns_topic" "guardduty_alerts" {
+  name = "guardduty-high-severity-alerts"
+}
+
+resource "aws_sns_topic_subscription" "security_team" {
+  topic_arn = aws_sns_topic.guardduty_alerts.arn
+  protocol  = "email"
+  endpoint  = "security@company.com"
+}
+
+# EventBridge rule to send findings to SNS
+resource "aws_cloudwatch_event_rule" "guardduty_high_severity" {
+  name        = "guardduty-high-severity-findings"
+  description = "Alert on high severity GuardDuty findings"
+
+  event_pattern = jsonencode({
+    source      = ["aws.guardduty"]
+    detail-type = ["GuardDuty Finding"]
+    detail = {
+      severity = [
+        { numeric = [">=", 7] }  # High and Critical findings only
+      ]
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "sns" {
+  rule      = aws_cloudwatch_event_rule.guardduty_high_severity.name
+  target_id = "SendToSNS"
+  arn       = aws_sns_topic.guardduty_alerts.arn
+}
+```
+
+### 2. AWS Security Hub
+
+```terraform
+# Enable Security Hub
+resource "aws_securityhub_account" "main" {}
+
+# Subscribe to GuardDuty findings in Security Hub
+resource "aws_securityhub_product_subscription" "guardduty" {
+  product_arn = "arn:aws:securityhub:${data.aws_region.current.name}::product/aws/guardduty"
+  
+  depends_on = [
+    aws_securityhub_account.main,
+    module.guardduty
+  ]
+}
+```
+
+### 3. AWS Lambda (Automated Response)
+
+```terraform
+# Lambda function for automated response
+resource "aws_lambda_function" "guardduty_response" {
+  filename      = "guardduty_response.zip"
+  function_name = "guardduty-automated-response"
+  role          = aws_iam_role.lambda_guardduty.arn
+  handler       = "index.handler"
+  runtime       = "python3.11"
+
+  environment {
+    variables = {
+      SNS_TOPIC_ARN = aws_sns_topic.guardduty_alerts.arn
+    }
+  }
+}
+
+# EventBridge rule to trigger Lambda
+resource "aws_cloudwatch_event_target" "lambda" {
+  rule      = aws_cloudwatch_event_rule.guardduty_high_severity.name
+  target_id = "TriggerLambda"
+  arn       = aws_lambda_function.guardduty_response.arn
+}
+```
+
+### 4. Amazon Detective (Investigation)
+
+```terraform
+# Enable Detective for forensic investigation
+resource "aws_detective_graph" "main" {
+  tags = {
+    Name = "production-detective"
+  }
+  
+  depends_on = [module.guardduty]
+}
+
+# Detective automatically ingests GuardDuty findings
+```
+
+## Viewing GuardDuty Findings
+
+### AWS Console
+
+1. Navigate to **GuardDuty** → **Findings**
+2. Filter by severity, threat type, or resource
+3. Click finding for detailed analysis
+
+### AWS CLI
+
+```bash
+# List all findings
+aws guardduty list-findings \
+  --detector-id abc123... \
+  --finding-criteria '{"Criterion":{"severity":{"Gte":7}}}'
+
+# Get finding details
+aws guardduty get-findings \
+  --detector-id abc123... \
+  --finding-ids finding-id-123
+```
+
+### CloudWatch Logs Insights
+
+```sql
+# Query GuardDuty findings (if exported to CloudWatch)
+fields @timestamp, detail.severity, detail.type, detail.resource.instanceDetails.instanceId
+| filter detail.severity >= 7
+| sort @timestamp desc
+| limit 100
+```
+
+## Responding to Findings
+
+### Example: Compromised EC2 Instance
+
+**Finding**: `Backdoor:EC2/C&CActivity.B!DNS` (Severity: 8.0)
+
+**Immediate Actions**:
+1. Isolate the instance (change security group)
+2. Snapshot EBS volumes for forensics
+3. Disable instance metadata service access
+4. Rotate credentials used by the instance
+
+**Investigation**:
+1. Review CloudTrail logs for API calls from the instance
+2. Check VPC Flow Logs for network connections
+3. Scan EBS volumes with GuardDuty malware protection
+4. Use Amazon Detective for timeline analysis
+
+**Remediation**:
+```bash
+# Isolate instance (change security group to deny all)
+aws ec2 modify-instance-attribute \
+  --instance-id i-0123456789abcdef \
+  --groups sg-quarantine
+
+# Create forensic snapshot
+aws ec2 create-snapshot \
+  --volume-id vol-0123456789abcdef \
+  --description "Forensic snapshot - GuardDuty finding"
+
+# Stop instance
+aws ec2 stop-instances --instance-ids i-0123456789abcdef
+```
+
+### Example: S3 Data Exfiltration
+
+**Finding**: `Exfiltration:S3/ObjectRead.Unusual` (Severity: 7.5)
+
+**Immediate Actions**:
+1. Review S3 access logs
+2. Check IAM credentials used
+3. Enable S3 Object Lock if not already enabled
+4. Rotate compromised credentials
+
+**Investigation**:
+```bash
+# Review S3 access logs
+aws s3api get-bucket-logging --bucket my-bucket
+
+# List recent access events
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=my-bucket \
+  --max-results 50
+```
+
+## Troubleshooting
+
+### GuardDuty Not Detecting Threats
+
+**Issue**: No findings appearing
+
+**Possible Causes**:
+1. Detector not enabled
+2. No actual threats in environment (good!)
+3. Trusted IP list excluding legitimate threats
+
+**Verification**:
+```bash
+# Check detector status
+aws guardduty get-detector --detector-id abc123...
+
+# List all findings (even low severity)
+aws guardduty list-findings --detector-id abc123...
+```
+
+### High False Positive Rate
+
+**Issue**: Too many low-severity findings
+
+**Solutions**:
+1. Add trusted IPs to suppression list
+2. Use finding suppression rules
+3. Archive low-severity findings
+
+```terraform
+# Suppress specific finding types
+resource "aws_guardduty_filter" "suppress_low_severity" {
+  detector_id = module.guardduty.guardduty.detector.id
+  name        = "suppress-low-severity"
+  action      = "ARCHIVE"
+  rank        = 1
+
+  finding_criteria {
+    criterion {
+      field  = "severity"
+      less_than = "4"
+    }
+  }
+}
+```
+
+### Missing EKS/RDS Findings
+
+**Issue**: No findings for EKS/RDS
+
+**Possible Causes**:
+1. Protection not enabled
+2. No EKS clusters or RDS instances in account
+3. No malicious activity detected
+
+**Fix**: Verify protection is enabled
+```terraform
+enable_eks_protection = true
+enable_rds_protection = true
+```
+
+## Best Practices
+
+### ✅ Recommended
+
+- [x] Enable GuardDuty in all regions
+- [x] Use `FIFTEEN_MINUTES` frequency in production
+- [x] Enable S3, RDS, and Lambda protection
+- [x] Set up SNS alerts for high-severity findings
+- [x] Integrate with Security Hub for centralized view
+- [x] Create automated response playbooks
+- [x] Review findings weekly
+- [x] Archive false positives to reduce noise
+
+### ❌ Avoid
+
+- [ ] Disabling GuardDuty to save costs (security > cost)
+- [ ] Ignoring medium-severity findings
+- [ ] Using only CloudWatch Events without SNS
+- [ ] Not investigating high-severity findings
+- [ ] Enabling all features without understanding costs
+- [ ] Not documenting suppression rules
+
+## Compliance Mapping
+
+| Standard | Requirement | Status |
+|----------|-------------|--------|
+| **CIS AWS Foundations** | Threat detection enabled | ✅ Met |
+| **PCI-DSS 10.6** | Review logs for anomalies | ✅ Met |
+| **HIPAA 164.308(a)(1)** | Threat and vulnerability analysis | ✅ Met |
+| **SOC 2 CC7.2** | System monitoring | ✅ Met |
+| **NIST 800-53 SI-4** | System monitoring | ✅ Met |
+| **ISO 27001 A.12.4.1** | Event logging and monitoring | ✅ Met |
+
+## Variables Reference
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enable_guardduty` | bool | `true` | Enable/disable GuardDuty |
+| `env` | string | Required | Environment name |
+| `project_id` | string | Required | Project identifier |
+| `tags` | map(string) | `{}` | Additional tags |
+| `finding_publishing_frequency` | string | `FIFTEEN_MINUTES` | Finding publication frequency |
+| `enable_s3_protection` | bool | `true` | Enable S3 protection |
+| `enable_eks_protection` | bool | `false` | Enable EKS protection |
+| `enable_malware_protection` | bool | `true` | Enable malware protection |
+| `enable_rds_protection` | bool | `true` | Enable RDS protection |
+| `enable_lambda_protection` | bool | `true` | Enable Lambda protection |
+| `enable_s3_data_events` | bool | `false` | Enable S3 data events |
+| `enable_eks_audit_logs` | bool | `false` | Enable EKS audit logs |
+| `enable_ebs_malware_protection` | bool | `false` | Enable EBS malware scanning |
+
+## Related Modules
+
+- **CloudTrail**: API audit logging
+- **AWS Config**: Configuration compliance
+- **Security Hub**: Centralized security findings
+- **Amazon Detective**: Security investigation
+
+## Support
+
+For issues or questions:
+- Internal: Contact Security Team
+- Documentation: See [AWS GuardDuty Documentation](https://docs.aws.amazon.com/guardduty/)
+
+---
+
+**Last Updated**: January 11, 2026  
+**Version**: 1.0.0  
+**Maintained By**: Security Team
+
