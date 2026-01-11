@@ -38,8 +38,9 @@ security_hub/
 ✅ **GuardDuty Integration**: Threat detection findings in Security Hub  
 ✅ **CIS Alarms**: 5 critical security alarms (root usage, unauthorized API calls, etc.)  
 ✅ **Infrastructure Alarms**: 3 change detection alarms (SG, VPC, S3 policies)  
-✅ **Dual Delivery**: Email via SNS + Slack via Lambda  
-✅ **Intelligent Filtering**: Only HIGH/CRITICAL findings sent to Slack  
+✅ **Dual Delivery**: Email via SNS/SES + Slack via Lambda  
+✅ **Beautiful HTML Emails**: Lambda-formatted emails with color-coding and remediation  
+✅ **Intelligent Filtering**: Only HIGH/CRITICAL findings sent to Slack and formatted emails  
 ✅ **EventBridge Routing**: Flexible findings distribution  
 
 ## Prerequisites
@@ -115,6 +116,50 @@ module "security_hub" {
   security_slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 }
 ```
+
+### Full Configuration (with Beautiful HTML Emails via SES)
+
+```terraform
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Enable Security Hub with all standards
+  enable_security_hub               = true
+  enable_aws_foundational_standard  = true
+  enable_cis_standard               = true
+  enable_resource_tagging_standard  = true
+
+  # Enable GuardDuty integration
+  enable_guardduty_integration = true
+
+  # Enable alerting features
+  enable_security_alerting          = true
+  enable_cloudtrail_security_alarms = true
+  enable_cloudtrail_infra_alarms    = true
+
+  # SNS topic for alerts
+  security_alerts_sns_topic_arn = aws_sns_topic.security_alerts.arn
+
+  # Beautiful HTML emails via Lambda + SES (HIGH/CRITICAL only)
+  enable_email_handler = true
+  ses_from_email       = "security-alerts@company.com"  # Must be verified in SES
+  ses_to_emails        = [
+    "security-team@company.com",
+    "oncall@company.com"
+  ]
+
+  # Optional: Also send to Slack
+  security_slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+}
+```
+
+**Note**: Before using the email handler, you must:
+1. Verify the sender email address in Amazon SES
+2. If in SES sandbox, verify recipient email addresses too
+3. Request production access for SES if sending to non-verified addresses
 
 ### Selective Standards (AWS Foundational Only)
 
@@ -454,7 +499,126 @@ Types:
 Open in AWS Console
 ```
 
-## Cost Estimate
+## Email Handler Integration (Beautiful HTML Emails)
+
+### Lambda Function Behavior
+
+The email handler Lambda function (`security_alert_email_handler.py`) provides a much better email experience than basic SNS emails:
+
+1. **Filtering**: Only `HIGH` and `CRITICAL` severity findings are sent
+2. **Beautiful HTML**: Professional, color-coded emails with proper formatting
+3. **Responsive Design**: Works on desktop and mobile devices
+4. **Metadata Rich**: Includes all finding details, remediation steps, and direct links
+5. **Dual Format**: HTML for modern clients + plain text fallback
+
+### Email Features
+
+| Feature | Basic SNS Email | Lambda HTML Email |
+|---------|----------------|-------------------|
+| **Formatting** | Plain text, JSON dump | Beautiful HTML with styling |
+| **Severity Filtering** | All severities | Only HIGH/CRITICAL |
+| **Color Coding** | No | Yes (red for CRITICAL, orange for HIGH) |
+| **Remediation Steps** | No | Yes (highlighted green box) |
+| **Responsive Design** | No | Yes (mobile-friendly) |
+| **Direct Links** | No | Yes (button to AWS Console) |
+| **Professional Look** | No | Yes (gradient headers, cards, grid layout) |
+
+### Example HTML Email
+
+The email includes:
+
+**Header Section** (gradient background with severity color):
+- 🔴/🟠 Emoji indicator
+- Severity level in badge
+- Finding title
+
+**Finding Details Section** (grid layout):
+- Source (AWS Security Hub, GuardDuty, etc.)
+- AWS Account ID
+- AWS Region
+- Affected Resource
+- Created timestamp
+
+**Description Section** (yellow info box):
+- Full finding description
+
+**Remediation Section** (green action box):
+- Step-by-step remediation instructions
+- Recommended actions
+
+**Additional Metadata** (code blocks):
+- Finding types
+- Threat indicators (if any)
+
+**Action Button**:
+- Direct link to AWS Security Hub console
+
+### Setting Up Amazon SES
+
+Before using the email handler, configure Amazon SES:
+
+**1. Verify Sender Email**:
+```bash
+# Verify the FROM email address
+aws ses verify-email-identity --email-address security-alerts@company.com
+```
+
+**2. Verify Recipient Emails (if in sandbox)**:
+```bash
+# In SES sandbox, verify each recipient
+aws ses verify-email-identity --email-address security-team@company.com
+aws ses verify-email-identity --email-address oncall@company.com
+```
+
+**3. Request Production Access** (recommended):
+```
+AWS Console → SES → Account dashboard → Request production access
+```
+
+Benefits of production access:
+- Send to any email address (no verification needed)
+- Higher sending limits
+- Better deliverability
+
+**4. (Optional) Configure Custom Domain**:
+```bash
+# Verify your domain
+aws ses verify-domain-identity --domain company.com
+
+# Add DNS records (DKIM, SPF, DMARC) for better deliverability
+```
+
+### Cost Comparison
+
+| Method | Cost | Pros | Cons |
+|--------|------|------|------|
+| **SNS Email** | Free (first 1,000) | Simple, no setup | Ugly, all findings, no filtering |
+| **Lambda + SES** | $0.10 per 1,000 emails | Beautiful, filtered, professional | Requires SES setup |
+
+Typical monthly cost for Lambda + SES: **~$0.10** (assuming 100 HIGH/CRITICAL findings/month)
+
+### Customizing Email Templates
+
+To customize the HTML email template, edit `lambda/security_alert_email_handler.py`:
+
+```python
+# Change colors
+SEVERITY_COLOR = {
+    "CRITICAL": "#YOUR_COLOR",  # Default: #8B0000 (dark red)
+    "HIGH": "#YOUR_COLOR",       # Default: #FF0000 (red)
+}
+
+# Modify HTML structure in the html_body variable
+html_body = f"""
+    <!-- Your custom HTML here -->
+"""
+```
+
+After making changes:
+1. Zip the updated Lambda function
+2. Run `terraform apply` to update
+
+## Slack Integration
 
 ### Typical Production Environment
 
@@ -728,8 +892,12 @@ aws lambda get-function-configuration \
 | `enable_cloudtrail_security_alarms` | bool | `true` | No | Enable CIS benchmark alarms |
 | `enable_cloudtrail_infra_alarms` | bool | `true` | No | Enable infrastructure change alarms |
 | `security_alerts_sns_topic_arn` | string | - | Yes | SNS topic ARN for alerts |
-| `security_alert_email` | string | `null` | No | Email for SNS subscription |
+| `security_alert_email` | string | `null` | No | Email for basic SNS subscription |
 | `security_slack_webhook_url` | string (sensitive) | `null` | No | Slack webhook URL |
+| `enable_email_handler` | bool | `false` | No | Enable Lambda-based HTML email handler |
+| `ses_from_email` | string | `null` | No* | SES verified sender email (* required if email_handler enabled) |
+| `ses_to_emails` | list(string) | `[]` | No* | List of recipient emails (* required if email_handler enabled) |
+| `lambda_log_level` | string | `INFO` | No | Lambda log level (DEBUG, INFO, WARNING, ERROR) |
 
 ## Related Modules
 

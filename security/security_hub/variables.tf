@@ -94,6 +94,49 @@ variable "security_slack_webhook_url" {
 }
 
 ################################################################################
+# Email Handler Configuration (Beautiful HTML Emails via SES)
+################################################################################
+
+variable "enable_email_handler" {
+  description = "Enable Lambda-based email handler for beautiful HTML emails (requires SES). If false, uses basic SNS email subscription."
+  type        = bool
+  default     = false
+}
+
+variable "ses_from_email" {
+  description = "SES verified email address to send security alerts from (required if enable_email_handler = true)"
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.ses_from_email == null || can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.ses_from_email))
+    error_message = "SES from email must be a valid email address"
+  }
+}
+
+variable "ses_to_emails" {
+  description = "List of email addresses to send security alerts to (required if enable_email_handler = true)"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for email in var.ses_to_emails : can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", email))])
+    error_message = "All SES to emails must be valid email addresses"
+  }
+}
+
+variable "lambda_log_level" {
+  description = "Log level for Lambda functions (DEBUG, INFO, WARNING, ERROR)"
+  type        = string
+  default     = "INFO"
+
+  validation {
+    condition     = contains(["DEBUG", "INFO", "WARNING", "ERROR"], var.lambda_log_level)
+    error_message = "Lambda log level must be one of: DEBUG, INFO, WARNING, ERROR"
+  }
+}
+
+################################################################################
 # CloudTrail Security Alarms (CIS Benchmark)
 ################################################################################
 

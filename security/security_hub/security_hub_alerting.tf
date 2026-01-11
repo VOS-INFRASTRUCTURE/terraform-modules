@@ -31,17 +31,17 @@ resource "aws_sns_topic" "security_alerts" {
   }
 }
 
-################################################################################
-# SNS EMAIL SUBSCRIPTION
-################################################################################
-
-resource "aws_sns_topic_subscription" "security_email" {
-  count = var.enable_security_alerting && var.security_alert_email != null ? 1 : 0
-
-  topic_arn = aws_sns_topic.security_alerts[0].arn
-  protocol  = "email"
-  endpoint  = var.security_alert_email
-}
+# ################################################################################
+# # SNS EMAIL SUBSCRIPTION
+# ################################################################################
+#
+# resource "aws_sns_topic_subscription" "security_email" {
+#   count = var.enable_security_alerting && var.security_alert_email != null ? 1 : 0
+#
+#   topic_arn = aws_sns_topic.security_alerts[0].arn
+#   protocol  = "email"
+#   endpoint  = var.security_alert_email
+# }
 
 ################################################################################
 # SNS TOPIC POLICY – Allow EventBridge to Publish

@@ -47,11 +47,20 @@ output "security_hub" {
         rule_arn  = aws_cloudwatch_event_rule.securityhub_findings[0].arn
       }
 
-      # Lambda normalizer (if Slack webhook configured)
-      lambda = var.security_slack_webhook_url != null ? {
+      # Slack Lambda normalizer (if Slack webhook configured)
+      slack_lambda = var.security_slack_webhook_url != null ? {
         function_name = aws_lambda_function.security_alert_normalizer.function_name
         function_arn  = aws_lambda_function.security_alert_normalizer.arn
         role_arn      = aws_iam_role.security_alert_lambda_role.arn
+      } : null
+
+      # Email Lambda handler (if SES configured)
+      email_lambda = var.enable_email_handler ? {
+        function_name = aws_lambda_function.security_email_handler[0].function_name
+        function_arn  = aws_lambda_function.security_email_handler[0].arn
+        role_arn      = aws_iam_role.security_email_lambda_role[0].arn
+        from_email    = var.ses_from_email
+        to_emails     = var.ses_to_emails
       } : null
     } : null
 
@@ -108,6 +117,7 @@ output "security_hub" {
       infrastructure_alarms_enabled  = var.enable_cloudtrail_infra_alarms
       slack_integration_enabled      = var.security_slack_webhook_url != null
       email_alerts_enabled           = var.security_alert_email != null
+      email_handler_enabled          = var.enable_email_handler
 
       # Totals
       total_standards_enabled        = (
