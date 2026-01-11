@@ -12,6 +12,17 @@ AWS Config continuously monitors and records AWS resource configurations, enabli
 - **Security Posture**: Identify security misconfigurations
 - **Relationship Tracking**: Understand dependencies between resources
 
+## Module Structure
+
+```
+aws_config/
+├── main.tf       # Configuration Recorder, Delivery Channel, and Recorder Status
+├── bucket.tf     # S3 bucket configuration for Config logs
+├── variables.tf  # Input variables
+├── outputs.tf    # Module outputs (single 'config' object)
+└── README.md     # This file
+```
+
 ## Features
 
 ✅ **S3 Bucket**: Secure storage for configuration snapshots and history  
@@ -225,26 +236,61 @@ module "aws_config_secondary" {
 
 ## Outputs
 
-This module provides the following outputs:
+This module provides a single comprehensive `config` output object containing all configuration details:
 
 ```terraform
-# Comprehensive output
 output "config" {
   value = {
-    bucket               = { name, arn, id }
-    recorder             = { name, role_arn, is_enabled }
-    delivery_channel     = { name, s3_bucket_name, snapshot_frequency }
-    lifecycle            = { enabled, glacier_transition_days, log_expiration_days }
-    account              = { account_id, region }
+    # S3 Bucket - Configuration log storage
+    bucket = {
+      name       = "production-cerpac-aws-config-logs"
+      arn        = "arn:aws:s3:::production-cerpac-aws-config-logs"
+      id         = "production-cerpac-aws-config-logs"
+      versioning = true
+      encryption = "AES256"  # or "KMS" if KMS key is used
+    }
+
+    # Configuration Recorder - Records resource configurations
+    recorder = {
+      name                     = "production-cerpac-config-recorder"
+      role_arn                 = "arn:aws:iam::123456789012:role/..."
+      record_all_resources     = true
+      include_global_resources = true
+      resource_types           = []
+      is_enabled               = true
+    }
+
+    # Delivery Channel - Delivers configuration snapshots
+    delivery_channel = {
+      name               = "production-cerpac-config-delivery"
+      s3_bucket_name     = "production-cerpac-aws-config-logs"
+      s3_key_prefix      = ""
+      snapshot_frequency = "TwentyFour_Hours"
+      sns_topic_arn      = null  # or SNS topic ARN if configured
+    }
+
+    # Lifecycle Policy - Cost optimization settings
+    lifecycle = {
+      enabled                 = true
+      glacier_transition_days = 90
+      log_expiration_days     = 2555
+    }
+
+    # Account Information
+    account = {
+      account_id = "123456789012"
+      region     = "eu-west-2"
+    }
+
+    # Configuration Summary
+    summary = {
+      module_enabled       = true
+      recording_active     = true
+      notifications_active = false  # true if SNS topic configured
+      cost_optimization    = true
+    }
   }
 }
-
-# Individual outputs
-output "bucket_name"           # S3 bucket name
-output "bucket_arn"            # S3 bucket ARN
-output "recorder_name"         # Configuration recorder name
-output "recorder_status"       # true/false (enabled/disabled)
-output "delivery_channel_name" # Delivery channel name
 ```
 
 ### Using Outputs
@@ -255,7 +301,25 @@ module "aws_config" {
   # ...configuration...
 }
 
-# Reference outputs
+# Access specific values
+output "config_bucket_name" {
+  value = module.aws_config.config.bucket.name
+}
+
+output "is_recording" {
+  value = module.aws_config.config.recorder.is_enabled
+}
+
+output "account_info" {
+  value = module.aws_config.config.account
+}
+
+# Or use the entire config object
+output "full_config" {
+  value = module.aws_config.config
+}
+
+# Reference in other resources
 resource "aws_config_config_rule" "restricted_ssh" {
   name = "restricted-ssh"
 
@@ -264,13 +328,8 @@ resource "aws_config_config_rule" "restricted_ssh" {
     source_identifier = "INCOMING_SSH_DISABLED"
   }
 
-  # Depends on Config being enabled
+  # Ensure Config is enabled before creating rules
   depends_on = [module.aws_config]
-}
-
-# Display bucket name
-output "config_bucket" {
-  value = module.aws_config.bucket_name
 }
 ```
 
