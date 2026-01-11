@@ -143,7 +143,21 @@ variable "config_role_arn" {
 ################################################################################
 
 variable "snapshot_delivery_frequency" {
-  description = "Frequency for AWS Config to deliver configuration snapshots"
+  description = <<-EOT
+    Frequency for AWS Config to deliver configuration snapshots to S3.
+
+    AWS Default: TwentyFour_Hours (if not specified)
+
+    Options:
+    - One_Hour: Most frequent, higher cost (~$2/month extra)
+    - Three_Hours: Frequent monitoring
+    - Six_Hours: Balanced
+    - Twelve_Hours: Less frequent
+    - TwentyFour_Hours: AWS default, most cost-effective
+
+    Note: More frequent snapshots increase S3 storage costs and API calls.
+    For most use cases, TwentyFour_Hours is sufficient.
+  EOT
   type        = string
   default     = "TwentyFour_Hours"
 

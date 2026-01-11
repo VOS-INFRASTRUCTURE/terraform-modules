@@ -59,13 +59,21 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
 
 ################################################################################
 # S3 Bucket - Versioning
+#
+# Versioning provides additional protection for audit logs by maintaining
+# multiple versions of objects. This is useful for:
+# - Recovering from accidental deletions
+# - Preventing malicious log tampering
+# - Meeting compliance requirements
+#
+# Note: Versioning increases storage costs as old versions are retained
 ################################################################################
 
 resource "aws_s3_bucket_versioning" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail_logs.id
 
   versioning_configuration {
-    status = "Enabled"
+    status = var.enable_bucket_versioning ? "Enabled" : "Suspended"
   }
 }
 
