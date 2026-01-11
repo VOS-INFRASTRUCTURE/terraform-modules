@@ -4,6 +4,8 @@
 # Purpose: Enable AWS Config to continuously monitor and record AWS resource
 #          configurations for compliance auditing and security analysis.
 #
+# It delivers directly to s3 buckets. It doesn't write to Cloudwatch logs
+#
 # Features:
 # - Multi-region configuration recording
 # - S3 bucket for configuration snapshots and history (see bucket.tf)

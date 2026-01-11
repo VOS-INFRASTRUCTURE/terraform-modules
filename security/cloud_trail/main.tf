@@ -1,13 +1,24 @@
 ################################################################################
-# CERPAC – CloudTrail Core Module
-# - S3 bucket (logs), encryption, lifecycle, versioning
-# - CloudWatch Log Group for streaming
-# - IAM role/policy for CloudTrail to write to CloudWatch Logs
-# - Multi-region CloudTrail trail
+# CloudTrail - Core Module
+#
+# Purpose: Multi-region audit trail for AWS API call logging and security
+#          monitoring. Delivers logs to both S3 and CloudWatch Logs.
+#
+# Components:
+# - CloudWatch Log Group for real-time streaming (this file)
+# - IAM role/policy for CloudTrail to write to CloudWatch Logs (this file)
+# - Multi-region CloudTrail trail (this file)
+# - S3 bucket for long-term storage (see bucket.tf)
+#
+# Features:
+# - Multi-region coverage (captures events from all regions)
+# - Global service events included (IAM, CloudFront, etc.)
+# - Log file validation enabled (tamper detection)
+# - Dual delivery: S3 (long-term) + CloudWatch (real-time alerts)
 ################################################################################
 
 ################################################################################
-# SHARED LOCALS – NAMING CONSISTENCY
+# Locals - Naming Consistency
 ################################################################################
 
 locals {
@@ -15,107 +26,12 @@ locals {
   ct_log_group_name = "/aws/cloudtrail/${var.env}-${var.project_id}-audit-trail"
 }
 
-################################################################################
-# S3 BUCKET – CLOUDTRAIL LOG STORAGE
-################################################################################
-
-resource "aws_s3_bucket" "cloudtrail_logs" {
-  bucket        = local.ct_bucket_name
-  force_destroy = var.force_destroy
-
-  tags = {
-    Name        = "${var.env}-${var.project_id}-cloudtrail-logs"
-    Environment = var.env
-    Project     = var.project_id
-    Purpose     = "CloudTrailAuditLogs"
-    Compliance  = "Required"
-    ManagedBy   = "Terraform"
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
 
 ################################################################################
-# S3 LIFECYCLE – RETENTION
-################################################################################
-
-resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
-
-  rule {
-    id     = "cloudtrail-retention"
-    status = "Enabled"
-
-    expiration {
-      days = var.retention_days
-    }
-
-    noncurrent_version_expiration {
-      noncurrent_days = var.retention_days
-    }
-  }
-}
-
-resource "aws_s3_bucket_versioning" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-################################################################################
-# S3 BUCKET POLICY – ALLOW CLOUDTRAIL WRITE
-################################################################################
-
-resource "aws_s3_bucket_policy" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AWSCloudTrailAclCheck"
-        Effect = "Allow"
-        Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action   = "s3:GetBucketAcl"
-        Resource = aws_s3_bucket.cloudtrail_logs.arn
-      },
-      {
-        Sid    = "AWSCloudTrailWrite"
-        Effect = "Allow"
-        Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.cloudtrail_logs.arn}/*"
-        Condition = {
-          StringEquals = {
-            "s3:x-amz-acl" = "bucket-owner-full-control"
-          }
-        }
-      }
-    ]
-  })
-}
-
-################################################################################
-# CLOUDWATCH LOG GROUP – CLOUDTRAIL STREAMING
+# CloudWatch Log Group - CloudTrail Streaming
+#
+# Purpose: Real-time log streaming for CloudWatch-based monitoring and alerting.
+#          Enables metric filters and alarms for security events.
 ################################################################################
 
 resource "aws_cloudwatch_log_group" "this" {
@@ -131,7 +47,13 @@ resource "aws_cloudwatch_log_group" "this" {
 }
 
 ################################################################################
-# IAM ROLE – CLOUDTRAIL → CLOUDWATCH LOGS
+# IAM Role - CloudTrail to CloudWatch Logs
+#
+# Purpose: Allow CloudTrail service to write logs to CloudWatch Log Group.
+#
+# Permissions:
+# - CreateLogStream: Create new log streams
+# - PutLogEvents: Write log events to streams
 ################################################################################
 
 resource "aws_iam_role" "cloudtrail_cloudwatch" {
@@ -140,9 +62,9 @@ resource "aws_iam_role" "cloudtrail_cloudwatch" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
+      Effect    = "Allow"
       Principal = { Service = "cloudtrail.amazonaws.com" }
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
 }
@@ -164,7 +86,19 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch" {
 }
 
 ################################################################################
-# CLOUDTRAIL – MULTI-REGION AUDIT TRAIL
+# CloudTrail - Multi-Region Audit Trail
+#
+# Purpose: Capture all AWS API calls across all regions for security auditing.
+#
+# Features:
+# - Multi-region: Captures events from ALL AWS regions
+# - Global events: Includes IAM, Route53, CloudFront, etc.
+# - Log validation: Enables tamper detection via cryptographic hashing
+# - Dual delivery: S3 (long-term storage) + CloudWatch (real-time alerts)
+#
+# Event Types Captured:
+# - Management events: API calls that modify resources (create, update, delete)
+# - Read/Write operations: All API activity
 ################################################################################
 
 resource "aws_cloudtrail" "trail" {
