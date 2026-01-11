@@ -10,15 +10,15 @@
 # - CloudWatch logging for monitoring
 ################################################################################
 
-resource "aws_kinesis_firehose_delivery_stream" "cerpac_waf_logs" {
+resource "aws_kinesis_firehose_delivery_stream" "waf_logs" {
   count = var.enable_waf_logging ? 1 : 0
 
-  name        = "aws-waf-logs-${var.env}-${var.project_id}-${local.cerpac_frontend_alb_key_name}"
+  name        = "aws-waf-logs-${var.env}-${var.project_id}-${local.frontend_alb_key_name}"
   destination = "extended_s3"
 
   extended_s3_configuration {
-    role_arn   = aws_iam_role.cerpac_waf_firehose_role[0].arn
-    bucket_arn = aws_s3_bucket.cerpac_waf_logs[0].arn
+    role_arn   = aws_iam_role.waf_firehose_role[0].arn
+    bucket_arn = aws_s3_bucket.waf_logs[0].arn
 
     # Required when dynamic partitioning is enabled
     buffering_size     = var.firehose_buffering_size      # MB (minimum: 64)
@@ -50,7 +50,7 @@ resource "aws_kinesis_firehose_delivery_stream" "cerpac_waf_logs" {
 
         parameters {
           parameter_name  = "LambdaArn"
-          parameter_value = aws_lambda_function.cerpac_waf_log_router[0].arn
+          parameter_value = aws_lambda_function.waf_log_router[0].arn
         }
       }
     }
@@ -77,7 +77,7 @@ resource "aws_lambda_permission" "allow_firehose" {
 
   statement_id  = "AllowFirehoseInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.cerpac_waf_log_router[0].function_name
+  function_name = aws_lambda_function.waf_log_router[0].function_name
   principal     = "firehose.amazonaws.com"
-  source_arn    = aws_kinesis_firehose_delivery_stream.cerpac_waf_logs[0].arn
+  source_arn    = aws_kinesis_firehose_delivery_stream.waf_logs[0].arn
 }

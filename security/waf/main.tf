@@ -64,7 +64,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
   resource_prefix = var.env
-  cerpac_frontend_alb_key_name = var.alb_name != null ? var.alb_name : "app-alb"
+  frontend_alb_key_name = var.alb_name != null ? var.alb_name : "app-alb"
 }
 
 ################################################################################

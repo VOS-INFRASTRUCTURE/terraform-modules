@@ -9,17 +9,17 @@
 # Note: S3 bucket configuration is in bucket.tf
 ################################################################################
 
-resource "aws_wafv2_web_acl_logging_configuration" "cerpac_waf_logging" {
+resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
   count = var.enable_waf && var.enable_waf_logging ? 1 : 0
 
   depends_on = [
-    aws_kinesis_firehose_delivery_stream.cerpac_waf_logs
+    aws_kinesis_firehose_delivery_stream.waf_logs
   ]
 
-  resource_arn = aws_wafv2_web_acl.cerpac_waf.arn
+  resource_arn = aws_wafv2_web_acl.waf.arn
 
   log_destination_configs = [
-    aws_kinesis_firehose_delivery_stream.cerpac_waf_logs[0].arn
+    aws_kinesis_firehose_delivery_stream.waf_logs[0].arn
   ]
 }
 

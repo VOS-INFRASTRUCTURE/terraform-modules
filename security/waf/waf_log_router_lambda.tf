@@ -16,7 +16,7 @@
 # IAM Role for Lambda
 ################################################################################
 
-resource "aws_iam_role" "cerpac_waf_lambda_role" {
+resource "aws_iam_role" "waf_lambda_role" {
   count = var.enable_waf_logging ? 1 : 0
 
   name = "${var.env}-${var.project_id}-waf-lambda-role"
@@ -48,10 +48,10 @@ resource "aws_iam_role" "cerpac_waf_lambda_role" {
 # IAM Policy Attachment - Basic Lambda Execution
 ################################################################################
 
-resource "aws_iam_role_policy_attachment" "cerpac_waf_lambda_basic" {
+resource "aws_iam_role_policy_attachment" "waf_lambda_basic" {
   count = var.enable_waf_logging ? 1 : 0
 
-  role       = aws_iam_role.cerpac_waf_lambda_role[0].name
+  role       = aws_iam_role.waf_lambda_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
@@ -59,11 +59,11 @@ resource "aws_iam_role_policy_attachment" "cerpac_waf_lambda_basic" {
 # Lambda Function - WAF Log Router
 ################################################################################
 
-resource "aws_lambda_function" "cerpac_waf_log_router" {
+resource "aws_lambda_function" "waf_log_router" {
   count = var.enable_waf_logging ? 1 : 0
 
   function_name = "${var.env}-${var.project_id}-waf-log-router"
-  role          = aws_iam_role.cerpac_waf_lambda_role[0].arn
+  role          = aws_iam_role.waf_lambda_role[0].arn
   handler       = "waf_log_router.lambda_handler"
   runtime       = "python3.11"
 

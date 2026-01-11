@@ -18,10 +18,10 @@
 # S3 Bucket for WAF Logs
 ################################################################################
 
-resource "aws_s3_bucket" "cerpac_waf_logs" {
+resource "aws_s3_bucket" "waf_logs" {
   count = var.enable_waf_logging ? 1 : 0
 
-  bucket        = "${var.env}-${var.project_id}-${local.cerpac_frontend_alb_key_name}-waf-logs"
+  bucket        = "${var.env}-${var.project_id}-${local.frontend_alb_key_name}-waf-logs"
   force_destroy = var.force_destroy_log_bucket
 
   tags = merge(
@@ -40,10 +40,10 @@ resource "aws_s3_bucket" "cerpac_waf_logs" {
 # S3 Bucket - Public Access Block
 ################################################################################
 
-resource "aws_s3_bucket_public_access_block" "cerpac_waf_logs" {
+resource "aws_s3_bucket_public_access_block" "waf_logs" {
   count = var.enable_waf_logging ? 1 : 0
 
-  bucket = aws_s3_bucket.cerpac_waf_logs[0].id
+  bucket = aws_s3_bucket.waf_logs[0].id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -55,10 +55,10 @@ resource "aws_s3_bucket_public_access_block" "cerpac_waf_logs" {
 # S3 Bucket - Server-Side Encryption
 ################################################################################
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "cerpac_waf_logs" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "waf_logs" {
   count = var.enable_waf_logging ? 1 : 0
 
-  bucket = aws_s3_bucket.cerpac_waf_logs[0].id
+  bucket = aws_s3_bucket.waf_logs[0].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -76,10 +76,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cerpac_waf_logs" 
 # - ERRORS → 7 days (debugging only)
 ################################################################################
 
-resource "aws_s3_bucket_lifecycle_configuration" "cerpac_waf_logs" {
+resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
   count = var.enable_waf_logging ? 1 : 0
 
-  bucket = aws_s3_bucket.cerpac_waf_logs[0].id
+  bucket = aws_s3_bucket.waf_logs[0].id
 
   # BLOCKED requests → 90 days retention
   rule {

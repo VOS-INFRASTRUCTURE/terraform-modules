@@ -9,7 +9,7 @@
 # - CloudWatch Logs: Write delivery logs
 ################################################################################
 
-resource "aws_iam_role" "cerpac_waf_firehose_role" {
+resource "aws_iam_role" "waf_firehose_role" {
   count = var.enable_waf_logging ? 1 : 0
 
   name = "${var.env}-${var.project_id}-waf-firehose-role"
@@ -37,11 +37,11 @@ resource "aws_iam_role" "cerpac_waf_firehose_role" {
   )
 }
 
-resource "aws_iam_role_policy" "cerpac_waf_firehose_policy" {
+resource "aws_iam_role_policy" "waf_firehose_policy" {
   count = var.enable_waf_logging ? 1 : 0
 
   name = "${var.env}-${var.project_id}-waf-firehose-policy"
-  role = aws_iam_role.cerpac_waf_firehose_role[0].id
+  role = aws_iam_role.waf_firehose_role[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -56,8 +56,8 @@ resource "aws_iam_role_policy" "cerpac_waf_firehose_policy" {
           "s3:ListBucket"
         ]
         Resource = [
-          aws_s3_bucket.cerpac_waf_logs[0].arn,
-          "${aws_s3_bucket.cerpac_waf_logs[0].arn}/*"
+          aws_s3_bucket.waf_logs[0].arn,
+          "${aws_s3_bucket.waf_logs[0].arn}/*"
         ]
       },
       {
@@ -67,7 +67,7 @@ resource "aws_iam_role_policy" "cerpac_waf_firehose_policy" {
           "lambda:InvokeFunction",
           "lambda:GetFunctionConfiguration"
         ]
-        Resource = aws_lambda_function.cerpac_waf_log_router[0].arn
+        Resource = aws_lambda_function.waf_log_router[0].arn
       },
       {
         Sid    = "CloudWatchLogs"

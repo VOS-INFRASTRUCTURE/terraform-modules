@@ -10,8 +10,8 @@
 #   Total WCU (enabled rules) MUST be ≤ 1500
 ################################################################################
 
-resource "aws_wafv2_web_acl" "cerpac_waf" {
-  name        = "${local.resource_prefix}-cerpac-waf"
+resource "aws_wafv2_web_acl" "waf" {
+  name        = "${local.resource_prefix}-waf"
   description = "Production AWS WAF protecting the CERPAC Application Load Balancer"
   scope       = "REGIONAL"
 
@@ -27,7 +27,7 @@ resource "aws_wafv2_web_acl" "cerpac_waf" {
   ##########################################################################
   visibility_config {
     cloudwatch_metrics_enabled = true
-    metric_name                = "${local.resource_prefix}-cerpac-waf"
+    metric_name                = "${local.resource_prefix}-waf"
     sampled_requests_enabled   = true
   }
 
@@ -601,9 +601,9 @@ resource "aws_wafv2_web_acl" "cerpac_waf" {
 #
 # Note: Only creates association if ALB ARN is provided
 ################################################################################
-resource "aws_wafv2_web_acl_association" "cerpac_alb_waf_assoc" {
+resource "aws_wafv2_web_acl_association" "alb_waf_assoc" {
   count = var.alb_arn != null ? 1 : 0
 
   resource_arn = var.alb_arn
-  web_acl_arn  = aws_wafv2_web_acl.cerpac_waf.arn
+  web_acl_arn  = aws_wafv2_web_acl.waf.arn
 }

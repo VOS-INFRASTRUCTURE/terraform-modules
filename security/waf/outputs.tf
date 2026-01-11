@@ -17,30 +17,30 @@ output "waf" {
     # Web ACL - Main WAF resource
     # ──────────────────────────────────────────────────────────────────────
     web_acl = {
-      id          = aws_wafv2_web_acl.cerpac_waf.id                    # Web ACL ID
-      arn         = aws_wafv2_web_acl.cerpac_waf.arn                   # Web ACL ARN
-      name        = aws_wafv2_web_acl.cerpac_waf.name                  # Web ACL name
-      capacity    = aws_wafv2_web_acl.cerpac_waf.capacity              # Current WCU usage
+      id          = aws_wafv2_web_acl.waf.id                    # Web ACL ID
+      arn         = aws_wafv2_web_acl.waf.arn                   # Web ACL ARN
+      name        = aws_wafv2_web_acl.waf.name                  # Web ACL name
+      capacity    = aws_wafv2_web_acl.waf.capacity              # Current WCU usage
       scope       = var.waf_scope                                       # REGIONAL or CLOUDFRONT
-      description = aws_wafv2_web_acl.cerpac_waf.description          # Web ACL description
+      description = aws_wafv2_web_acl.waf.description          # Web ACL description
     }
 
     # ──────────────────────────────────────────────────────────────────────
     # Association - ALB/CloudFront association
     # ──────────────────────────────────────────────────────────────────────
     association = var.alb_arn != null ? {
-      resource_arn = aws_wafv2_web_acl_association.cerpac_alb_waf_assoc[0].resource_arn  # Associated resource ARN
-      web_acl_arn  = aws_wafv2_web_acl_association.cerpac_alb_waf_assoc[0].web_acl_arn   # Web ACL ARN
+      resource_arn = aws_wafv2_web_acl_association.alb_waf_assoc[0].resource_arn  # Associated resource ARN
+      web_acl_arn  = aws_wafv2_web_acl_association.alb_waf_assoc[0].web_acl_arn   # Web ACL ARN
     } : null
 
     # ──────────────────────────────────────────────────────────────────────
     # Logging - S3 bucket and Firehose configuration
     # ──────────────────────────────────────────────────────────────────────
     logging = var.enable_waf_logging ? {
-      bucket_name         = aws_s3_bucket.cerpac_waf_logs[0].bucket                    # S3 bucket name
-      bucket_arn          = aws_s3_bucket.cerpac_waf_logs[0].arn                       # S3 bucket ARN
-      firehose_stream_arn = aws_kinesis_firehose_delivery_stream.cerpac_waf_logs[0].arn  # Firehose stream ARN
-      firehose_stream_name = aws_kinesis_firehose_delivery_stream.cerpac_waf_logs[0].name # Firehose stream name
+      bucket_name         = aws_s3_bucket.waf_logs[0].bucket                    # S3 bucket name
+      bucket_arn          = aws_s3_bucket.waf_logs[0].arn                       # S3 bucket ARN
+      firehose_stream_arn = aws_kinesis_firehose_delivery_stream.waf_logs[0].arn  # Firehose stream ARN
+      firehose_stream_name = aws_kinesis_firehose_delivery_stream.waf_logs[0].name # Firehose stream name
 
       retention = {
         blocked_days = var.blocked_logs_retention_days     # Blocked logs retention
@@ -49,8 +49,8 @@ output "waf" {
       }
 
       lambda_router = {
-        function_name = aws_lambda_function.cerpac_waf_log_router[0].function_name  # Lambda function name
-        function_arn  = aws_lambda_function.cerpac_waf_log_router[0].arn            # Lambda function ARN
+        function_name = aws_lambda_function.waf_log_router[0].function_name  # Lambda function name
+        function_arn  = aws_lambda_function.waf_log_router[0].arn            # Lambda function ARN
       }
     } : null
 
