@@ -47,8 +47,11 @@ security_hub/
 
 - AWS CloudTrail configured with CloudWatch Logs integration
 - CloudWatch Log Group: `/aws/cloudtrail/${env}-cerpac-audit-trail`
+- **AWS Config enabled** (required for Security Hub standards - many controls use Config Rules)
 - (Optional) Slack webhook URL for Slack notifications
 - (Optional) GuardDuty enabled for threat detection
+
+**Important**: AWS Security Hub standards (AWS Foundational Security Best Practices, CIS Benchmark, Resource Tagging) rely heavily on AWS Config Rules to evaluate resource compliance. Without AWS Config enabled, many security controls will not function properly.
 
 ## Usage
 
@@ -277,7 +280,16 @@ module "security_hub" {
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐ │
 │  │ AWS Foundational │  │  CIS Benchmark   │  │  Resource Tags   │ │
 │  │   Best Practices │  │     v5.0.0       │  │     Standard     │ │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘ │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘ │
+│           │                     │                      │            │
+│           └──────────┬──────────┴──────────┬───────────┘            │
+│                      │ Requires            │                        │
+│                      ▼                     │                        │
+│           ┌─────────────────────┐          │                        │
+│           │    AWS Config       │◀─────────┘                        │
+│           │  (Config Rules)     │                                   │
+│           └─────────────────────┘                                   │
+│           Many standards use AWS Config Rules for compliance checks │
 │                                                                     │
 │  Integrations: GuardDuty, AWS Config, Inspector, IAM Analyzer      │
 └──────────────────────────────┬──────────────────────────────────────┘
@@ -692,7 +704,7 @@ module "security_hub" {
 ### With AWS Config Module
 
 ```terraform
-# Enable AWS Config
+# Enable AWS Config (REQUIRED for Security Hub standards)
 module "aws_config" {
   source = "../../modules/security/aws_config"
 
@@ -700,20 +712,35 @@ module "aws_config" {
   project_id = "cerpac"
 
   enable_aws_config = true
+  
+  # Enable all resource types for comprehensive coverage
+  record_all_resources     = true
+  include_global_resources = true
 }
 
-# Security Hub leverages Config rules for standards
+# Security Hub leverages Config rules for standards compliance
+# IMPORTANT: Many Security Hub controls will not work without AWS Config
 module "security_hub" {
   source = "../../modules/security/security_hub"
 
   env        = "production"
   project_id = "cerpac"
 
-  enable_security_hub = true
+  enable_security_hub              = true
+  enable_aws_foundational_standard = true  # Requires AWS Config
+  enable_cis_standard              = true  # Requires AWS Config
+  enable_resource_tagging_standard = true  # Requires AWS Config
   
+  # AWS Config must be enabled first
   depends_on = [module.aws_config]
 }
 ```
+
+**Why AWS Config is Required**:
+- AWS Foundational Security Best Practices: ~100 controls, many use Config Rules
+- CIS AWS Foundations Benchmark: ~50 controls, majority use Config Rules
+- Resource Tagging Standard: All controls use Config Rules
+- Without Config, these controls will show as "NOT_AVAILABLE" in Security Hub
 
 ### With CloudTrail Module
 
@@ -748,8 +775,9 @@ module "security_hub" {
 
 **Possible Causes**:
 1. Standards still initializing (takes 1-2 hours)
-2. No resources violating controls
-3. GuardDuty not enabled or no threats detected
+2. AWS Config not enabled (many controls require Config Rules)
+3. No resources violating controls
+4. GuardDuty not enabled or no threats detected
 
 **Fix**:
 ```bash
@@ -759,8 +787,59 @@ aws securityhub describe-hub
 # List standards subscriptions
 aws securityhub get-enabled-standards
 
+# Check if AWS Config is enabled
+aws configservice describe-configuration-recorders
+
 # Check GuardDuty detector
 aws guardduty list-detectors
+```
+
+### Security Hub Controls Showing "NOT_AVAILABLE"
+
+**Issue**: Many controls show status "NOT_AVAILABLE" instead of PASSED/FAILED
+
+**Cause**: AWS Config is not enabled or Config Recorder is stopped
+
+**Impact**: 
+- AWS Foundational Security Best Practices: ~70% of controls unavailable
+- CIS AWS Foundations Benchmark: ~60% of controls unavailable
+- Resource Tagging Standard: 100% of controls unavailable
+
+**Fix**:
+```bash
+# Check if Config is enabled
+aws configservice describe-configuration-recorders
+
+# Check Config recorder status
+aws configservice describe-configuration-recorder-status
+
+# Enable Config if not already enabled (use Terraform module)
+# Or manually start the recorder
+aws configservice start-configuration-recorder \
+  --configuration-recorder-name default
+```
+
+**Solution**: Enable AWS Config module before Security Hub:
+```terraform
+# Enable AWS Config FIRST
+module "aws_config" {
+  source = "../../modules/security/aws_config"
+  
+  env               = "production"
+  project_id        = "cerpac"
+  enable_aws_config = true
+}
+
+# Then enable Security Hub
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+  
+  env                 = "production"
+  project_id          = "cerpac"
+  enable_security_hub = true
+  
+  depends_on = [module.aws_config]
+}
 ```
 
 ### Alarms Not Triggering
