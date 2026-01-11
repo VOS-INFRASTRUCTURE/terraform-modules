@@ -1,0 +1,696 @@
+# AWS Security Hub Terraform Module
+
+Comprehensive security monitoring and alerting module that integrates AWS Security Hub, CloudTrail alarms, and automated notifications via SNS and Slack.
+
+## Overview
+
+This module provides a complete security monitoring solution by combining multiple AWS services:
+
+- **AWS Security Hub**: Centralized security findings and compliance management
+- **CloudTrail Alarms**: CIS benchmark and infrastructure change detection
+- **EventBridge**: Intelligent findings routing
+- **SNS**: Email-based alerting
+- **Lambda**: Slack integration with intelligent filtering
+- **GuardDuty Integration**: Threat detection findings
+- **AWS Config Integration**: Configuration compliance findings
+
+## Module Structure
+
+```
+security_hub/
+├── main.tf                                      # Module entry point and data sources
+├── security_hub.tf                              # Security Hub enablement and standards
+├── security_hub_alerting.tf                     # SNS topic and EventBridge rules
+├── security_hub_alerting_slack_normalizer_lambda.tf  # Lambda for Slack
+├── trail_security_alarms.tf                     # CIS benchmark alarms
+├── trail_infra_change_alarms.tf                 # Infrastructure change alarms
+├── variables.tf                                 # Input variables
+├── outputs.tf                                   # Module outputs
+├── lambda/
+│   ├── security_alert_normalizer.py             # Lambda function code
+│   └── security_alert_normalizer.zip            # Packaged Lambda
+└── README.md                                    # This file
+```
+
+## Features
+
+✅ **Security Hub Standards**: AWS Foundational, CIS Benchmark v5.0, Resource Tagging  
+✅ **GuardDuty Integration**: Threat detection findings in Security Hub  
+✅ **CIS Alarms**: 5 critical security alarms (root usage, unauthorized API calls, etc.)  
+✅ **Infrastructure Alarms**: 3 change detection alarms (SG, VPC, S3 policies)  
+✅ **Dual Delivery**: Email via SNS + Slack via Lambda  
+✅ **Intelligent Filtering**: Only HIGH/CRITICAL findings sent to Slack  
+✅ **EventBridge Routing**: Flexible findings distribution  
+
+## Prerequisites
+
+- AWS CloudTrail configured with CloudWatch Logs integration
+- CloudWatch Log Group: `/aws/cloudtrail/${env}-cerpac-audit-trail`
+- (Optional) Slack webhook URL for Slack notifications
+- (Optional) GuardDuty enabled for threat detection
+
+## Usage
+
+### Basic Configuration (Security Hub + Email Alerts)
+
+```terraform
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Enable Security Hub and standards
+  enable_security_hub = true
+
+  # Enable alerting
+  enable_security_alerting = true
+  security_alerts_sns_topic_arn = aws_sns_topic.security_alerts.arn
+  security_alert_email          = "security@company.com"
+
+  # Enable CIS benchmark alarms
+  enable_cloudtrail_security_alarms = true
+  enable_cloudtrail_infra_alarms    = true
+}
+```
+
+### Full Configuration (with Slack Integration)
+
+```terraform
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Enable all features
+  enable_security_hub               = true
+  enable_security_alerting          = true
+  enable_cloudtrail_security_alarms = true
+  enable_cloudtrail_infra_alarms    = true
+
+  # SNS topic for alerts
+  security_alerts_sns_topic_arn = aws_sns_topic.security_alerts.arn
+
+  # Email notifications
+  security_alert_email = "security@company.com"
+
+  # Slack notifications (HIGH/CRITICAL only)
+  security_slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+}
+```
+
+### Minimal Configuration (Security Hub Only, No Alarms)
+
+```terraform
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Enable Security Hub only
+  enable_security_hub = true
+
+  # Disable alarms and alerting
+  enable_security_alerting          = false
+  enable_cloudtrail_security_alarms = false
+  enable_cloudtrail_infra_alarms    = false
+
+  # Still required even if alerting is disabled
+  security_alerts_sns_topic_arn = aws_sns_topic.security_alerts.arn
+}
+```
+
+## Architecture
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         CloudTrail Events                           │
+│                   (API calls across all regions)                    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                ┌──────────────┴──────────────┐
+                │                             │
+                ▼                             ▼
+    ┌────────────────────┐        ┌────────────────────┐
+    │  CloudWatch Logs   │        │    GuardDuty       │
+    │  /aws/cloudtrail/  │        │  (Threat Intel)    │
+    └─────────┬──────────┘        └─────────┬──────────┘
+              │                             │
+              │ Metric Filters              │ Findings
+              ▼                             │
+    ┌─────────────────────┐                │
+    │  CloudWatch Alarms  │                │
+    │  • Root usage       │                │
+    │  • Unauthorized API │                │
+    │  • IAM changes      │                │
+    │  • SG changes       │                │
+    │  • VPC changes      │                │
+    └─────────┬───────────┘                │
+              │                             │
+              │ Alarm State Change          │
+              ▼                             │
+    ┌──────────────────────────────────────▼────────────┐
+    │              SNS Topic                            │
+    │        (security-alerts)                          │
+    └───────────────┬───────────────┬───────────────────┘
+                    │               │
+        ┌───────────┘               └──────────┐
+        ▼                                      ▼
+┌────────────────┐                  ┌──────────────────────┐
+│     Email      │                  │  Lambda Normalizer   │
+│  Subscription  │                  │  (Filter + Format)   │
+└────────────────┘                  └──────────┬───────────┘
+                                               │
+                                               │ Only HIGH/CRITICAL
+                                               ▼
+                                    ┌─────────────────────┐
+                                    │   Slack Channel     │
+                                    │  #security-alerts   │
+                                    └─────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      AWS Security Hub                               │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐ │
+│  │ AWS Foundational │  │  CIS Benchmark   │  │  Resource Tags   │ │
+│  │   Best Practices │  │     v5.0.0       │  │     Standard     │ │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘ │
+│                                                                     │
+│  Integrations: GuardDuty, AWS Config, Inspector, IAM Analyzer      │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                               │ Findings Imported
+                               ▼
+                    ┌────────────────────┐
+                    │    EventBridge     │
+                    │  (Security Hub)    │
+                    └─────────┬──────────┘
+                              │
+                              ▼
+                    ┌────────────────────┐
+                    │    SNS Topic       │
+                    │ (same as above)    │
+                    └────────────────────┘
+```
+
+## Outputs
+
+This module provides a single comprehensive `security_hub` output object:
+
+```terraform
+output "security_hub" {
+  value = {
+    # Security Hub core service
+    hub = {
+      account_id = "123456789012"
+      region     = "eu-west-2"
+      enabled    = true
+      
+      standards = {
+        aws_foundational = "arn:aws:securityhub:eu-west-2::standards/..."
+        cis_benchmark    = "arn:aws:securityhub:eu-west-2::standards/..."
+        resource_tagging = "arn:aws:securityhub:eu-west-2::standards/..."
+      }
+      
+      products = {
+        guardduty = "arn:aws:securityhub:eu-west-2::product/aws/guardduty"
+      }
+    }
+
+    # Alerting infrastructure
+    alerting = {
+      sns_topic_arn      = "arn:aws:sns:..."
+      sns_topic_name     = "production-cerpac-security-alerts"
+      email_subscription = "security@company.com"
+      
+      eventbridge = {
+        rule_name = "production-securityhub-findings"
+        rule_arn  = "arn:aws:events:..."
+      }
+      
+      lambda = {
+        function_name = "production-cerpac-security-alert-normalizer"
+        function_arn  = "arn:aws:lambda:..."
+        role_arn      = "arn:aws:iam::..."
+      }
+    }
+
+    # CloudWatch alarms
+    alarms = {
+      security = {
+        count = 5
+        alarms = {
+          unauthorized_api_calls = "production-unauthorized-api-calls"
+          root_account_usage     = "production-root-account-usage"
+          console_login_no_mfa   = "production-console-login-no-mfa"
+          iam_policy_changes     = "production-iam-policy-changes"
+          cloudtrail_changes     = "production-cloudtrail-changes"
+        }
+        metrics_namespace = "CERPAC/Security"
+      }
+      
+      infrastructure = {
+        count = 3
+        alarms = {
+          security_group_changes = "production-security-group-changes"
+          vpc_changes            = "production-vpc-changes"
+          s3_policy_changes      = "production-s3-policy-changes"
+        }
+        metrics_namespace = "CERPAC/Infra"
+      }
+    }
+
+    # Configuration summary
+    summary = {
+      module_enabled                = true
+      environment                   = "production"
+      project_id                    = "cerpac"
+      security_hub_enabled          = true
+      security_alerting_enabled     = true
+      security_alarms_enabled       = true
+      infrastructure_alarms_enabled = true
+      slack_integration_enabled     = true
+      email_alerts_enabled          = true
+      total_alarms                  = 8
+    }
+  }
+}
+```
+
+### Using Outputs
+
+```terraform
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+  # ...configuration...
+}
+
+# Get SNS topic for other integrations
+output "security_alerts_topic" {
+  value = module.security_hub.security_hub.alerting.sns_topic_arn
+}
+
+# Get alarm names for dashboards
+output "critical_alarms" {
+  value = [
+    module.security_hub.security_hub.alarms.security.alarms.root_account_usage,
+    module.security_hub.security_hub.alarms.security.alarms.cloudtrail_changes,
+  ]
+}
+
+# Get Security Hub account info
+output "security_hub_region" {
+  value = module.security_hub.security_hub.hub.region
+}
+```
+
+## Security Alarms Details
+
+### CIS Benchmark Alarms (5 alarms)
+
+| Alarm | CIS Control | Description | Threshold |
+|-------|-------------|-------------|-----------|
+| **Unauthorized API Calls** | CIS 3.1 | Detects `AccessDenied` or `UnauthorizedOperation` errors | ≥ 1 in 5 min |
+| **Root Account Usage** | CIS 1.1 | Detects any activity by AWS root user | ≥ 1 in 5 min |
+| **Console Login Without MFA** | CIS 1.2 | Detects console logins without MFA | ≥ 1 in 5 min |
+| **IAM Policy Changes** | CIS 3.7 | Detects IAM policy create/attach/delete operations | ≥ 1 in 5 min |
+| **CloudTrail Changes** | CIS 3.4 | Detects CloudTrail disabled or configuration changed | ≥ 1 in 5 min |
+
+### Infrastructure Change Alarms (3 alarms)
+
+| Alarm | Description | Events Monitored |
+|-------|-------------|------------------|
+| **Security Group Changes** | Detects security group modifications | Authorize/Revoke Ingress/Egress, Create/Delete SG |
+| **VPC Changes** | Detects VPC infrastructure changes | Create/Delete VPC, Route, Internet Gateway, NAT Gateway |
+| **S3 Bucket Policy Changes** | Detects S3 bucket policy modifications | PutBucketPolicy, DeleteBucketPolicy |
+
+## Security Hub Standards
+
+### 1. AWS Foundational Security Best Practices v1.0.0
+
+Comprehensive security checks across all AWS services:
+- IAM best practices
+- S3 bucket security
+- EC2 security configurations
+- RDS encryption and backups
+- Lambda function security
+- And many more...
+
+### 2. CIS AWS Foundations Benchmark v5.0.0
+
+Industry-standard security baseline:
+- Identity and Access Management (Section 1)
+- Storage (Section 2)
+- Logging (Section 3)
+- Monitoring (Section 4)
+- Networking (Section 5)
+
+### 3. AWS Resource Tagging Standard v1.0.0
+
+Ensures proper resource tagging for:
+- Cost allocation
+- Access control
+- Automation
+- Compliance
+
+## Slack Integration
+
+### Lambda Function Behavior
+
+The Lambda function (`security_alert_normalizer.py`) intelligently processes findings:
+
+1. **Filtering**: Only `HIGH` and `CRITICAL` severity findings are forwarded
+2. **Normalization**: Supports both classic ASFF and new OCSF/V2 finding formats
+3. **Formatting**: Creates rich Slack messages with color-coding
+4. **Metadata**: Includes account, region, resource, finding types, threats
+
+### Severity Color Coding
+
+| Severity | Color | Hex Code |
+|----------|-------|----------|
+| **CRITICAL** | Dark Red | `#8B0000` |
+| **HIGH** | Red | `#FF0000` |
+| **MEDIUM** | Orange | `#FFA500` (suppressed) |
+| **LOW** | Yellow | `#FFFF00` (suppressed) |
+| **INFORMATIONAL** | Blue | `#439FE0` (suppressed) |
+
+### Example Slack Message
+
+```
+🔴 CRITICAL Security Finding
+
+Title: [EC2.1] Amazon EBS snapshots should not be public
+Severity: CRITICAL
+Source: AWS Security Hub
+Account: 123456789012
+Region: eu-west-2
+Resource: snap-0123456789abcdef
+
+Description:
+This control checks whether Amazon Elastic Block Store snapshots are 
+not publicly restorable. EBS snapshots should not be publicly restorable 
+by everyone unless you explicitly allow it, to avoid accidental exposure 
+of data.
+
+Types:
+["Effects/Data Exposure", "Software and Configuration Checks"]
+
+Open in AWS Console
+```
+
+## Cost Estimate
+
+### Typical Production Environment
+
+| Component | Volume | Unit Cost | Monthly Cost |
+|-----------|--------|-----------|--------------|
+| **Security Hub - Findings** | 10,000 | Free (first 10k) | $0.00 |
+| **Security Hub - Findings** | 50,000 (additional) | $0.0010/finding | $50.00 |
+| **CloudWatch Alarms** | 8 alarms | $0.10/alarm | $0.80 |
+| **Lambda Invocations** | 1,000 | Free (first 1M) | $0.00 |
+| **Lambda Duration** | 100 GB-seconds | $0.0000166667/GB-sec | $0.02 |
+| **SNS Email** | 1,000 | Free (first 1,000) | $0.00 |
+| **EventBridge Events** | 10,000 | Free (first 1M) | $0.00 |
+| **TOTAL** | | | **~$50.82/month** |
+
+### Cost Optimization Tips
+
+1. **Reduce Findings Volume**: Configure finding filters to suppress low-value findings
+   ```terraform
+   # In AWS Console: Security Hub → Settings → Findings → Suppression rules
+   ```
+
+2. **Disable Unused Standards**: Only enable standards you actively monitor
+   ```terraform
+   # Comment out unused standards in security_hub.tf
+   ```
+
+3. **Increase Alarm Period**: Longer evaluation periods reduce alarm charges
+   ```terraform
+   # Modify period in trail_security_alarms.tf
+   period = 900  # 15 minutes instead of 300 (5 minutes)
+   ```
+
+4. **Use Consolidated Alarms**: Combine multiple metrics into composite alarms
+   ```terraform
+   resource "aws_cloudwatch_composite_alarm" "security_composite" {
+     alarm_name = "all-security-alarms"
+     alarm_rule = "ALARM(unauthorized_api_calls) OR ALARM(root_account_usage)"
+   }
+   ```
+
+## Integration Examples
+
+### With GuardDuty Module
+
+```terraform
+# Enable GuardDuty
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  enable_guardduty = true
+}
+
+# Security Hub automatically ingests GuardDuty findings
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  enable_security_hub = true
+  
+  depends_on = [module.guardduty]
+}
+```
+
+### With AWS Config Module
+
+```terraform
+# Enable AWS Config
+module "aws_config" {
+  source = "../../modules/security/aws_config"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  enable_aws_config = true
+}
+
+# Security Hub leverages Config rules for standards
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  enable_security_hub = true
+  
+  depends_on = [module.aws_config]
+}
+```
+
+### With CloudTrail Module
+
+```terraform
+# Enable CloudTrail
+module "cloudtrail" {
+  source = "../../modules/security/cloud_trail"
+
+  env            = "production"
+  project_id     = "cerpac"
+  retention_days = 90
+}
+
+# Security Hub alarms depend on CloudTrail logs
+module "security_hub" {
+  source = "../../modules/security/security_hub"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  enable_cloudtrail_security_alarms = true
+  
+  depends_on = [module.cloudtrail]
+}
+```
+
+## Troubleshooting
+
+### No Findings Appearing in Security Hub
+
+**Issue**: Security Hub enabled but no findings visible
+
+**Possible Causes**:
+1. Standards still initializing (takes 1-2 hours)
+2. No resources violating controls
+3. GuardDuty not enabled or no threats detected
+
+**Fix**:
+```bash
+# Check Security Hub status
+aws securityhub describe-hub
+
+# List standards subscriptions
+aws securityhub get-enabled-standards
+
+# Check GuardDuty detector
+aws guardduty list-detectors
+```
+
+### Alarms Not Triggering
+
+**Issue**: CloudWatch alarms never enter ALARM state
+
+**Possible Causes**:
+1. CloudTrail not streaming to CloudWatch Logs
+2. Log group name mismatch
+3. No actual security events occurring
+
+**Fix**:
+```bash
+# Verify log group exists
+aws logs describe-log-groups \
+  --log-group-name-prefix /aws/cloudtrail/
+
+# Test with simulated root login (CAREFUL!)
+aws sts get-caller-identity
+
+# Check metric filter
+aws logs describe-metric-filters \
+  --log-group-name /aws/cloudtrail/production-cerpac-audit-trail
+```
+
+### Lambda Not Forwarding to Slack
+
+**Issue**: Slack messages not appearing
+
+**Possible Causes**:
+1. Incorrect webhook URL
+2. Lambda execution errors
+3. Findings below HIGH severity (suppressed)
+
+**Fix**:
+```bash
+# Check Lambda logs
+aws logs tail /aws/lambda/production-cerpac-security-alert-normalizer --follow
+
+# Test Lambda manually
+aws lambda invoke \
+  --function-name production-cerpac-security-alert-normalizer \
+  --payload file://test-event.json \
+  response.json
+
+# Check Lambda environment variables
+aws lambda get-function-configuration \
+  --function-name production-cerpac-security-alert-normalizer
+```
+
+### High Security Hub Costs
+
+**Issue**: Unexpectedly high Security Hub charges
+
+**Causes**: Large number of findings ingested
+
+**Solutions**:
+
+1. **Enable Suppression Rules**:
+   ```
+   AWS Console → Security Hub → Settings → Findings → Suppression rules
+   Suppress PASSED findings
+   Suppress LOW severity findings
+   ```
+
+2. **Disable Unused Standards**:
+   ```terraform
+   # Comment out standards not actively monitored
+   # resource "aws_securityhub_standards_subscription" "resource_tagging" {
+   #   ...
+   # }
+   ```
+
+3. **Use Finding Aggregation**:
+   ```bash
+   # Enable regional aggregation
+   aws securityhub create-finding-aggregator \
+     --region-linking-mode ALL_REGIONS
+   ```
+
+## Best Practices
+
+### ✅ Recommended
+
+- [x] Enable Security Hub in all regions
+- [x] Subscribe to all three core standards
+- [x] Enable GuardDuty for threat detection
+- [x] Configure Slack integration for real-time alerts
+- [x] Set up email alerts for compliance team
+- [x] Review findings weekly in Security Hub console
+- [x] Enable CloudTrail security alarms (CIS compliance)
+- [x] Test alarm notification flow monthly
+- [x] Document incident response procedures
+- [x] Use tagging standard for resource governance
+
+### ❌ Avoid
+
+- [ ] Disabling Security Hub to save costs (security > cost)
+- [ ] Ignoring MEDIUM severity findings
+- [ ] Not responding to HIGH/CRITICAL findings within 24 hours
+- [ ] Using only email alerts (easy to miss)
+- [ ] Not testing Slack integration
+- [ ] Disabling standards without review
+- [ ] Suppressing all findings to reduce noise
+
+## Compliance Mapping
+
+| Standard | Coverage | Status |
+|----------|----------|--------|
+| **CIS AWS Foundations Benchmark** | 5 alarms + standard subscription | ✅ Full |
+| **AWS Foundational Security** | Standard subscription (100+ controls) | ✅ Full |
+| **PCI-DSS** | Logging, monitoring, access controls | ✅ Supported |
+| **HIPAA** | Audit trails, encryption, access logs | ✅ Supported |
+| **SOC 2** | Security monitoring, incident response | ✅ Supported |
+| **GDPR** | Breach detection, audit logs | ✅ Supported |
+| **ISO 27001** | Security monitoring and logging | ✅ Supported |
+| **NIST 800-53** | Continuous monitoring (SI-4) | ✅ Supported |
+
+## Variables Reference
+
+| Variable | Type | Default | Required | Description |
+|----------|------|---------|----------|-------------|
+| `env` | string | - | Yes | Environment name |
+| `project_id` | string | - | Yes | Project identifier |
+| `enable_security_hub` | bool | `true` | No | Enable Security Hub |
+| `enable_security_alerting` | bool | `true` | No | Enable SNS/EventBridge alerting |
+| `enable_cloudtrail_security_alarms` | bool | `true` | No | Enable CIS benchmark alarms |
+| `enable_cloudtrail_infra_alarms` | bool | `true` | No | Enable infrastructure change alarms |
+| `security_alerts_sns_topic_arn` | string | - | Yes | SNS topic ARN for alerts |
+| `security_alert_email` | string | `null` | No | Email for SNS subscription |
+| `security_slack_webhook_url` | string (sensitive) | `null` | No | Slack webhook URL |
+
+## Related Modules
+
+- **CloudTrail**: Audit logging (required for alarms)
+- **GuardDuty**: Threat detection (integrated with Security Hub)
+- **AWS Config**: Configuration compliance (used by Security Hub standards)
+- **Inspector**: Vulnerability scanning (integrated with Security Hub)
+
+## Support
+
+For issues or questions:
+- Internal: Contact Security Team
+- Documentation: See [AWS Security Hub Documentation](https://docs.aws.amazon.com/securityhub/)
+- Architecture: See [2DArchitecture.md](./2DArchitecture.md)
+
+---
+
+**Last Updated**: January 11, 2026  
+**Version**: 1.0.0  
+**Maintained By**: Security Team
+
