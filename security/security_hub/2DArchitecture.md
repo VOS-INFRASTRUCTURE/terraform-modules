@@ -85,17 +85,21 @@ This module sets up production-grade audit logging and security alerting by stit
    |                                 |      Alerts Topic      |
    |                                 +------------------------+
    |                                      |           |
-   |                                      |           | subscriptions
+   |                                      |           | Lambda subscriptions
    |                                      v           v
-   |                               +-----------+  +------------------+
-   |                               |  Email    |  | Lambda Normalizer|
-   |                               | (optional)|  |  / Slack forwarder|
-   |                               +-----------+  +------------------+
-   |                                                   |
-   |                                                   v
-   |                                           +----------------+
-   |                                           |  Slack Channel |
-   |                                           +----------------+
+   |                          +-------------------+  +--------------------+
+   |                          | Lambda Email      |  | Lambda Slack       |
+   |                          | Handler           |  | Handler            |
+   |                          | (HIGH/CRITICAL)   |  | (HIGH/CRITICAL)    |
+   |                          | - Beautiful HTML  |  | - Rich text blocks |
+   |                          | - Send via SES    |  | - Slack webhook    |
+   |                          +-------------------+  +--------------------+
+   |                                   |                      |
+   |                                   v                      v
+   |                          +----------------+    +------------------+
+   |                          |  Email Inbox   |    |  Slack Channel   |
+   |                          | (HTML emails)  |    | #security-alerts |
+   |                          +----------------+    +------------------+
    |
    | CloudTrail events (for GuardDuty)
    v
@@ -157,11 +161,20 @@ This module sets up production-grade audit logging and security alerting by stit
   - Rules listen for Security Hub imported findings (classic + V2) and route raw events to SNS and/or Lambda.
   - Can be extended with catch-all diagnostics when debugging, behind a toggle.
 
-- SNS + Lambda
-  - SNS topic centralizes alert delivery; supports email subscriptions for simple notification.
-  - Lambda (security_alert_normalizer.py) formats Security Hub/GuardDuty findings into Slack messages.
-  - Only HIGH/CRITICAL severities are forwarded; others are suppressed (configurable).
-  - Lambda logs decisions and delivery outcomes to CloudWatch Logs (`/aws/lambda/<env>-<project_id>-security-alert-normalizer`).
+- SNS + Lambda Handlers
+  - SNS topic centralizes alert delivery from CloudWatch alarms and EventBridge.
+  - **Lambda Email Handler** (security_alert_email_handler.py):
+    - Formats Security Hub/GuardDuty findings into beautiful HTML emails.
+    - Sends via Amazon SES to specified email addresses.
+    - Only HIGH/CRITICAL severities are forwarded; others are suppressed.
+    - Includes remediation steps, color-coded severity, and responsive design.
+    - Logs decisions and delivery outcomes to CloudWatch Logs.
+  - **Lambda Slack Handler** (security_alert_normalizer.py):
+    - Formats Security Hub/GuardDuty findings into Slack messages.
+    - Only HIGH/CRITICAL severities are forwarded; others are suppressed (configurable).
+    - Sends via Slack webhook to specified channel.
+    - Logs decisions and delivery outcomes to CloudWatch Logs.
+  - Both Lambda functions subscribe to the same SNS topic for parallel processing.
 
 - Security Hub
   - Enabled per account/region and subscribed to core standards:

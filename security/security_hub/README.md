@@ -254,21 +254,23 @@ module "security_hub" {
     ┌──────────────────────────────────────▼────────────┐
     │              SNS Topic                            │
     │        (security-alerts)                          │
-    └───────────────┬───────────────┬───────────────────┘
-                    │               │
-        ┌───────────┘               └──────────┐
+    └────────────────┬──────────────┬───────────────────┘
+                     │              │
+        ┌────────────┘              └──────────┐
         ▼                                      ▼
-┌────────────────┐                  ┌──────────────────────┐
-│     Email      │                  │  Lambda Normalizer   │
-│  Subscription  │                  │  (Filter + Format)   │
-└────────────────┘                  └──────────┬───────────┘
-                                               │
-                                               │ Only HIGH/CRITICAL
-                                               ▼
-                                    ┌─────────────────────┐
-                                    │   Slack Channel     │
-                                    │  #security-alerts   │
-                                    └─────────────────────┘
+┌───────────────────────┐          ┌──────────────────────┐
+│  Lambda Email Handler │          │ Lambda Slack Handler │
+│  (Filter + Format)    │          │  (Filter + Format)   │
+│  - HIGH/CRITICAL only │          │  - HIGH/CRITICAL only│
+│  - Beautiful HTML     │          │  - Rich text blocks  │
+└──────────┬────────────┘          └──────────┬───────────┘
+           │                                  │
+           │ Send via SES                    │
+           ▼                                  ▼
+┌─────────────────────┐          ┌─────────────────────┐
+│   Email Inbox       │          │   Slack Channel     │
+│  (HTML formatted)   │          │  #security-alerts   │
+└─────────────────────┘          └─────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      AWS Security Hub                               │
