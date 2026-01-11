@@ -10,7 +10,7 @@
 #   module.guardduty.guardduty.summary.total_features_enabled
 ################################################################################
 
-output "guardduty" {
+output "guard_duty" {
   description = "GuardDuty resources and configuration details"
   value = var.enable_guardduty ? {
     # ──────────────────────────────────────────────────────────────────────
@@ -31,9 +31,9 @@ output "guardduty" {
       cloudtrail       = true                             # Always enabled (API call monitoring)
       vpc_flow_logs    = true                             # Always enabled (network traffic)
       dns_logs         = true                             # Always enabled (DNS query analysis)
-      s3_logs          = var.enable_s3_protection         # S3 data event monitoring
-      kubernetes_logs  = var.enable_eks_protection        # EKS audit log analysis
-      malware_scanning = var.enable_malware_protection    # EBS volume malware scanning
+      s3_logs          = var.enable_s3_data_events         # S3 data event monitoring
+      kubernetes_logs  = var.enable_eks_audit_logs        # EKS audit log analysis
+      malware_scanning = var.enable_ebs_malware_protection    # EBS volume malware scanning
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -60,12 +60,6 @@ output "guardduty" {
         (var.enable_rds_protection ? 1 : 0) +
         (var.enable_lambda_protection ? 1 : 0) +
         (var.enable_ebs_malware_protection ? 1 : 0)
-      )
-      total_data_sources_enabled = (
-        3 +  # CloudTrail, VPC Flow Logs, DNS (always enabled)
-        (var.enable_s3_protection ? 1 : 0) +
-        (var.enable_eks_protection ? 1 : 0) +
-        (var.enable_malware_protection ? 1 : 0)
       )
     }
   } : null
