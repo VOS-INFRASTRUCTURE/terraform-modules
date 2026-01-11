@@ -40,6 +40,8 @@ resource "aws_lambda_function" "security_alert_normalizer" {
   environment {
     variables = {
       SLACK_WEBHOOK_URL = var.security_slack_webhook_url
+      PROJECT_NAME      = var.project_id
+      LOG_LEVEL         = "INFO"
     }
   }
 

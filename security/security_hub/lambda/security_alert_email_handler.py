@@ -15,6 +15,7 @@ ses_client = boto3.client('ses')
 # Configuration from environment variables
 FROM_EMAIL = os.environ.get("FROM_EMAIL")
 TO_EMAILS = os.environ.get("TO_EMAILS", "").split(",")
+PROJECT_NAME = os.environ.get("PROJECT_NAME", "AWS")  # Default to "AWS" if not set
 
 # Allow list for reporting
 ALLOWED_SEVERITIES = {"CRITICAL", "HIGH"}
@@ -314,7 +315,7 @@ def send_email(
     </head>
     <body>
         <div class="header">
-            <h1>{severity_emoji} {severity} Security Finding</h1>
+            <h1>{severity_emoji} [{PROJECT_NAME}] {severity} Security Finding</h1>
             <div class="severity-badge">{severity} SEVERITY</div>
         </div>
 
@@ -395,7 +396,7 @@ def send_email(
 
     # Plain text version (fallback)
     text_body = f"""
-{severity_emoji} {severity} Security Finding
+[{PROJECT_NAME}] {severity_emoji} {severity} Security Finding
 
 Title: {title}
 Severity: {severity}
@@ -414,7 +415,7 @@ Description:
 Open in AWS Console: {console_url}
 
 ---
-This is an automated security alert from AWS Security Hub.
+This is an automated security alert from {PROJECT_NAME}.
 Only HIGH and CRITICAL severity findings are sent via email.
 """
 
@@ -426,7 +427,7 @@ Only HIGH and CRITICAL severity findings are sent via email.
         },
         Message={
             'Subject': {
-                'Data': f'{severity_emoji} {severity}: {title[:100]}',
+                'Data': f'[{PROJECT_NAME}] {severity_emoji} {severity}: {title[:80]}',
                 'Charset': 'UTF-8'
             },
             'Body': {
