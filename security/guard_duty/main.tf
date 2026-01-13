@@ -91,14 +91,18 @@ resource "aws_guardduty_detector" "this" {
 # - Suspicious S3 access patterns
 #
 # Cost: ~$0.20 per GB of S3 data analyzed
+#
+# Note: This resource is ALWAYS created when GuardDuty is enabled.
+#       We explicitly set status to ENABLED or DISABLED based on variable.
+#       This ensures proper cleanup when disabling features.
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "s3_data_events" {
-  count = var.enable_guardduty && var.enable_s3_data_events ? 1 : 0
+  count = var.enable_guardduty ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "S3_DATA_EVENTS"
-  status      = "ENABLED"
+  status      = var.enable_s3_data_events ? "ENABLED" : "DISABLED"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -113,14 +117,18 @@ resource "aws_guardduty_detector_feature" "s3_data_events" {
 # - Kubernetes API abuse
 #
 # Cost: ~$0.012 per GB of audit logs analyzed
+#
+# Note: This resource is ALWAYS created when GuardDuty is enabled.
+#       We explicitly set status to ENABLED or DISABLED based on variable.
+#       This ensures proper cleanup when disabling features.
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "eks_audit_logs" {
-  count = var.enable_guardduty && var.enable_eks_audit_logs ? 1 : 0
+  count = var.enable_guardduty ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "EKS_AUDIT_LOGS"
-  status      = "ENABLED"
+  status      = var.enable_eks_audit_logs ? "ENABLED" : "DISABLED"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -136,14 +144,18 @@ resource "aws_guardduty_detector_feature" "eks_audit_logs" {
 #
 # Supported: Aurora (MySQL/PostgreSQL), RDS MySQL, RDS PostgreSQL
 # Cost: Included in base GuardDuty pricing
+#
+# Note: This resource is ALWAYS created when GuardDuty is enabled.
+#       We explicitly set status to ENABLED or DISABLED based on variable.
+#       This ensures proper cleanup when disabling features.
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "rds_login_events" {
-  count = var.enable_guardduty && var.enable_rds_protection ? 1 : 0
+  count = var.enable_guardduty ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "RDS_LOGIN_EVENTS"
-  status      = "ENABLED"
+  status      = var.enable_rds_protection ? "ENABLED" : "DISABLED"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -158,14 +170,18 @@ resource "aws_guardduty_detector_feature" "rds_login_events" {
 # - Unusual outbound connections
 #
 # Cost: Included in base GuardDuty pricing
+#
+# Note: This resource is ALWAYS created when GuardDuty is enabled.
+#       We explicitly set status to ENABLED or DISABLED based on variable.
+#       This ensures proper cleanup when disabling features.
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "lambda_network_logs" {
-  count = var.enable_guardduty && var.enable_lambda_protection ? 1 : 0
+  count = var.enable_guardduty ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "LAMBDA_NETWORK_LOGS"
-  status      = "ENABLED"
+  status      = var.enable_lambda_protection ? "ENABLED" : "DISABLED"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -180,13 +196,17 @@ resource "aws_guardduty_detector_feature" "lambda_network_logs" {
 # 4. Publishes findings with malware details
 #
 # Cost: $0.10 per GB scanned (only when triggered)
+#
+# Note: This resource is ALWAYS created when GuardDuty is enabled.
+#       We explicitly set status to ENABLED or DISABLED based on variable.
+#       This ensures proper cleanup when disabling features.
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
-  count = var.enable_guardduty && var.enable_ebs_malware_protection ? 1 : 0
+  count = var.enable_guardduty ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "EBS_MALWARE_PROTECTION"
-  status      = "ENABLED"
+  status      = var.enable_ebs_malware_protection ? "ENABLED" : "DISABLED"
 }
 

@@ -138,6 +138,78 @@ module "guardduty" {
 }
 ```
 
+## Important: Feature Toggle Behavior
+
+### How Feature Disabling Works
+
+⚠️ **CRITICAL**: When you disable a GuardDuty feature (e.g., set `enable_s3_data_events = false`), this module **explicitly sets the feature status to DISABLED** in AWS.
+
+**Why this matters:**
+
+Previously enabled features don't automatically turn off when you remove Terraform resources. This module handles this correctly by:
+
+1. **Always creating** the feature resource when GuardDuty is enabled
+2. **Explicitly setting** `status = "ENABLED"` or `status = "DISABLED"` based on variables
+3. **Ensuring** features are properly disabled in AWS Console when you set variables to `false`
+
+### Example: Disabling S3 Protection
+
+```terraform
+# Initial configuration (S3 Protection enabled)
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+  
+  enable_s3_data_events = true  # S3 Protection ON
+}
+```
+
+After applying, you'll see in AWS Console:
+```
+S3 Protection: ENABLED ✅
+```
+
+Now disable it:
+
+```terraform
+# Updated configuration (S3 Protection disabled)
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+  
+  enable_s3_data_events = false  # S3 Protection OFF
+}
+```
+
+After running `terraform apply`, you'll see in AWS Console:
+```
+S3 Protection: DISABLED ❌
+```
+
+### What Happens Behind the Scenes
+
+**Before the fix** (incorrect behavior):
+- Setting `enable_s3_data_events = false` would **not create** the resource
+- Previously enabled features would **remain enabled** in AWS
+- Console would still show "S3 Protection: ENABLED" ❌
+
+**After the fix** (correct behavior):
+- Setting `enable_s3_data_events = false` **creates** the resource with `status = "DISABLED"`
+- Feature is **explicitly disabled** in AWS
+- Console correctly shows "S3 Protection: DISABLED" ✅
+
+### Verification Steps
+
+After disabling a feature:
+
+1. Run `terraform apply` to update the configuration
+2. Wait 1-2 minutes for AWS to process the change
+3. Check AWS Console → GuardDuty → Protection plans
+4. Verify the feature shows "DISABLED"
+
+If you still see "ENABLED" after 5 minutes:
+- Check Terraform state: `terraform state list | grep guardduty`
+- Verify variable value: `terraform console` → `var.enable_s3_data_events`
+- Force refresh: `terraform refresh` then `terraform apply`
+
 ## Outputs
 
 This module provides a single comprehensive `guardduty` output object:
