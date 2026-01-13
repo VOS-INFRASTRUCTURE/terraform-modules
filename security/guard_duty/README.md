@@ -25,11 +25,35 @@ guard_duty/
 ## Features
 
 ✅ **Base Detector**: CloudTrail, VPC Flow Logs, DNS logs analysis  
-✅ **S3 Protection**: Monitor S3 data events for malicious activity  
+✅ **S3 Data Events**: Monitor S3 object-level API calls for suspicious activity  
 ✅ **EKS Protection**: Kubernetes audit log analysis  
 ✅ **RDS Protection**: Database login activity monitoring  
 ✅ **Lambda Protection**: Serverless function threat detection  
-✅ **Malware Protection**: EBS volume scanning for malware  
+✅ **Runtime Monitoring**: EKS/ECS Fargate runtime behavior analysis  
+
+### Malware Protection (3 Types)
+
+GuardDuty provides three distinct malware protection capabilities:
+
+1. **EC2/EBS Malware Protection** (`enable_ebs_malware_protection`)
+   - **What**: GuardDuty-initiated scans of EBS volumes attached to EC2 instances
+   - **When**: Triggered automatically when suspicious activity is detected
+   - **Cost**: $0.10/GB scanned (only when triggered)
+   - **Status**: ✅ Fully supported by this module
+
+2. **S3 Malware Scanning** (`enable_s3_malware_protection`)
+   - **What**: Scans new files uploaded to S3 buckets for malware
+   - **When**: Real-time scanning of new uploads to configured buckets
+   - **Cost**: Varies by usage (pay per scan)
+   - **Status**: ✅ Fully supported by this module
+   - **Note**: After enabling, configure buckets in GuardDuty console or via additional Terraform
+
+3. **AWS Backup Malware Scanning** (Not yet supported)
+   - **What**: Scans AWS Backup recovery points for malware
+   - **When**: Automatic scans or on-demand
+   - **Cost**: Varies by usage
+   - **Status**: ❌ Not yet available via Terraform (configure manually in console)
+
 ✅ **Configurable Frequency**: 15 minutes to 6 hours finding publication  
 
 ## Prerequisites
@@ -209,6 +233,107 @@ If you still see "ENABLED" after 5 minutes:
 - Check Terraform state: `terraform state list | grep guardduty`
 - Verify variable value: `terraform console` → `var.enable_s3_data_events`
 - Force refresh: `terraform refresh` then `terraform apply`
+
+## Understanding S3 Protection Options
+
+⚠️ **IMPORTANT**: GuardDuty has TWO different S3 protection features that serve different purposes:
+
+### 1. S3 Data Events (`enable_s3_data_events`)
+
+**What it does**: Monitors **WHO** accessed S3 and **WHAT** they did
+- Tracks S3 API calls (GetObject, PutObject, DeleteObject, etc.)
+- Analyzes access patterns for anomalies
+- Detects unusual download volumes or suspicious access times
+
+**Example threats detected**:
+- An EC2 instance suddenly downloading 100GB of data
+- S3 access from a malicious IP address
+- Unusual access patterns (e.g., accessing thousands of objects rapidly)
+- Data exfiltration attempts
+
+**Cost**: ~$0.20/GB of S3 data analyzed  
+**Variable**: `enable_s3_data_events = true/false`  
+**AWS Console**: GuardDuty → Data sources → S3 logs
+
+### 2. S3 Malware Scanning (`enable_s3_malware_protection`)
+
+**What it does**: Scans **FILE CONTENTS** for malware
+- Analyzes the actual bytes of uploaded files
+- Checks against malware signature databases
+- Scans for trojans, ransomware, viruses, malicious scripts
+
+**Example threats detected**:
+- User uploads a file containing ransomware
+- Malicious executable uploaded to S3
+- JavaScript file with embedded malware
+- PDF with embedded exploit code
+
+**Cost**: Varies by usage (pay per scan)  
+**Variable**: `enable_s3_malware_protection = true/false`  
+**AWS Console**: GuardDuty → Malware Protection → S3
+
+### Comparison Table
+
+| Feature | S3 Data Events | S3 Malware Scanning |
+|---------|----------------|---------------------|
+| **Analyzes** | API access patterns | File contents |
+| **Detects** | Unusual access behavior | Malware in files |
+| **Example** | "Someone downloaded 1000 files" | "File contains virus" |
+| **Use Case** | Insider threats, data exfiltration | Malware uploads, compromised files |
+| **Cost** | $0.20/GB analyzed | Per-scan pricing |
+| **Setup** | Enable feature (done) | Enable + configure buckets |
+
+### When to Use Each
+
+**Enable S3 Data Events if**:
+- You need to detect data exfiltration
+- You want to monitor access patterns
+- You have compliance requirements for access logging
+- You want to detect compromised IAM credentials
+
+**Enable S3 Malware Scanning if**:
+- Users upload files to S3 (file sharing, user-generated content)
+- You store downloaded files from external sources
+- You need to prevent malware distribution
+- You have compliance requirements for malware scanning
+
+**Best Practice**: Enable BOTH for comprehensive S3 protection 🛡️
+
+### Configuration Example
+
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "cerpac"
+
+  # Monitor S3 access patterns (WHO did WHAT)
+  enable_s3_data_events = true
+
+  # Scan S3 files for malware (WHAT is in the files)
+  enable_s3_malware_protection = true
+
+  # Other features...
+}
+```
+
+### Additional Setup for S3 Malware Scanning
+
+After enabling `enable_s3_malware_protection = true`, you must:
+
+1. **Configure which buckets to scan** (via AWS Console or additional Terraform):
+   - GuardDuty → Malware Protection → S3 → Configure
+   - Select buckets and optionally specific prefixes
+   
+2. **Set up notifications** (optional but recommended):
+   - Create EventBridge rule for malware findings
+   - Send alerts to SNS, Slack, or email
+
+3. **Define remediation actions** (optional):
+   - Auto-quarantine infected files
+   - Move to isolated bucket
+   - Delete malicious uploads
 
 ## Outputs
 

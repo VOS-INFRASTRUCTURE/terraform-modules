@@ -92,10 +92,23 @@ variable "enable_lambda_protection" {
 }
 
 variable "enable_ebs_malware_protection" {
-  description = "Enable EBS malware protection (scans EBS volumes when suspicious activity is detected). Cost: $0.10/GB scanned (only when triggered)."
+  description = "Enable EC2/EBS malware protection - GuardDuty-initiated scans (scans EBS volumes when suspicious activity is detected). Cost: $0.10/GB scanned (only when triggered)."
   type        = bool
   default     = true
 }
+
+variable "enable_s3_malware_protection" {
+  description = "Enable S3 malware scanning (scans new S3 uploads for malware). Cost: Varies by usage. Note: This is different from enable_s3_data_events which monitors access patterns."
+  type        = bool
+  default     = false  # Disabled by default due to additional cost
+}
+
+variable "enable_runtime_monitoring" {
+  description = "Enable Runtime Monitoring for EKS and ECS Fargate (monitors runtime behavior of containers). Cost: Varies by usage."
+  type        = bool
+  default     = false  # Only enable if you have EKS/ECS Fargate
+}
+
 
 
 

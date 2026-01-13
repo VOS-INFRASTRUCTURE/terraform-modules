@@ -210,3 +210,124 @@ resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
   status      = var.enable_ebs_malware_protection ? "ENABLED" : "DISABLED"
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# S3 Malware Protection (Object-Level Scanning)
+#
+# Purpose: Scan new S3 uploads for malware in real-time
+#
+# How it works:
+# 1. Configure specific S3 buckets for scanning
+# 2. New objects uploaded to these buckets are automatically scanned
+# 3. Malware findings published to GuardDuty console
+# 4. Can trigger automatic remediation (quarantine, delete, etc.)
+#
+# What it detects:
+# - Known malware signatures
+# - Trojans, ransomware, viruses
+# - Suspicious executable files
+# - Malicious scripts
+#
+# Cost: Varies by usage (pay per scan)
+#
+# Note: This is DIFFERENT from enable_s3_data_events:
+#   - S3_DATA_EVENTS: Monitors access patterns (who accessed what, when)
+#   - S3_MALWARE_SCANNING: Scans file contents for malware
+#
+# Important: After enabling, you must configure which S3 buckets to scan
+#            via the GuardDuty console or additional Terraform resources.
+# ──────────────────────────────────────────────────────────────────────────────
+
+resource "aws_guardduty_detector_feature" "s3_malware_protection" {
+  count = var.enable_guardduty ? 1 : 0
+
+  detector_id = aws_guardduty_detector.this[0].id
+  name        = "S3_MALWARE_SCANNING"
+  status      = var.enable_s3_malware_protection ? "ENABLED" : "DISABLED"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Runtime Monitoring (EKS and ECS Fargate)
+#
+# Purpose: Monitor runtime behavior of containerized workloads
+#
+# How it works:
+# 1. Deploys lightweight agent to EKS/ECS Fargate
+# 2. Monitors process executions, file access, network connections
+# 3. Detects runtime threats in real-time
+# 4. Publishes findings for suspicious behavior
+#
+# What it detects:
+# - Privilege escalation attempts
+# - Suspicious process executions
+# - Unauthorized file access
+# - Reverse shells
+# - Crypto mining in containers
+#
+# Supported:
+# - Amazon EKS (Elastic Kubernetes Service)
+# - Amazon ECS Fargate
+#
+# Cost: Varies by vCPU-hours monitored
+#
+# Note: Only enable if you have EKS clusters or ECS Fargate tasks.
+#       For ECS EC2 launch type, use EBS_MALWARE_PROTECTION instead.
+# ──────────────────────────────────────────────────────────────────────────────
+
+resource "aws_guardduty_detector_feature" "runtime_monitoring" {
+  count = var.enable_guardduty ? 1 : 0
+
+  detector_id = aws_guardduty_detector.this[0].id
+  name        = "RUNTIME_MONITORING"
+  status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Runtime Monitoring - EKS Add-on Management (Sub-feature)
+#
+# Purpose: Automatically manage GuardDuty agent on EKS clusters
+#
+# When enabled with RUNTIME_MONITORING:
+# - GuardDuty automatically deploys agent to EKS clusters
+# - Handles agent updates and lifecycle
+# - Simplifies deployment (no manual kubectl commands)
+#
+# When disabled:
+# - You must manually deploy the GuardDuty agent
+# - More control but requires manual maintenance
+#
+# Recommendation: Keep enabled if you enabled runtime_monitoring
+# ──────────────────────────────────────────────────────────────────────────────
+
+resource "aws_guardduty_detector_feature" "eks_addon_management" {
+  count = var.enable_guardduty && var.enable_runtime_monitoring ? 1 : 0
+
+  detector_id = aws_guardduty_detector.this[0].id
+  name        = "EKS_ADDON_MANAGEMENT"
+  status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Runtime Monitoring - ECS Fargate Agent Management (Sub-feature)
+#
+# Purpose: Automatically manage GuardDuty agent on ECS Fargate tasks
+#
+# When enabled with RUNTIME_MONITORING:
+# - GuardDuty automatically injects agent into Fargate tasks
+# - Monitors task runtime behavior
+# - Handles agent updates automatically
+#
+# When disabled:
+# - Runtime monitoring not available for ECS Fargate
+#
+# Recommendation: Keep enabled if you have ECS Fargate and enabled runtime_monitoring
+# ──────────────────────────────────────────────────────────────────────────────
+
+resource "aws_guardduty_detector_feature" "ecs_fargate_agent_management" {
+  count = var.enable_guardduty && var.enable_runtime_monitoring ? 1 : 0
+
+  detector_id = aws_guardduty_detector.this[0].id
+  name        = "FARGATE_RUNTIME_MONITORING"
+  status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
+}
+
+

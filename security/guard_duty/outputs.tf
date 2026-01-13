@@ -28,12 +28,12 @@ output "guard_duty" {
     # Data Sources - What GuardDuty monitors
     # ──────────────────────────────────────────────────────────────────────
     data_sources = {
-      cloudtrail       = true                             # Always enabled (API call monitoring)
-      vpc_flow_logs    = true                             # Always enabled (network traffic)
-      dns_logs         = true                             # Always enabled (DNS query analysis)
-      s3_logs          = var.enable_s3_data_events         # S3 data event monitoring
-      kubernetes_logs  = var.enable_eks_audit_logs        # EKS audit log analysis
-      malware_scanning = var.enable_ebs_malware_protection    # EBS volume malware scanning
+      cloudtrail       = true                                      # Always enabled (API call monitoring)
+      vpc_flow_logs    = true                                      # Always enabled (network traffic)
+      dns_logs         = true                                      # Always enabled (DNS query analysis)
+      s3_logs          = var.enable_s3_data_events                 # S3 data event monitoring
+      kubernetes_logs  = var.enable_eks_audit_logs                 # EKS audit log analysis
+      malware_scanning = var.enable_ebs_malware_protection         # EBS volume malware scanning
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -44,7 +44,19 @@ output "guard_duty" {
       eks_audit_logs          = var.enable_eks_audit_logs           # Kubernetes API monitoring
       rds_login_events        = var.enable_rds_protection           # Database login monitoring
       lambda_network_logs     = var.enable_lambda_protection        # Lambda network monitoring
-      ebs_malware_protection  = var.enable_ebs_malware_protection   # EBS malware scanning
+      ebs_malware_protection  = var.enable_ebs_malware_protection   # EBS malware scanning (GuardDuty-initiated)
+      s3_malware_scanning     = var.enable_s3_malware_protection    # S3 malware scanning (file content analysis)
+      runtime_monitoring      = var.enable_runtime_monitoring       # EKS/ECS Fargate runtime monitoring
+    }
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Malware Protection Summary - All 3 types
+    # ──────────────────────────────────────────────────────────────────────
+    malware_protection = {
+      ec2_ebs_scanning = var.enable_ebs_malware_protection    # EC2: GuardDuty-initiated EBS scans
+      s3_scanning      = var.enable_s3_malware_protection     # S3: Automatic upload scanning
+      # Note: AWS Backup malware scanning is not yet supported via Terraform
+      # You must configure it manually in the AWS Console
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -59,7 +71,9 @@ output "guard_duty" {
         (var.enable_eks_audit_logs ? 1 : 0) +
         (var.enable_rds_protection ? 1 : 0) +
         (var.enable_lambda_protection ? 1 : 0) +
-        (var.enable_ebs_malware_protection ? 1 : 0)
+        (var.enable_ebs_malware_protection ? 1 : 0) +
+        (var.enable_s3_malware_protection ? 1 : 0) +
+        (var.enable_runtime_monitoring ? 1 : 0)
       )
     }
   } : null
