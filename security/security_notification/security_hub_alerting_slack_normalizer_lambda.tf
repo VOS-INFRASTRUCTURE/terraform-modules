@@ -39,11 +39,33 @@ resource "aws_iam_role_policy_attachment" "security_alert_lambda_basic_logs" {
 }
 
 ################################################################################
+# CLOUDWATCH LOG GROUP – SLACK LAMBDA
+# Purpose: Explicitly create log group with retention to prevent infinite growth
+################################################################################
+
+resource "aws_cloudwatch_log_group" "security_alert_slack_handler" {
+  count = var.enable_slack_alerts ? 1 : 0
+
+  name              = "/aws/lambda/${var.env}-${var.project_id}-security-alert-slack-handler"
+  retention_in_days = 90  # 3 months retention for security logs
+
+  tags = {
+    Environment = var.env
+    Project     = var.project_id
+    ManagedBy   = "Terraform"
+    Purpose     = "SecuritySlackAlerts"
+  }
+}
+
+################################################################################
 # LAMBDA FUNCTION – SECURITY ALERT NORMALIZER (SLACK)
 ################################################################################
 
 resource "aws_lambda_function" "security_alert_slack_handler" {
   count = var.enable_slack_alerts ? 1 : 0
+
+  # Create log group first to ensure retention is set before Lambda writes to it
+  depends_on = [aws_cloudwatch_log_group.security_alert_slack_handler]
 
   function_name = "${var.env}-${var.project_id}-security-alert-slack-handler"
   role          = aws_iam_role.security_alert_lambda_role[0].arn

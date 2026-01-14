@@ -78,13 +78,36 @@ resource "aws_iam_role_policy" "security_email_lambda_ses" {
 }
 
 ################################################################################
+# CLOUDWATCH LOG GROUP – EMAIL LAMBDA
+# Purpose: Explicitly create log group with retention to prevent infinite growth
+################################################################################
+
+resource "aws_cloudwatch_log_group" "security_email_handler" {
+  count = var.enable_email_handler ? 1 : 0
+
+  name              = "/aws/lambda/${local.email_lambda_name}"
+  retention_in_days = 90  # 3 months retention for security logs
+
+  tags = {
+    Environment = var.env
+    Project     = var.project_id
+    ManagedBy   = "Terraform"
+    Purpose     = "SecurityEmailHandler"
+  }
+}
+
+################################################################################
 # LAMBDA FUNCTION – SECURITY EMAIL HANDLER
 ################################################################################
 
 resource "aws_lambda_function" "security_email_handler" {
   count = var.enable_email_handler ? 1 : 0
 
+  # Create log group first to ensure retention is set before Lambda writes to it
+  depends_on = [aws_cloudwatch_log_group.security_email_handler]
+
   function_name = local.email_lambda_name
+  // ...existing code...
   role          = aws_iam_role.security_email_lambda_role[0].arn
   handler       = "security_alert_email_handler.lambda_handler"
   runtime       = "python3.11"
