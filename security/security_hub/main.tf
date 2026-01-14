@@ -1,5 +1,7 @@
 ################################################################################
 # AWS Security Hub - Centralized Security Monitoring & Alerting
+# Go to https://eu-west-2.console.aws.amazon.com/securityhub/home?region=eu-west-2#/onboard
+# Enable AWS Security Hub CSPM
 #
 # Purpose: Comprehensive security monitoring module that provides:
 #   - AWS Security Hub (standards-based security posture management)
