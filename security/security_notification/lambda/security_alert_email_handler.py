@@ -31,13 +31,17 @@ SEVERITY_COLOR = {
 
 
 def lambda_handler(event, context):
-    # Raw event debug
-    logger.debug("Received event: %s", json.dumps(event))
+    # Raw event debug - using print to ensure it always shows
+    print(f"=== RECEIVED EVENT ===")
+    print(json.dumps(event, indent=2, default=str))
+    print(f"=== LOG_LEVEL: {os.environ.get('LOG_LEVEL')} ===")
 
     try:
         sns = event["Records"][0]["Sns"]
         message = json.loads(sns["Message"])
     except Exception as e:
+        print(f"ERROR: Failed to parse SNS event: {e}")
+        print(f"Event that failed: {json.dumps(event, indent=2, default=str)}")
         logger.exception("Failed to parse SNS event: %s", e)
         return {"status": "error", "error": str(e)}
 
@@ -132,15 +136,15 @@ def lambda_handler(event, context):
 
     # Suppress non-HIGH/CRITICAL severities
     normalized_sev = str(severity).upper()
-    logger.debug("Parsed severity: %s", normalized_sev)
+    print(f"Parsed severity: {normalized_sev}")
 
     if normalized_sev not in ALLOWED_SEVERITIES:
-        logger.info("Suppressed finding with severity=%s title=%s", normalized_sev, title)
+        print(f"Suppressed finding with severity={normalized_sev} title={title}")
         return {"status": "suppressed", "severity": severity}
 
     # Send HTML email
     try:
-        logger.info("Sending email alert: title=%s severity=%s", title, normalized_sev)
+        print(f"Sending email alert: title={title} severity={normalized_sev}")
         send_email(
             title=title,
             severity=normalized_sev,
@@ -155,9 +159,10 @@ def lambda_handler(event, context):
             console_url=console_url,
             created_at=created_at,
         )
-        logger.info("Email delivery success")
+        print("Email delivery success")
         return {"status": "ok"}
     except Exception as e:
+        print(f"ERROR: Email delivery failed: {e}")
         logger.exception("Email delivery failed: %s", e)
         return {"status": "error", "error": str(e)}
 

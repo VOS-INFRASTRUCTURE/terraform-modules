@@ -219,7 +219,7 @@ output "security_notification" {
       enabled              = true
       webhook_configured   = true
       lambda_function_arn  = "arn:aws:lambda:..."
-      lambda_function_name = "production-my-project-security-alert-normalizer"
+      lambda_function_name = "production-my-project-security-alert-slack-handler"
     }
 
     # Summary

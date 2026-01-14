@@ -26,13 +26,17 @@ ALLOWED_SEVERITIES = {"CRITICAL", "HIGH"}
 
 
 def lambda_handler(event, context):
-    # Raw event debug
-    logger.debug("Received event: %s", json.dumps(event))
+    # Raw event debug - using print to ensure it always shows
+    print(f"=== RECEIVED EVENT ===")
+    print(json.dumps(event, indent=2))
+    print(f"=== LOG_LEVEL: {os.environ.get('LOG_LEVEL')} ===")
 
     try:
         sns = event["Records"][0]["Sns"]
         message = json.loads(sns["Message"])
     except Exception as e:
+        print(f"ERROR: Failed to parse SNS event: {e}")
+        print(f"Event that failed: {json.dumps(event, indent=2)}")
         logger.exception("Failed to parse SNS event: %s", e)
         return {"status": "error", "error": str(e)}
 
@@ -114,10 +118,10 @@ def lambda_handler(event, context):
 
     # Suppress non-HIGH/CRITICAL severities
     normalized_sev = str(severity).upper()
-    logger.debug("Parsed severity: %s", normalized_sev)
+    print(f"Parsed severity: {normalized_sev}")
 
     if normalized_sev not in ALLOWED_SEVERITIES:
-        logger.info("Suppressed finding with severity=%s title=%s", normalized_sev, title)
+        print(f"Suppressed finding with severity={normalized_sev} title={title}")
         return {"status": "suppressed", "severity": severity}
 
     color = SEVERITY_COLOR.get(normalized_sev, SEVERITY_COLOR["UNKNOWN"])
@@ -158,11 +162,12 @@ def lambda_handler(event, context):
     }
 
     try:
-        logger.info("Sending alert to Slack: title=%s severity=%s", title, normalized_sev)
+        print(f"Sending alert to Slack: title={title} severity={normalized_sev}")
         send_to_slack(slack_payload)
-        logger.info("Slack delivery success")
+        print("Slack delivery success")
         return {"status": "ok"}
     except Exception as e:
+        print(f"ERROR: Slack delivery failed: {e}")
         logger.exception("Slack delivery failed: %s", e)
         return {"status": "error", "error": str(e)}
 

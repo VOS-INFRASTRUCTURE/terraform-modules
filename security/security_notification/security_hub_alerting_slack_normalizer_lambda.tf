@@ -45,7 +45,7 @@ resource "aws_iam_role_policy_attachment" "security_alert_lambda_basic_logs" {
 resource "aws_lambda_function" "security_alert_slack_handler" {
   count = var.enable_slack_alerts ? 1 : 0
 
-  function_name = "${var.env}-${var.project_id}-security-alert-normalizer"
+  function_name = "${var.env}-${var.project_id}-security-alert-slack-handler"
   role          = aws_iam_role.security_alert_lambda_role[0].arn
   handler       = "security_alert_slack_handler.lambda_handler"
   runtime       = "python3.11"

@@ -860,17 +860,17 @@ aws logs describe-metric-filters \
 **Fix**:
 ```bash
 # Check Lambda logs
-aws logs tail /aws/lambda/production-security-alert-normalizer --follow
+aws logs tail /aws/lambda/production-security-alert-slack-handler --follow
 
 # Test Lambda manually
 aws lambda invoke \
-  --function-name production-security-alert-normalizer \
+  --function-name production-security-alert-slack-handler \
   --payload file://test-event.json \
   response.json
 
 # Check Lambda environment variables
 aws lambda get-function-configuration \
-  --function-name production-security-alert-normalizer
+  --function-name production-security-alert-slack-handler
 ```
 
 ### High Security Hub Costs
