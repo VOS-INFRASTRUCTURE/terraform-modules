@@ -215,14 +215,15 @@ This table maps AWS Console Protection Plans to Terraform variables for easy ref
 | **Protection Plans → RDS Protection** | `enable_rds_protection` | RDS Login Events | ✅ Supported |
 | **Protection Plans → Lambda Protection** | `enable_lambda_protection` | Lambda Network Logs | ✅ Supported |
 | **Protection Plans → Runtime Monitoring** | `enable_runtime_monitoring` | Runtime Monitoring | ✅ Supported |
-| **Protection Plans → Runtime Monitoring → EKS Add-on** | `enable_runtime_monitoring` | EKS Add-on Management | ✅ Auto-enabled with Runtime Monitoring |
-| **Protection Plans → Runtime Monitoring → ECS Fargate** | `enable_runtime_monitoring` | ECS Fargate Agent | ✅ Auto-enabled with Runtime Monitoring |
+| **Protection Plans → Runtime Monitoring → EKS** | `enable_runtime_monitoring` | EKS Runtime Monitoring | ✅ Auto-enabled with Runtime Monitoring |
+| **Protection Plans → Runtime Monitoring → ECS Fargate** | `enable_runtime_monitoring` | ECS Fargate Runtime | ✅ Auto-included with Runtime Monitoring (no separate feature) |
 | **Protection Plans → Malware Protection → EC2** | `enable_ebs_malware_protection` | EBS Malware Scanning | ✅ Supported |
 | **Protection Plans → Malware Protection → S3** | `enable_s3_malware_protection` | S3 Malware Scanning | ✅ Supported |
 | **Protection Plans → Malware Protection → AWS Backup** | N/A | AWS Backup Scanning | ❌ Not available via Terraform |
 
 **Important Notes**: 
-- Setting `enable_runtime_monitoring = true` automatically enables both EKS Add-on Management and ECS Fargate Agent Management sub-features.
+- Setting `enable_runtime_monitoring = true` automatically enables EKS Runtime Monitoring as a sub-feature
+- ECS Fargate runtime monitoring is automatically included with the main `RUNTIME_MONITORING` feature (no separate toggle)
 - ⚠️ **Runtime Monitoring is ONLY supported for ECS Fargate** (serverless), NOT for ECS EC2 launch type
 - For ECS tasks running on EC2 instances, use `enable_ebs_malware_protection` instead
 

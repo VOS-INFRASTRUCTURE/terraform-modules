@@ -301,7 +301,7 @@ resource "aws_guardduty_detector_feature" "runtime_monitoring" {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Runtime Monitoring - EKS Add-on Management (Sub-feature)
+# Runtime Monitoring - EKS Runtime Monitoring (Sub-feature)
 #
 # AWS Console: Protection Plans → Runtime Monitoring → EKS Add-on Management
 #
@@ -316,31 +316,33 @@ resource "aws_guardduty_detector_feature" "runtime_monitoring" {
 # - You must manually deploy the GuardDuty agent
 # - More control but requires manual maintenance
 #
-# Recommendation: Keep enabled if you enabled runtime_monitoring
+# Note: This is a separate feature from the main RUNTIME_MONITORING feature.
+#       It specifically handles EKS cluster monitoring.
+#
+# Recommendation: Keep enabled if you enabled runtime_monitoring and have EKS clusters
 # ──────────────────────────────────────────────────────────────────────────────
 
-resource "aws_guardduty_detector_feature" "eks_addon_management" {
+resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
   count = var.enable_guardduty && var.enable_runtime_monitoring ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
-  name        = "EKS_ADDON_MANAGEMENT"
+  name        = "EKS_RUNTIME_MONITORING"
   status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Runtime Monitoring - ECS Fargate Agent Management (Sub-feature)
+# Note: ECS Fargate Runtime Monitoring
 #
 # AWS Console: Protection Plans → Runtime Monitoring → ECS Fargate Agent Management
 #
-# Purpose: Automatically manage GuardDuty agent on ECS Fargate tasks
+# ECS Fargate runtime monitoring is automatically included when you enable
+# the main RUNTIME_MONITORING feature above. There is no separate feature flag
+# for ECS Fargate specifically.
 #
-# When enabled with RUNTIME_MONITORING:
-# - GuardDuty automatically injects agent into Fargate tasks
-# - Monitors task runtime behavior
-# - Handles agent updates automatically
-#
-# When disabled:
-# - Runtime monitoring not available for ECS Fargate
+# When RUNTIME_MONITORING is enabled:
+# - ✅ EKS clusters: Agent automatically deployed
+# - ✅ ECS Fargate tasks: Agent automatically injected
+# - ❌ ECS EC2 instances: NOT supported (use EBS_MALWARE_PROTECTION instead)
 #
 # Important: ECS Launch Type Support
 # ✅ ECS Fargate (serverless): SUPPORTED - Agent auto-injected into tasks
@@ -350,16 +352,7 @@ resource "aws_guardduty_detector_feature" "eks_addon_management" {
 # - Fargate: AWS controls the infrastructure, can inject agent automatically
 # - EC2: You control the instances, agent injection not possible
 # - For EC2 instances: GuardDuty scans EBS volumes instead of runtime monitoring
-#
-# Recommendation: Keep enabled if you have ECS Fargate and enabled runtime_monitoring
 # ──────────────────────────────────────────────────────────────────────────────
 
-resource "aws_guardduty_detector_feature" "ecs_fargate_agent_management" {
-  count = var.enable_guardduty && var.enable_runtime_monitoring ? 1 : 0
-
-  detector_id = aws_guardduty_detector.this[0].id
-  name        = "FARGATE_RUNTIME_MONITORING"
-  status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
-}
 
 
