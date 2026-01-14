@@ -104,9 +104,9 @@ variable "enable_s3_malware_protection" {
 }
 
 variable "enable_runtime_monitoring" {
-  description = "Enable Runtime Monitoring for EKS and ECS Fargate (monitors runtime behavior of containers). Cost: Varies by usage."
+  description = "Enable Runtime Monitoring for EKS and ECS Fargate ONLY (monitors runtime behavior of containers). NOT supported for ECS EC2 launch type - use enable_ebs_malware_protection instead. Cost: Varies by usage."
   type        = bool
-  default     = false  # Only enable if you have EKS/ECS Fargate
+  default     = false  # Only enable if you have EKS clusters or ECS Fargate tasks
 }
 
 

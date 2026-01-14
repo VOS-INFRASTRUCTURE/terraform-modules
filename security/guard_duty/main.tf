@@ -277,14 +277,19 @@ resource "aws_guardduty_detector_feature" "s3_malware_protection" {
 # - Reverse shells
 # - Crypto mining in containers
 #
-# Supported:
-# - Amazon EKS (Elastic Kubernetes Service)
-# - Amazon ECS Fargate
+# Supported Platforms:
+# - ✅ Amazon EKS (Elastic Kubernetes Service)
+# - ✅ Amazon ECS Fargate (serverless containers)
+# - ❌ Amazon ECS EC2 launch type (NOT SUPPORTED)
 #
 # Cost: Varies by vCPU-hours monitored
 #
-# Note: Only enable if you have EKS clusters or ECS Fargate tasks.
-#       For ECS EC2 launch type, use EBS_MALWARE_PROTECTION instead.
+# Important Notes:
+# - Only enable if you have EKS clusters or ECS Fargate tasks
+# - For ECS EC2 launch type, Runtime Monitoring is NOT available
+# - For ECS EC2 instances, use EBS_MALWARE_PROTECTION instead to scan volumes
+# - Runtime Monitoring analyzes RUNTIME behavior (processes, files, network)
+# - EBS Malware Protection scans DISK contents for malware files
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "runtime_monitoring" {
@@ -336,6 +341,15 @@ resource "aws_guardduty_detector_feature" "eks_addon_management" {
 #
 # When disabled:
 # - Runtime monitoring not available for ECS Fargate
+#
+# Important: ECS Launch Type Support
+# ✅ ECS Fargate (serverless): SUPPORTED - Agent auto-injected into tasks
+# ❌ ECS EC2 (container instances): NOT SUPPORTED - Use EBS_MALWARE_PROTECTION instead
+#
+# Why the difference?
+# - Fargate: AWS controls the infrastructure, can inject agent automatically
+# - EC2: You control the instances, agent injection not possible
+# - For EC2 instances: GuardDuty scans EBS volumes instead of runtime monitoring
 #
 # Recommendation: Keep enabled if you have ECS Fargate and enabled runtime_monitoring
 # ──────────────────────────────────────────────────────────────────────────────

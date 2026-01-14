@@ -33,8 +33,9 @@ guard_duty/
    - *AWS Console: Protection Plans → RDS Protection*  
 ✅ **Lambda Protection**: Serverless function threat detection  
    - *AWS Console: Protection Plans → Lambda Protection*  
-✅ **Runtime Monitoring**: EKS/ECS Fargate runtime behavior analysis  
-   - *AWS Console: Protection Plans → Runtime Monitoring*  
+✅ **Runtime Monitoring**: EKS/ECS Fargate (ONLY) runtime behavior analysis  
+   - *AWS Console: Protection Plans → Runtime Monitoring*
+   - ⚠️ **NOT supported for ECS EC2 launch type** - use EBS Malware Protection instead  
 
 ### Malware Protection (3 Types)
 
@@ -220,7 +221,10 @@ This table maps AWS Console Protection Plans to Terraform variables for easy ref
 | **Protection Plans → Malware Protection → S3** | `enable_s3_malware_protection` | S3 Malware Scanning | ✅ Supported |
 | **Protection Plans → Malware Protection → AWS Backup** | N/A | AWS Backup Scanning | ❌ Not available via Terraform |
 
-**Note**: Setting `enable_runtime_monitoring = true` automatically enables both EKS Add-on Management and ECS Fargate Agent Management sub-features.
+**Important Notes**: 
+- Setting `enable_runtime_monitoring = true` automatically enables both EKS Add-on Management and ECS Fargate Agent Management sub-features.
+- ⚠️ **Runtime Monitoring is ONLY supported for ECS Fargate** (serverless), NOT for ECS EC2 launch type
+- For ECS tasks running on EC2 instances, use `enable_ebs_malware_protection` instead
 
 ## Important: Feature Toggle Behavior
 
@@ -400,6 +404,85 @@ After enabling `enable_s3_malware_protection = true`, you must:
    - Auto-quarantine infected files
    - Move to isolated bucket
    - Delete malicious uploads
+
+## Understanding Runtime Monitoring: ECS Fargate vs ECS EC2
+
+⚠️ **CRITICAL**: Runtime Monitoring has different support depending on your ECS launch type.
+
+### ECS Fargate (Serverless) - ✅ SUPPORTED
+
+**What**: AWS-managed serverless container platform  
+**Runtime Monitoring**: ✅ Fully supported  
+**How it works**: GuardDuty automatically injects agent into Fargate tasks  
+**Variable**: `enable_runtime_monitoring = true`  
+**AWS Console**: Protection Plans → Runtime Monitoring → ECS Fargate  
+
+**Example Configuration**:
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "my-app"
+
+  # ✅ This works for ECS Fargate tasks
+  enable_runtime_monitoring = true
+}
+```
+
+### ECS EC2 (Container Instances) - ❌ NOT SUPPORTED
+
+**What**: ECS tasks running on EC2 instances you manage  
+**Runtime Monitoring**: ❌ NOT supported (agent cannot be injected)  
+**Alternative**: Use EBS Malware Protection instead  
+**Variable**: `enable_ebs_malware_protection = true`  
+**AWS Console**: Protection Plans → Malware Protection → EC2  
+
+**Example Configuration**:
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "my-app"
+
+  # ❌ Runtime Monitoring doesn't work for ECS EC2
+  enable_runtime_monitoring = false
+
+  # ✅ Use EBS Malware Protection instead
+  enable_ebs_malware_protection = true
+}
+```
+
+### Why the Difference?
+
+| Aspect | ECS Fargate | ECS EC2 |
+|--------|-------------|---------|
+| **Infrastructure** | AWS-managed (serverless) | You manage EC2 instances |
+| **Agent Injection** | Automatic by AWS | Not possible |
+| **Runtime Monitoring** | ✅ Supported | ❌ Not Supported |
+| **Protection Method** | Agent monitors runtime behavior | GuardDuty scans EBS volumes |
+| **What's Monitored** | Process execution, file access, network | Disk contents for malware |
+| **Cost Model** | Per vCPU-hour | Per GB scanned (when triggered) |
+
+### Quick Decision Guide
+
+**You have ECS Fargate?**  
+→ Enable `enable_runtime_monitoring = true`
+
+**You have ECS tasks on EC2 instances?**  
+→ Enable `enable_ebs_malware_protection = true`  
+→ DO NOT enable `enable_runtime_monitoring` (it won't work)
+
+**You have both Fargate AND EC2?**  
+→ Enable both:
+```terraform
+enable_runtime_monitoring     = true  # For Fargate tasks
+enable_ebs_malware_protection = true  # For EC2 instances
+```
+
+**You also have EKS (Kubernetes)?**  
+→ `enable_runtime_monitoring = true` works for EKS too!
 
 ## Outputs
 
