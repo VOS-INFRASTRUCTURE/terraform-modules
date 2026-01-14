@@ -291,57 +291,72 @@ resource "aws_guardduty_detector_feature" "runtime_monitoring" {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Runtime Monitoring - EKS Runtime Monitoring (Sub-feature)
+# Runtime Monitoring - EKS Automated Agent Configuration
 #
-# AWS Console: Protection Plans → Runtime Monitoring → EKS Add-on Management
+# AWS Console: Protection Plans → Runtime Monitoring → Automated agent configuration → Amazon EKS
 #
-# Purpose: Automatically manage GuardDuty agent on EKS clusters
+# Purpose: Automatically deploy and manage GuardDuty security agent on EKS clusters
 #
-# When enabled with RUNTIME_MONITORING:
+# Requirements:
+# - enable_runtime_monitoring = true (base feature must be enabled first)
+# - enable_eks_runtime_agent = true (this variable)
+#
+# When enabled:
 # - GuardDuty automatically deploys agent to EKS clusters
-# - Handles agent updates and lifecycle
-# - Simplifies deployment (no manual kubectl commands)
+# - Handles agent updates and lifecycle automatically
+# - No manual kubectl commands required
+# - Shows "Automated agent configuration for Amazon EKS is enabled" in console
 #
 # When disabled:
-# - You must manually deploy the GuardDuty agent
+# - You must manually deploy the GuardDuty agent via kubectl
 # - More control but requires manual maintenance
+# - Shows "Automated agent configuration for Amazon EKS is not enabled" in console
 #
-# Note: This is a separate feature from the main RUNTIME_MONITORING feature.
-#       It specifically handles EKS cluster monitoring.
+# Note: This is the ONLY runtime monitoring agent that can be automated via Terraform.
+#       ECS Fargate and EC2 agents require manual configuration in AWS Console.
 #
-# Recommendation: Keep enabled if you enabled runtime_monitoring and have EKS clusters
+# Recommendation: Enable if you have EKS clusters
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
-  count = var.enable_guardduty && var.enable_runtime_monitoring ? 1 : 0
+  count = var.enable_guardduty && var.enable_runtime_monitoring && var.enable_eks_runtime_agent ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "EKS_RUNTIME_MONITORING"
-  status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
+  status      = "ENABLED"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Note: ECS Fargate Runtime Monitoring
+# Note: ECS Fargate and EC2 Runtime Monitoring Agents
 #
-# AWS Console: Protection Plans → Runtime Monitoring → ECS Fargate Agent Management
+# AWS Console: Protection Plans → Runtime Monitoring → Automated agent configuration
 #
-# ECS Fargate runtime monitoring is automatically included when you enable
-# the main RUNTIME_MONITORING feature above. There is no separate feature flag
-# for ECS Fargate specifically.
+# ⚠️ IMPORTANT: ECS Fargate and EC2 agents CANNOT be configured via Terraform
 #
-# When RUNTIME_MONITORING is enabled:
-# - ✅ EKS clusters: Agent automatically deployed
-# - ✅ ECS Fargate tasks: Agent automatically injected
-# - ❌ ECS EC2 instances: NOT supported (use EBS_MALWARE_PROTECTION instead)
+# After enabling enable_runtime_monitoring = true, you MUST manually configure:
 #
-# Important: ECS Launch Type Support
-# ✅ ECS Fargate (serverless): SUPPORTED - Agent auto-injected into tasks
-# ❌ ECS EC2 (container instances): NOT SUPPORTED - Use EBS_MALWARE_PROTECTION instead
+# 1. ECS Fargate Agent (if you have ECS Fargate tasks):
+#    - Go to: GuardDuty → Runtime Monitoring → Configuration
+#    - Find: "Automated agent configuration" section
+#    - Click: Enable button for "AWS Fargate (ECS only)"
+#    - Result: Agent will be auto-injected into Fargate tasks
 #
-# Why the difference?
-# - Fargate: AWS controls the infrastructure, can inject agent automatically
-# - EC2: You control the instances, agent injection not possible
-# - For EC2 instances: GuardDuty scans EBS volumes instead of runtime monitoring
+# 2. EC2 Agent (if you have standalone EC2 instances):
+#    - Go to: GuardDuty → Runtime Monitoring → Configuration
+#    - Find: "Automated agent configuration" section
+#    - Click: Enable button for "Amazon EC2"
+#    - Result: Agent will be deployed via AWS Systems Manager
+#
+# Why manual configuration is required:
+# - AWS does not provide Terraform resources for these agent configurations
+# - Only EKS_RUNTIME_MONITORING is available as a detector feature
+# - ECS Fargate and EC2 use a different configuration mechanism
+#
+# Platform Support Summary:
+# ├── EKS clusters: ✅ Fully automated via enable_eks_runtime_agent = true
+# ├── ECS Fargate: ⚠️ Manual enable in console required
+# ├── EC2 instances: ⚠️ Manual enable in console required
+# └── ECS EC2 launch type: ❌ NOT supported (use EBS_MALWARE_PROTECTION instead)
 # ──────────────────────────────────────────────────────────────────────────────
 
 

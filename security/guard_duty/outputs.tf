@@ -45,8 +45,8 @@ output "guard_duty" {
       rds_login_events        = var.enable_rds_protection           # Database login monitoring
       lambda_network_logs     = var.enable_lambda_protection        # Lambda network monitoring
       ebs_malware_protection  = var.enable_ebs_malware_protection   # EBS malware scanning (GuardDuty-initiated)
-      eks_runtime_monitoring  = var.enable_runtime_monitoring       # EKS runtime monitoring
-      runtime_monitoring      = var.enable_runtime_monitoring       # EKS/ECS Fargate runtime monitoring
+      runtime_monitoring      = var.enable_runtime_monitoring       # Base runtime monitoring feature
+      eks_runtime_agent       = var.enable_eks_runtime_agent        # EKS automated agent deployment
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -73,7 +73,8 @@ output "guard_duty" {
         (var.enable_rds_protection ? 1 : 0) +
         (var.enable_lambda_protection ? 1 : 0) +
         (var.enable_ebs_malware_protection ? 1 : 0) +
-        (var.enable_runtime_monitoring ? 1 : 0)
+        (var.enable_runtime_monitoring ? 1 : 0) +
+        (var.enable_eks_runtime_agent && var.enable_runtime_monitoring ? 1 : 0)
         # Note: S3 malware protection not counted as it's not a detector feature
       )
     }

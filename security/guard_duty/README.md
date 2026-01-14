@@ -53,8 +53,8 @@ GuardDuty provides three distinct malware protection capabilities:
    - **When**: Real-time scanning of new uploads to configured buckets
    - **Cost**: Varies by usage (pay per scan)
    - **AWS Console**: Protection Plans → Malware Protection → S3
-   - **Status**: ✅ Fully supported by this module
-   - **Note**: After enabling, configure buckets in GuardDuty console or via additional Terraform
+   - **Status**: ⚠️ NOT supported via Terraform `aws_guardduty_detector_feature`
+   - **Note**: Must be configured manually in AWS Console - the variable `enable_s3_malware_protection` is kept for future compatibility but currently has no effect
 
 3. **AWS Backup Malware Scanning** (Not yet supported)
    - **What**: Scans AWS Backup recovery points for malware
@@ -108,8 +108,11 @@ module "guardduty" {
   # Protection Plans → Malware Protection → S3
   enable_s3_malware_protection = false  # Additional cost - enable if needed
 
-  # Protection Plans → Runtime Monitoring (only if you have EKS/ECS Fargate)
-  enable_runtime_monitoring = false
+  # Protection Plans → Runtime Monitoring (only if you have EKS/ECS Fargate/EC2)
+  enable_runtime_monitoring = false  # Base feature - enables runtime monitoring capability
+  enable_eks_runtime_agent  = false  # Auto-deploy agent to EKS (requires runtime_monitoring = true)
+  
+  # Note: ECS Fargate and EC2 agents must be enabled manually in AWS Console
 
   tags = {
     ManagedBy   = "Terraform"
@@ -154,7 +157,8 @@ module "guardduty" {
   enable_eks_audit_logs = false
   
   # Protection Plans → Runtime Monitoring
-  enable_runtime_monitoring = false
+  enable_runtime_monitoring = false  # Base feature
+  enable_eks_runtime_agent  = false  # EKS agent deployment
 
   tags = {
     Environment = "dev"
@@ -191,10 +195,15 @@ module "guardduty" {
   enable_ebs_malware_protection = true   # Scan EBS volumes for malware
   
   # Protection Plans → Malware Protection → S3
-  enable_s3_malware_protection = true   # Scan S3 uploads for malware
+  # Note: S3 malware scanning must be configured manually in AWS Console
+  # The variable below has no effect currently (kept for future compatibility)
+  enable_s3_malware_protection = false   # Not supported via Terraform
   
   # Protection Plans → Runtime Monitoring (only if you have EKS/ECS Fargate)
-  enable_runtime_monitoring = true   # Monitor container runtime behavior
+  enable_runtime_monitoring = true   # Enable base runtime monitoring feature
+  enable_eks_runtime_agent  = true   # Auto-deploy agent to EKS clusters (optional)
+  
+  # Note: ECS Fargate and EC2 agents must be enabled manually in AWS Console
 
   tags = {
     ManagedBy   = "Terraform"
@@ -214,11 +223,12 @@ This table maps AWS Console Protection Plans to Terraform variables for easy ref
 | **Protection Plans → EKS Protection** | `enable_eks_audit_logs` | EKS Audit Logs | ✅ Supported |
 | **Protection Plans → RDS Protection** | `enable_rds_protection` | RDS Login Events | ✅ Supported |
 | **Protection Plans → Lambda Protection** | `enable_lambda_protection` | Lambda Network Logs | ✅ Supported |
-| **Protection Plans → Runtime Monitoring** | `enable_runtime_monitoring` | Runtime Monitoring | ✅ Supported |
-| **Protection Plans → Runtime Monitoring → EKS** | `enable_runtime_monitoring` | EKS Runtime Monitoring | ✅ Auto-enabled with Runtime Monitoring |
-| **Protection Plans → Runtime Monitoring → ECS Fargate** | `enable_runtime_monitoring` | ECS Fargate Runtime | ✅ Auto-included with Runtime Monitoring (no separate feature) |
+| **Protection Plans → Runtime Monitoring** | `enable_runtime_monitoring` | Runtime Monitoring Base | ✅ Supported |
+| **Protection Plans → Runtime Monitoring → EKS** | `enable_eks_runtime_agent` | EKS Automated Agent | ✅ Supported (requires runtime_monitoring) |
+| **Protection Plans → Runtime Monitoring → ECS Fargate** | Manual | ECS Fargate Agent | ⚠️ Manual configuration in console required |
+| **Protection Plans → Runtime Monitoring → EC2** | Manual | EC2 Agent | ⚠️ Manual configuration in console required |
 | **Protection Plans → Malware Protection → EC2** | `enable_ebs_malware_protection` | EBS Malware Scanning | ✅ Supported |
-| **Protection Plans → Malware Protection → S3** | `enable_s3_malware_protection` | S3 Malware Scanning | ✅ Supported |
+| **Protection Plans → Malware Protection → S3** | `enable_s3_malware_protection` | S3 Malware Scanning | ⚠️ Not available via `aws_guardduty_detector_feature` |
 | **Protection Plans → Malware Protection → AWS Backup** | N/A | AWS Backup Scanning | ❌ Not available via Terraform |
 
 **Important Notes**: 
@@ -226,6 +236,7 @@ This table maps AWS Console Protection Plans to Terraform variables for easy ref
 - ECS Fargate runtime monitoring is automatically included with the main `RUNTIME_MONITORING` feature (no separate toggle)
 - ⚠️ **Runtime Monitoring is ONLY supported for ECS Fargate** (serverless), NOT for ECS EC2 launch type
 - For ECS tasks running on EC2 instances, use `enable_ebs_malware_protection` instead
+- ⚠️ **S3 Malware Scanning is NOT available** via Terraform `aws_guardduty_detector_feature` - must configure manually in AWS Console
 
 ## Important: Feature Toggle Behavior
 
@@ -326,6 +337,8 @@ If you still see "ENABLED" after 5 minutes:
 
 **AWS Console**: Protection Plans → Malware Protection → S3
 
+⚠️ **IMPORTANT**: S3 Malware Scanning is NOT currently supported via Terraform's `aws_guardduty_detector_feature` resource. It must be configured manually in the AWS Console.
+
 **What it does**: Scans **FILE CONTENTS** for malware
 - Analyzes the actual bytes of uploaded files
 - Checks against malware signature databases
@@ -338,8 +351,9 @@ If you still see "ENABLED" after 5 minutes:
 - PDF with embedded exploit code
 
 **Cost**: Varies by usage (pay per scan)  
-**Variable**: `enable_s3_malware_protection = true/false`  
-**AWS Console**: GuardDuty → Malware Protection → S3
+**Variable**: `enable_s3_malware_protection = true/false` (currently has no effect - kept for future compatibility)  
+**AWS Console**: GuardDuty → Malware Protection → S3  
+**Status**: Must be manually configured in AWS Console
 
 ### Comparison Table
 
@@ -348,6 +362,7 @@ If you still see "ENABLED" after 5 minutes:
 | **Analyzes** | API access patterns | File contents |
 | **Detects** | Unusual access behavior | Malware in files |
 | **Example** | "Someone downloaded 1000 files" | "File contains virus" |
+| **Terraform Support** | ✅ Fully supported | ⚠️ Manual configuration only |
 | **Use Case** | Insider threats, data exfiltration | Malware uploads, compromised files |
 | **Cost** | $0.20/GB analyzed | Per-scan pricing |
 | **Setup** | Enable feature (done) | Enable + configure buckets |
@@ -382,26 +397,29 @@ module "guardduty" {
   enable_s3_data_events = true
 
   # Protection Plans → Malware Protection → S3
-  # Scan S3 files for malware (WHAT is in the files)
-  enable_s3_malware_protection = true
+  # ⚠️ Note: S3 malware scanning must be configured manually in AWS Console
+  # The variable below currently has no effect (kept for future compatibility)
+  # enable_s3_malware_protection = false  # Not supported via Terraform
 
   # Other features...
 }
 ```
 
-### Additional Setup for S3 Malware Scanning
+### Manual Setup for S3 Malware Scanning
 
-After enabling `enable_s3_malware_protection = true`, you must:
+⚠️ **S3 Malware Scanning cannot be configured via Terraform** at this time. To enable it:
 
-1. **Configure which buckets to scan** (via AWS Console or additional Terraform):
+1. **Navigate to AWS Console**:
    - GuardDuty → Malware Protection → S3 → Configure
+   
+2. **Configure which buckets to scan**:
    - Select buckets and optionally specific prefixes
    
-2. **Set up notifications** (optional but recommended):
+3. **Set up notifications** (optional but recommended):
    - Create EventBridge rule for malware findings
    - Send alerts to SNS, Slack, or email
 
-3. **Define remediation actions** (optional):
+4. **Define remediation actions** (optional):
    - Auto-quarantine infected files
    - Move to isolated bucket
    - Delete malicious uploads
@@ -410,13 +428,49 @@ After enabling `enable_s3_malware_protection = true`, you must:
 
 ⚠️ **CRITICAL**: Runtime Monitoring has different support depending on your ECS launch type.
 
-### ECS Fargate (Serverless) - ✅ SUPPORTED
+### What Runtime Monitoring Does
+
+Runtime Monitoring requires TWO things:
+1. **Enable the feature** - Done via Terraform (`enable_runtime_monitoring = true`)
+2. **Deploy the security agent** - Must be configured per platform
+
+### Automated Agent Configuration
+
+When you enable Runtime Monitoring, you'll see in the AWS Console:
+
+```
+Runtime Monitoring configuration
+├── Runtime Monitoring Status: Enabled ✅
+└── Automated agent configuration:
+    ├── Amazon EKS: Enabled ✅ (via EKS_RUNTIME_MONITORING)
+    ├── AWS Fargate (ECS only): Not enabled ⚠️ (manual configuration required)
+    └── Amazon EC2: Not enabled ⚠️ (manual configuration required)
+```
+
+### What This Module Configures
+
+| Platform | Terraform Support | Status in Console | Action Required |
+|----------|------------------|-------------------|-----------------|
+| **Base Runtime Monitoring** | ✅ Fully supported | "Runtime Monitoring Status: Enabled" | None - automated |
+| **Amazon EKS** | ✅ Fully supported | "Automated agent configuration for Amazon EKS is enabled" | None - automated |
+| **AWS Fargate (ECS)** | ⚠️ Manual only | "Automated agent configuration for AWS Fargate (ECS only) is not enabled" | Manual enable in console |
+| **Amazon EC2** | ⚠️ Manual only | "Automated agent configuration for Amazon EC2 is not enabled" | Manual enable in console |
+
+### ECS Fargate (Serverless) - ⚠️ MANUAL CONFIGURATION REQUIRED
 
 **What**: AWS-managed serverless container platform  
-**Runtime Monitoring**: ✅ Fully supported  
-**How it works**: GuardDuty automatically injects agent into Fargate tasks  
-**Variable**: `enable_runtime_monitoring = true`  
-**AWS Console**: Protection Plans → Runtime Monitoring → ECS Fargate  
+**Runtime Monitoring**: ✅ Supported but requires manual agent configuration  
+**Terraform**: Enables Runtime Monitoring feature, but agent deployment must be configured manually  
+
+**Steps after enabling `enable_runtime_monitoring = true`**:
+1. Go to AWS Console → GuardDuty → Runtime Monitoring → Configuration
+2. Under "Automated agent configuration"
+3. Find "AWS Fargate (ECS only)"
+4. Click "Enable" button
+5. GuardDuty will automatically inject agent into new Fargate tasks
+
+**Why manual?**  
+There's no Terraform resource available to enable ECS Fargate automated agent configuration via `aws_guardduty_detector_feature`.
 
 **Example Configuration**:
 ```terraform
@@ -426,8 +480,10 @@ module "guardduty" {
   env        = "production"
   project_id = "my-app"
 
-  # ✅ This works for ECS Fargate tasks
+  # ✅ This enables Runtime Monitoring feature
   enable_runtime_monitoring = true
+  
+  # ⚠️ Manual step required: Enable ECS Fargate agent in console
 }
 ```
 
@@ -455,35 +511,89 @@ module "guardduty" {
 }
 ```
 
+### EKS (Kubernetes) - ✅ FULLY AUTOMATED
+
+**What**: Amazon Elastic Kubernetes Service  
+**Runtime Monitoring**: ✅ Fully supported and automated via Terraform  
+**Terraform**: Both feature and agent configuration automated  
+
+**Example Configuration**:
+```terraform
+module "guardduty" {
+  source = "../../modules/security/guard_duty"
+
+  env        = "production"
+  project_id = "my-app"
+
+  # ✅ Fully automated - both feature and agent deployment
+  enable_runtime_monitoring = true
+}
+```
+
+**What happens**:
+1. Terraform enables `RUNTIME_MONITORING` feature
+2. Terraform enables `EKS_RUNTIME_MONITORING` feature (automated agent configuration)
+3. GuardDuty automatically deploys agent to all EKS clusters
+4. No manual steps required! ✅
+
+### Amazon EC2 Instances - ⚠️ MANUAL CONFIGURATION REQUIRED
+
+**What**: Standalone EC2 instances (not ECS)  
+**Runtime Monitoring**: ✅ Supported but requires manual agent configuration  
+**Terraform**: Enables Runtime Monitoring feature, but agent deployment must be configured manually  
+
+**Steps after enabling `enable_runtime_monitoring = true`**:
+1. Go to AWS Console → GuardDuty → Runtime Monitoring → Configuration
+2. Under "Automated agent configuration"
+3. Find "Amazon EC2"
+4. Click "Enable" button
+5. GuardDuty will deploy agent to EC2 instances via AWS Systems Manager
+
+**Why manual?**  
+There's no Terraform resource available to enable EC2 automated agent configuration via `aws_guardduty_detector_feature`.
+
 ### Why the Difference?
 
-| Aspect | ECS Fargate | ECS EC2 |
-|--------|-------------|---------|
-| **Infrastructure** | AWS-managed (serverless) | You manage EC2 instances |
-| **Agent Injection** | Automatic by AWS | Not possible |
-| **Runtime Monitoring** | ✅ Supported | ❌ Not Supported |
-| **Protection Method** | Agent monitors runtime behavior | GuardDuty scans EBS volumes |
-| **What's Monitored** | Process execution, file access, network | Disk contents for malware |
-| **Cost Model** | Per vCPU-hour | Per GB scanned (when triggered) |
+| Aspect | EKS | ECS Fargate | ECS EC2 | EC2 Instances |
+|--------|-----|-------------|---------|---------------|
+| **Infrastructure** | AWS-managed K8s | AWS-managed serverless | You manage instances | You manage instances |
+| **Terraform Support** | ✅ Full | ⚠️ Feature only | ❌ None | ⚠️ Feature only |
+| **Agent Deployment** | Automated via Terraform | Manual console config | Not supported | Manual console config |
+| **Protection Method** | Runtime monitoring | Runtime monitoring | EBS volume scanning | Runtime monitoring |
+| **Manual Steps** | None | Enable in console | Use EBS protection | Enable in console |
 
 ### Quick Decision Guide
 
-**You have ECS Fargate?**  
-→ Enable `enable_runtime_monitoring = true`
+**You have EKS clusters?**  
+→ Enable `enable_runtime_monitoring = true`  
+→ ✅ Fully automated - no manual steps!
+
+**You have ECS Fargate tasks?**  
+→ Enable `enable_runtime_monitoring = true`  
+→ ⚠️ Then manually enable agent in AWS Console:
+  - GuardDuty → Runtime Monitoring → Configuration
+  - Automated agent configuration → AWS Fargate (ECS only) → Enable
 
 **You have ECS tasks on EC2 instances?**  
 → Enable `enable_ebs_malware_protection = true`  
 → DO NOT enable `enable_runtime_monitoring` (it won't work)
 
-**You have both Fargate AND EC2?**  
+**You have standalone EC2 instances?**  
+→ Enable `enable_runtime_monitoring = true`  
+→ ⚠️ Then manually enable agent in AWS Console:
+  - GuardDuty → Runtime Monitoring → Configuration
+  - Automated agent configuration → Amazon EC2 → Enable
+
+**You have a mix?**  
 → Enable both:
 ```terraform
-enable_runtime_monitoring     = true  # For Fargate tasks
-enable_ebs_malware_protection = true  # For EC2 instances
+enable_runtime_monitoring     = true  # For EKS, ECS Fargate, EC2 instances
+enable_ebs_malware_protection = true  # For ECS EC2 launch type
 ```
-
-**You also have EKS (Kubernetes)?**  
-→ `enable_runtime_monitoring = true` works for EKS too!
+→ ⚠️ Manual configuration required for:
+  - ECS Fargate agent (enable in console)
+  - EC2 instance agent (enable in console)
+→ ✅ EKS agent is fully automated!
 
 ## Outputs
 
@@ -938,8 +1048,9 @@ enable_rds_protection = true
 | `enable_rds_protection` | bool | `true` | Enable RDS login activity monitoring | Protection Plans → RDS Protection |
 | `enable_lambda_protection` | bool | `true` | Enable Lambda network monitoring | Protection Plans → Lambda Protection |
 | `enable_ebs_malware_protection` | bool | `true` | Enable EC2/EBS malware scanning | Protection Plans → Malware Protection → EC2 |
-| `enable_s3_malware_protection` | bool | `false` | Enable S3 malware scanning | Protection Plans → Malware Protection → S3 |
-| `enable_runtime_monitoring` | bool | `false` | Enable EKS/ECS Fargate runtime monitoring | Protection Plans → Runtime Monitoring |
+| `enable_s3_malware_protection` | bool | `false` | ⚠️ Not supported - must configure manually in AWS Console | Protection Plans → Malware Protection → S3 |
+| `enable_runtime_monitoring` | bool | `false` | Enable base runtime monitoring feature | Protection Plans → Runtime Monitoring |
+| `enable_eks_runtime_agent` | bool | `false` | Enable automated EKS agent deployment (requires runtime_monitoring) | Protection Plans → Runtime Monitoring → EKS |
 
 ## Related Modules
 

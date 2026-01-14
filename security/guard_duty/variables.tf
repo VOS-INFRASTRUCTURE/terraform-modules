@@ -104,9 +104,15 @@ variable "enable_s3_malware_protection" {
 }
 
 variable "enable_runtime_monitoring" {
-  description = "Enable Runtime Monitoring for EKS and ECS Fargate ONLY (monitors runtime behavior of containers). NOT supported for ECS EC2 launch type - use enable_ebs_malware_protection instead. Cost: Varies by usage."
+  description = "Enable Runtime Monitoring base feature (required for EKS/ECS Fargate/EC2 runtime monitoring). This only enables the feature - you must also enable agent deployment per platform. Cost: Varies by usage."
   type        = bool
-  default     = false  # Only enable if you have EKS clusters or ECS Fargate tasks
+  default     = false  # Only enable if you have EKS clusters, ECS Fargate tasks, or EC2 instances
+}
+
+variable "enable_eks_runtime_agent" {
+  description = "Enable automated agent deployment for EKS clusters. Requires enable_runtime_monitoring = true. This is the ONLY runtime agent that can be automated via Terraform."
+  type        = bool
+  default     = false  # Only enable if you have EKS clusters
 }
 
 
