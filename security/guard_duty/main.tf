@@ -326,8 +326,8 @@ resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
   status      = "ENABLED"
 }
 
-resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
-  count = var.enable_guardduty && var.enable_runtime_monitoring && var.enable_ecs__fargate_runtime_agent ? 1 : 0
+resource "aws_guardduty_detector_feature" "ecs_runtime_fargate_monitoring" {
+  count = var.enable_guardduty && var.enable_runtime_monitoring && var.enable_ecs_fargate_runtime_agent ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "ECS_FARGATE_AGENT_MANAGEMENT"
