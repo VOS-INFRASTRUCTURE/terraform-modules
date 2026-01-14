@@ -5,7 +5,7 @@
 ################################################################################
 
 locals {
-  metrics_namespace = "${upper(var.project_id)}/Infra"
+  infra_metrics_namespace = "${upper(var.project_id)}/Infra"
 }
 
 ################################################################################
@@ -30,7 +30,7 @@ EOF
 
   metric_transformation {
     name      = "SecurityGroupChanges"
-    namespace = local.metrics_namespace
+    namespace = local.infra_metrics_namespace
     value     = "1"
   }
 }
@@ -40,7 +40,7 @@ resource "aws_cloudwatch_metric_alarm" "security_group_changes" {
 
   alarm_name          = "${var.env}-security-group-changes"
   alarm_description   = "CIS – Security Group changes detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.infra_metrics_namespace
   metric_name         = "SecurityGroupChanges"
   statistic           = "Sum"
   period              = 300
@@ -75,7 +75,7 @@ EOF
 
   metric_transformation {
     name      = "VPCChanges"
-    namespace = local.metrics_namespace
+    namespace = local.infra_metrics_namespace
     value     = "1"
   }
 }
@@ -85,7 +85,7 @@ resource "aws_cloudwatch_metric_alarm" "vpc_changes" {
 
   alarm_name          = "${var.env}-vpc-changes"
   alarm_description   = "CIS – VPC, route, or gateway changes detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.infra_metrics_namespace
   metric_name         = "VPCChanges"
   statistic           = "Sum"
   period              = 300
@@ -114,7 +114,7 @@ EOF
 
   metric_transformation {
     name      = "S3PolicyChanges"
-    namespace = local.metrics_namespace
+    namespace = local.infra_metrics_namespace
     value     = "1"
   }
 }
@@ -124,7 +124,7 @@ resource "aws_cloudwatch_metric_alarm" "s3_policy_changes" {
 
   alarm_name          = "${var.env}-s3-policy-changes"
   alarm_description   = "CIS – S3 bucket policy changes detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.infra_metrics_namespace
   metric_name         = "S3PolicyChanges"
   statistic           = "Sum"
   period              = 300

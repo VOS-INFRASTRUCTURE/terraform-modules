@@ -14,7 +14,7 @@
 # Shared locals for consistency
 # ----------------------------
 locals {
-  metrics_namespace = "${upper(var.project_id)}/Security"
+  security_metrics_namespace = "${upper(var.project_id)}/Security"
 }
 
 ################################################################################
@@ -34,7 +34,7 @@ EOF
 
   metric_transformation {
     name      = "UnauthorizedAPICalls"
-    namespace = local.metrics_namespace
+    namespace = local.security_metrics_namespace
     value     = "1"
   }
 }
@@ -44,7 +44,7 @@ resource "aws_cloudwatch_metric_alarm" "unauthorized_api_calls" {
 
   alarm_name          = "${var.env}-unauthorized-api-calls"
   alarm_description   = "CIS 3.1 – Unauthorized AWS API calls detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.security_metrics_namespace
   metric_name         = "UnauthorizedAPICalls"
   statistic           = "Sum"
   period              = 300
@@ -71,7 +71,7 @@ EOF
 
   metric_transformation {
     name      = "RootAccountUsage"
-    namespace = local.metrics_namespace
+    namespace = local.security_metrics_namespace
     value     = "1"
   }
 }
@@ -81,7 +81,7 @@ resource "aws_cloudwatch_metric_alarm" "root_account_usage" {
 
   alarm_name          = "${var.env}-root-account-usage"
   alarm_description   = "CIS 1.1 – Root account activity detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.security_metrics_namespace
   metric_name         = "RootAccountUsage"
   statistic           = "Sum"
   period              = 300
@@ -109,7 +109,7 @@ EOF
 
   metric_transformation {
     name      = "ConsoleLoginNoMFA"
-    namespace = local.metrics_namespace
+    namespace = local.security_metrics_namespace
     value     = "1"
   }
 }
@@ -119,7 +119,7 @@ resource "aws_cloudwatch_metric_alarm" "console_login_no_mfa" {
 
   alarm_name          = "${var.env}-console-login-no-mfa"
   alarm_description   = "CIS 1.2 – Console login without MFA detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.security_metrics_namespace
   metric_name         = "ConsoleLoginNoMFA"
   statistic           = "Sum"
   period              = 300
@@ -153,7 +153,7 @@ EOF
 
   metric_transformation {
     name      = "IAMPolicyChanges"
-    namespace = local.metrics_namespace
+    namespace = local.security_metrics_namespace
     value     = "1"
   }
 }
@@ -163,7 +163,7 @@ resource "aws_cloudwatch_metric_alarm" "iam_policy_changes" {
 
   alarm_name          = "${var.env}-iam-policy-changes"
   alarm_description   = "CIS 3.7 – IAM policy changes detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.security_metrics_namespace
   metric_name         = "IAMPolicyChanges"
   statistic           = "Sum"
   period              = 300
@@ -194,7 +194,7 @@ EOF
 
   metric_transformation {
     name      = "CloudTrailChanges"
-    namespace = local.metrics_namespace
+    namespace = local.security_metrics_namespace
     value     = "1"
   }
 }
@@ -204,7 +204,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudtrail_changes" {
 
   alarm_name          = "${var.env}-cloudtrail-changes"
   alarm_description   = "CIS 3.4 – CloudTrail configuration changes detected"
-  namespace           = local.metrics_namespace
+  namespace           = local.security_metrics_namespace
   metric_name         = "CloudTrailChanges"
   statistic           = "Sum"
   period              = 300
