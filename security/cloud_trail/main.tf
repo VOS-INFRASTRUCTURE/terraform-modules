@@ -46,6 +46,11 @@ locals {
   ct_log_group_name = "/aws/cloudtrail/${var.env}-${var.project_id}-audit-trail"
 }
 
+################################################################################
+# Data Sources
+################################################################################
+
+data "aws_caller_identity" "current" {}
 
 ################################################################################
 # CloudWatch Log Group - CloudTrail Streaming
