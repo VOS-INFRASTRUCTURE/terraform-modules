@@ -44,8 +44,14 @@ variable "enable_bucket_versioning" {
 # SNS Alerting Configuration
 ################################################################################
 
+variable "enable_alarms" {
+  description = "Master toggle to enable/disable CloudTrail alarms. Set to false if you don't want any alarms created, regardless of security_alerts_sns_topic_arn value."
+  type        = bool
+  default     = true
+}
+
 variable "security_alerts_sns_topic_arn" {
-  description = "SNS topic ARN for CloudTrail security and infrastructure alarms (from security_notification module). Set to empty string \"\" to disable alarms."
+  description = "SNS topic ARN for CloudTrail security and infrastructure alarms (from security_notification module). Required if enable_alarms is true."
   type        = string
   default     = ""
 

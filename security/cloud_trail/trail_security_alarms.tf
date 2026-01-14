@@ -20,8 +20,8 @@ locals {
   security_metrics_namespace = "${upper(var.project_id)}/Security"
 
   # Determine if alarms should be created
-  # Only depends on enable flag and non-empty SNS ARN (both known at plan time)
-  create_security_alarms = var.enable_cloudtrail_security_alarms && var.security_alerts_sns_topic_arn != ""
+  # Uses only boolean flags that are known at plan time
+  create_security_alarms = var.enable_alarms && var.enable_cloudtrail_security_alarms
 }
 
 ################################################################################
