@@ -2,33 +2,51 @@
 # ALERT NORMALIZER LAMBDA – Slack Forwarder
 # Purpose: Normalize Security Hub/GuardDuty findings and forward to Slack.
 # Related: lambda/security_alert_normalizer.py, env LOG_LEVEL, SLACK_WEBHOOK_URL
+# Only created if enable_slack_alerts = true
 ################################################################################
 
 ################################################################################
-# SECURITY ALERT NORMALIZER – SLACK FORWARDER LAMBDA
+# IAM ROLE FOR SLACK ALERT LAMBDA
 ################################################################################
 
 resource "aws_iam_role" "security_alert_lambda_role" {
+  count = var.enable_slack_alerts ? 1 : 0
+
   name = "${var.env}-${var.project_id}-security-alert-lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Effect = "Allow",
+      Effect    = "Allow",
       Principal = { Service = "lambda.amazonaws.com" },
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
+
+  tags = {
+    Environment = var.env
+    Project     = var.project_id
+    ManagedBy   = "Terraform"
+    Purpose     = "SecuritySlackAlerts"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "security_alert_lambda_basic_logs" {
-  role       = aws_iam_role.security_alert_lambda_role.name
+  count = var.enable_slack_alerts ? 1 : 0
+
+  role       = aws_iam_role.security_alert_lambda_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+################################################################################
+# LAMBDA FUNCTION – SECURITY ALERT NORMALIZER (SLACK)
+################################################################################
+
 resource "aws_lambda_function" "security_alert_normalizer" {
+  count = var.enable_slack_alerts ? 1 : 0
+
   function_name = "${var.env}-${var.project_id}-security-alert-normalizer"
-  role          = aws_iam_role.security_alert_lambda_role.arn
+  role          = aws_iam_role.security_alert_lambda_role[0].arn
   handler       = "security_alert_normalizer.lambda_handler"
   runtime       = "python3.11"
   timeout       = 30
@@ -41,7 +59,8 @@ resource "aws_lambda_function" "security_alert_normalizer" {
     variables = {
       SLACK_WEBHOOK_URL = var.security_slack_webhook_url
       PROJECT_NAME      = var.project_id
-      LOG_LEVEL         = "INFO"
+      ENVIRONMENT       = var.env
+      LOG_LEVEL         = var.lambda_log_level
     }
   }
 
@@ -58,17 +77,21 @@ resource "aws_lambda_function" "security_alert_normalizer" {
 ################################################################################
 
 resource "aws_sns_topic_subscription" "security_alerts_lambda" {
+  count = var.enable_slack_alerts ? 1 : 0
+
   depends_on = [aws_lambda_function.security_alert_normalizer]
 
-  topic_arn = aws_sns_topic.security_alerts[0].arn
+  topic_arn = aws_sns_topic.security_alerts.arn
   protocol  = "lambda"
-  endpoint  = aws_lambda_function.security_alert_normalizer.arn
+  endpoint  = aws_lambda_function.security_alert_normalizer[0].arn
 }
 
 resource "aws_lambda_permission" "allow_sns" {
+  count = var.enable_slack_alerts ? 1 : 0
+
   statement_id  = "AllowSNSTrigger"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.security_alert_normalizer.function_name
+  function_name = aws_lambda_function.security_alert_normalizer[0].function_name
   principal     = "sns.amazonaws.com"
-  source_arn    = aws_sns_topic.security_alerts[0].arn
+  source_arn    = aws_sns_topic.security_alerts.arn
 }

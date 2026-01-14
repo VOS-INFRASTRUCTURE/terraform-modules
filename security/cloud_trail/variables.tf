@@ -40,9 +40,19 @@ variable "enable_bucket_versioning" {
   default     = true
 }
 
+################################################################################
+# SNS Alerting Configuration
+################################################################################
+
 variable "security_alerts_sns_topic_arn" {
-  description = "SNS topic ARN for security alerts (used as destination for CloudWatch alarms and EventBridge targets)"
+  description = "SNS topic ARN for CloudTrail security and infrastructure alarms (from security_notification module). Required if alarms are enabled."
   type        = string
+  default     = null
+
+  validation {
+    condition     = var.security_alerts_sns_topic_arn == null || can(regex("^arn:aws:sns:[a-z0-9-]+:[0-9]{12}:.+$", var.security_alerts_sns_topic_arn))
+    error_message = "Must be a valid SNS topic ARN (e.g., arn:aws:sns:us-east-1:123456789012:my-topic) or null"
+  }
 }
 
 ################################################################################
@@ -50,7 +60,7 @@ variable "security_alerts_sns_topic_arn" {
 ################################################################################
 
 variable "enable_cloudtrail_infra_alarms" {
-  description = "Enable infrastructure change detection alarms (security groups, VPC changes, S3 bucket policy changes)"
+  description = "Enable infrastructure change detection alarms (security groups, VPC changes, S3 bucket policy changes). Requires security_alerts_sns_topic_arn to be set."
   type        = bool
   default     = true
 }
@@ -60,7 +70,7 @@ variable "enable_cloudtrail_infra_alarms" {
 ################################################################################
 
 variable "enable_cloudtrail_security_alarms" {
-  description = "Enable CloudTrail security metric filters and alarms for CIS benchmark compliance (unauthorized API calls, root usage, MFA, IAM changes, CloudTrail changes)"
+  description = "Enable CloudTrail security metric filters and alarms for CIS benchmark compliance (unauthorized API calls, root usage, MFA, IAM changes, CloudTrail changes). Requires security_alerts_sns_topic_arn to be set."
   type        = bool
   default     = true
 }

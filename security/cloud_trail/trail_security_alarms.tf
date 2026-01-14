@@ -4,10 +4,13 @@
 # Purpose:
 # - Detect high-risk activities via CloudTrail logs (e.g., unauthorized API calls,
 #   root usage, IAM policy changes, CloudTrail config changes).
-# - Emit metrics to a project-scoped namespace and alarm via SNS.
+# - Emit metrics to a project-scoped namespace and alarm via external SNS topic.
 #
 # Toggle:
 # - Controlled by var.enable_cloudtrail_security_alarms (bool).
+# - Requires var.security_alerts_sns_topic_arn to be provided.
+#
+# Note: SNS topic is managed by the security_notification module, not this module.
 ################################################################################
 
 # ----------------------------
@@ -15,6 +18,9 @@
 # ----------------------------
 locals {
   security_metrics_namespace = "${upper(var.project_id)}/Security"
+
+  # Determine if alarms should be created (requires both flag and SNS topic ARN)
+  create_security_alarms = var.enable_cloudtrail_security_alarms && var.security_alerts_sns_topic_arn != null
 }
 
 ################################################################################
@@ -22,7 +28,7 @@ locals {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "unauthorized_api_calls" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   name           = "${var.env}-unauthorized-api-calls"
   log_group_name = local.ct_log_group_name
@@ -40,7 +46,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "unauthorized_api_calls" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-unauthorized-api-calls"
   alarm_description   = "CIS 3.1 – Unauthorized AWS API calls detected"
@@ -60,7 +66,7 @@ resource "aws_cloudwatch_metric_alarm" "unauthorized_api_calls" {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "root_account_usage" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   name           = "${var.env}-root-account-usage"
   log_group_name = local.ct_log_group_name
@@ -77,7 +83,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "root_account_usage" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-root-account-usage"
   alarm_description   = "CIS 1.1 – Root account activity detected"
@@ -97,7 +103,7 @@ resource "aws_cloudwatch_metric_alarm" "root_account_usage" {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "console_login_no_mfa" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   name           = "${var.env}-console-login-no-mfa"
   log_group_name = local.ct_log_group_name
@@ -115,7 +121,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "console_login_no_mfa" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-console-login-no-mfa"
   alarm_description   = "CIS 1.2 – Console login without MFA detected"
@@ -135,7 +141,7 @@ resource "aws_cloudwatch_metric_alarm" "console_login_no_mfa" {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "iam_policy_changes" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   name           = "${var.env}-iam-policy-changes"
   log_group_name = local.ct_log_group_name
@@ -159,7 +165,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "iam_policy_changes" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-iam-policy-changes"
   alarm_description   = "CIS 3.7 – IAM policy changes detected"
@@ -179,7 +185,7 @@ resource "aws_cloudwatch_metric_alarm" "iam_policy_changes" {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "cloudtrail_changes" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   name           = "${var.env}-cloudtrail-changes"
   log_group_name = local.ct_log_group_name
@@ -200,7 +206,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "cloudtrail_changes" {
-  count = var.enable_cloudtrail_security_alarms ? 1 : 0
+  count = local.create_security_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-cloudtrail-changes"
   alarm_description   = "CIS 3.4 – CloudTrail configuration changes detected"

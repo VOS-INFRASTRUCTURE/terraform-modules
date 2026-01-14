@@ -47,6 +47,41 @@ output "cloudtrail" {
     }
 
     # ──────────────────────────────────────────────────────────────────────
+    # CloudTrail Security Alarms - CIS benchmark compliance
+    # ──────────────────────────────────────────────────────────────────────
+    alarms = {
+      # SNS topic used for alarms (external, from security_notification module)
+      sns_topic_arn = var.security_alerts_sns_topic_arn
+
+      security = var.enable_cloudtrail_security_alarms && var.security_alerts_sns_topic_arn != null ? {
+        count = 5  # Number of security alarms configured
+
+        alarms = {
+          unauthorized_api_calls = aws_cloudwatch_metric_alarm.unauthorized_api_calls[0].alarm_name
+          root_account_usage     = aws_cloudwatch_metric_alarm.root_account_usage[0].alarm_name
+          console_login_no_mfa   = aws_cloudwatch_metric_alarm.console_login_no_mfa[0].alarm_name
+          iam_policy_changes     = aws_cloudwatch_metric_alarm.iam_policy_changes[0].alarm_name
+          cloudtrail_changes     = aws_cloudwatch_metric_alarm.cloudtrail_changes[0].alarm_name
+        }
+
+        metrics_namespace = "${upper(var.project_id)}/Security"
+      } : null
+
+      # Infrastructure change alarms
+      infrastructure = var.enable_cloudtrail_infra_alarms && var.security_alerts_sns_topic_arn != null ? {
+        count = 3  # Number of infrastructure alarms configured
+
+        alarms = {
+          security_group_changes = aws_cloudwatch_metric_alarm.security_group_changes[0].alarm_name
+          vpc_changes            = aws_cloudwatch_metric_alarm.vpc_changes[0].alarm_name
+          s3_policy_changes      = aws_cloudwatch_metric_alarm.s3_policy_changes[0].alarm_name
+        }
+
+        metrics_namespace = "${upper(var.project_id)}/Infra"
+      } : null
+    }
+
+    # ──────────────────────────────────────────────────────────────────────
     # IAM Role - CloudTrail to CloudWatch Logs
     # ──────────────────────────────────────────────────────────────────────
     iam_role = {
@@ -60,8 +95,18 @@ output "cloudtrail" {
     summary = {
       module_enabled     = true                              # Module is active
       dual_delivery      = true                              # Both S3 and CloudWatch
+
+      # Alerting configuration
+      security_alarms_enabled        = var.enable_cloudtrail_security_alarms
+      infrastructure_alarms_enabled  = var.enable_cloudtrail_infra_alarms
+
       retention_days     = var.retention_days                # Log retention period
       force_destroy      = var.force_destroy                 # Bucket force destroy setting
+
+      total_alarms                   = (
+      (var.enable_cloudtrail_security_alarms ? 5 : 0) +
+      (var.enable_cloudtrail_infra_alarms ? 3 : 0)
+      )
     }
   }
 }

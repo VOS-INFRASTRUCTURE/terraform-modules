@@ -71,68 +71,12 @@ variable "enable_security_alerting" {
 }
 
 variable "security_alerts_sns_topic_arn" {
-  description = "SNS topic ARN for security alerts (used as destination for CloudWatch alarms and EventBridge targets)"
+  description = "SNS topic ARN for security alerts (from security_notification module). Used as destination for EventBridge targets."
   type        = string
-}
-
-variable "security_alert_email" {
-  description = "Email address to receive security alerts (optional). If provided, an SNS email subscription will be created."
-  type        = string
-  default     = null
 
   validation {
-    condition     = var.security_alert_email == null || can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.security_alert_email))
-    error_message = "Security alert email must be a valid email address"
-  }
-}
-
-variable "security_slack_webhook_url" {
-  description = "Slack webhook URL for security alerts (optional). If provided, Lambda will forward HIGH/CRITICAL findings to Slack."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-################################################################################
-# Email Handler Configuration (Beautiful HTML Emails via SES)
-################################################################################
-
-variable "enable_email_handler" {
-  description = "Enable Lambda-based email handler for beautiful HTML emails (requires SES). If false, uses basic SNS email subscription."
-  type        = bool
-  default     = false
-}
-
-variable "ses_from_email" {
-  description = "SES verified email address to send security alerts from (required if enable_email_handler = true)"
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.ses_from_email == null || can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.ses_from_email))
-    error_message = "SES from email must be a valid email address"
-  }
-}
-
-variable "ses_to_emails" {
-  description = "List of email addresses to send security alerts to (required if enable_email_handler = true)"
-  type        = list(string)
-  default     = []
-
-  validation {
-    condition     = alltrue([for email in var.ses_to_emails : can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", email))])
-    error_message = "All SES to emails must be valid email addresses"
-  }
-}
-
-variable "lambda_log_level" {
-  description = "Log level for Lambda functions (DEBUG, INFO, WARNING, ERROR)"
-  type        = string
-  default     = "INFO"
-
-  validation {
-    condition     = contains(["DEBUG", "INFO", "WARNING", "ERROR"], var.lambda_log_level)
-    error_message = "Lambda log level must be one of: DEBUG, INFO, WARNING, ERROR"
+    condition     = can(regex("^arn:aws:sns:[a-z0-9-]+:[0-9]{12}:.+$", var.security_alerts_sns_topic_arn))
+    error_message = "Must be a valid SNS topic ARN (e.g., arn:aws:sns:us-east-1:123456789012:my-topic)"
   }
 }
 

@@ -14,7 +14,7 @@ locals {
 ################################################################################
 
 resource "aws_iam_role" "security_email_lambda_role" {
-  count = var.enable_security_alerting && var.enable_email_handler ? 1 : 0
+  count = var.enable_email_handler ? 1 : 0
 
   name = "${var.env}-${var.project_id}-security-email-lambda-role"
 
@@ -40,7 +40,7 @@ resource "aws_iam_role" "security_email_lambda_role" {
 ################################################################################
 
 resource "aws_iam_role_policy_attachment" "security_email_lambda_basic_logs" {
-  count = var.enable_security_alerting && var.enable_email_handler ? 1 : 0
+  count = var.enable_email_handler ? 1 : 0
 
   role       = aws_iam_role.security_email_lambda_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -51,7 +51,7 @@ resource "aws_iam_role_policy_attachment" "security_email_lambda_basic_logs" {
 ################################################################################
 
 resource "aws_iam_role_policy" "security_email_lambda_ses" {
-  count = var.enable_security_alerting && var.enable_email_handler ? 1 : 0
+  count = var.enable_email_handler ? 1 : 0
 
   name = "${var.env}-${var.project_id}-security-email-lambda-ses-policy"
   role = aws_iam_role.security_email_lambda_role[0].id
@@ -82,7 +82,7 @@ resource "aws_iam_role_policy" "security_email_lambda_ses" {
 ################################################################################
 
 resource "aws_lambda_function" "security_email_handler" {
-  count = var.enable_security_alerting && var.enable_email_handler ? 1 : 0
+  count = var.enable_email_handler ? 1 : 0
 
   function_name = local.email_lambda_name
   role          = aws_iam_role.security_email_lambda_role[0].arn
@@ -116,11 +116,11 @@ resource "aws_lambda_function" "security_email_handler" {
 ################################################################################
 
 resource "aws_sns_topic_subscription" "security_alerts_email_lambda" {
-  count = var.enable_security_alerting && var.enable_email_handler ? 1 : 0
+  count = var.enable_email_handler ? 1 : 0
 
   depends_on = [aws_lambda_function.security_email_handler]
 
-  topic_arn = aws_sns_topic.security_alerts[0].arn
+  topic_arn = aws_sns_topic.security_alerts.arn
   protocol  = "lambda"
   endpoint  = aws_lambda_function.security_email_handler[0].arn
 }
@@ -130,12 +130,12 @@ resource "aws_sns_topic_subscription" "security_alerts_email_lambda" {
 ################################################################################
 
 resource "aws_lambda_permission" "allow_sns_email_handler" {
-  count = var.enable_security_alerting && var.enable_email_handler ? 1 : 0
+  count = var.enable_email_handler ? 1 : 0
 
   statement_id  = "AllowSNSTriggerEmailHandler"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.security_email_handler[0].function_name
   principal     = "sns.amazonaws.com"
-  source_arn    = aws_sns_topic.security_alerts[0].arn
+  source_arn    = aws_sns_topic.security_alerts.arn
 }
 

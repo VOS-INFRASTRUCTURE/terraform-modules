@@ -9,12 +9,32 @@
 # - IAM role/policy for CloudTrail to write to CloudWatch Logs (this file)
 # - Multi-region CloudTrail trail (this file)
 # - S3 bucket for long-term storage (see bucket.tf)
+# - Security alarms for CIS compliance (see trail_security_alarms.tf)
+# - Infrastructure change alarms (see trail_infra_change_alarms.tf)
 #
 # Features:
 # - Multi-region coverage (captures events from all regions)
 # - Global service events included (IAM, CloudFront, etc.)
 # - Log file validation enabled (tamper detection)
 # - Dual delivery: S3 (long-term) + CloudWatch (real-time alerts)
+# - Metric filters and alarms for security events
+#
+# Architecture:
+#   CloudTrail → S3 (long-term storage)
+#   CloudTrail → CloudWatch Logs → Metric Filters → Alarms → SNS (external)
+#
+# Note: This module does NOT create SNS topics.
+#       Use the security_notification module to create:
+#         - SNS topic for security alerts
+#         - Email/Slack subscriptions (optional)
+#       Then pass the SNS topic ARN to this module via security_alerts_sns_topic_arn
+#
+# Cost Impact:
+#   - CloudTrail: Free (first trail per account)
+#   - S3 storage: ~$0.023/GB/month
+#   - CloudWatch Logs: $0.50/GB ingested + $0.03/GB archived
+#   - CloudWatch Alarms: $0.10 per alarm/month
+#   Typical: $10-25/month for production
 ################################################################################
 
 ################################################################################

@@ -2,10 +2,14 @@
 # CLOUDTRAIL INFRASTRUCTURE CHANGE ALARMS
 # Purpose: Detect changes to IAM, VPC, CloudTrail configuration impacting posture.
 # Toggle: var.enable_cloudtrail_infra_alarms
+# Note: SNS topic is managed by the security_notification module, not this module.
 ################################################################################
 
 locals {
   infra_metrics_namespace = "${upper(var.project_id)}/Infra"
+
+  # Determine if infrastructure alarms should be created (requires both flag and SNS topic ARN)
+  create_infra_alarms = var.enable_cloudtrail_infra_alarms && var.security_alerts_sns_topic_arn != null
 }
 
 ################################################################################
@@ -13,7 +17,7 @@ locals {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "security_group_changes" {
-  count = var.enable_cloudtrail_infra_alarms ? 1 : 0
+  count = local.create_infra_alarms ? 1 : 0
 
   name           = "${var.env}-security-group-changes"
   log_group_name = local.ct_log_group_name
@@ -36,7 +40,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "security_group_changes" {
-  count = var.enable_cloudtrail_infra_alarms ? 1 : 0
+  count = local.create_infra_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-security-group-changes"
   alarm_description   = "CIS – Security Group changes detected"
@@ -56,7 +60,7 @@ resource "aws_cloudwatch_metric_alarm" "security_group_changes" {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "vpc_changes" {
-  count = var.enable_cloudtrail_infra_alarms ? 1 : 0
+  count = local.create_infra_alarms ? 1 : 0
 
   name           = "${var.env}-vpc-changes"
   log_group_name = local.ct_log_group_name
@@ -81,7 +85,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "vpc_changes" {
-  count = var.enable_cloudtrail_infra_alarms ? 1 : 0
+  count = local.create_infra_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-vpc-changes"
   alarm_description   = "CIS – VPC, route, or gateway changes detected"
@@ -101,7 +105,7 @@ resource "aws_cloudwatch_metric_alarm" "vpc_changes" {
 ################################################################################
 
 resource "aws_cloudwatch_log_metric_filter" "s3_policy_changes" {
-  count = var.enable_cloudtrail_infra_alarms ? 1 : 0
+  count = local.create_infra_alarms ? 1 : 0
 
   name           = "${var.env}-s3-policy-changes"
   log_group_name = local.ct_log_group_name
@@ -120,7 +124,7 @@ EOF
 }
 
 resource "aws_cloudwatch_metric_alarm" "s3_policy_changes" {
-  count = var.enable_cloudtrail_infra_alarms ? 1 : 0
+  count = local.create_infra_alarms ? 1 : 0
 
   alarm_name          = "${var.env}-s3-policy-changes"
   alarm_description   = "CIS – S3 bucket policy changes detected"
