@@ -45,18 +45,19 @@ output "guard_duty" {
       rds_login_events        = var.enable_rds_protection           # Database login monitoring
       lambda_network_logs     = var.enable_lambda_protection        # Lambda network monitoring
       ebs_malware_protection  = var.enable_ebs_malware_protection   # EBS malware scanning (GuardDuty-initiated)
-      s3_malware_scanning     = var.enable_s3_malware_protection    # S3 malware scanning (file content analysis)
+      eks_runtime_monitoring  = var.enable_runtime_monitoring       # EKS runtime monitoring
       runtime_monitoring      = var.enable_runtime_monitoring       # EKS/ECS Fargate runtime monitoring
     }
 
     # ──────────────────────────────────────────────────────────────────────
-    # Malware Protection Summary - All 3 types
+    # Malware Protection Summary
     # ──────────────────────────────────────────────────────────────────────
     malware_protection = {
       ec2_ebs_scanning = var.enable_ebs_malware_protection    # EC2: GuardDuty-initiated EBS scans
-      s3_scanning      = var.enable_s3_malware_protection     # S3: Automatic upload scanning
+      # Note: S3 malware scanning is not available via aws_guardduty_detector_feature
+      #       Must be configured manually in AWS Console or via different resource
       # Note: AWS Backup malware scanning is not yet supported via Terraform
-      # You must configure it manually in the AWS Console
+      #       Must be configured manually in the AWS Console
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -72,8 +73,8 @@ output "guard_duty" {
         (var.enable_rds_protection ? 1 : 0) +
         (var.enable_lambda_protection ? 1 : 0) +
         (var.enable_ebs_malware_protection ? 1 : 0) +
-        (var.enable_s3_malware_protection ? 1 : 0) +
         (var.enable_runtime_monitoring ? 1 : 0)
+        # Note: S3 malware protection not counted as it's not a detector feature
       )
     }
   } : null

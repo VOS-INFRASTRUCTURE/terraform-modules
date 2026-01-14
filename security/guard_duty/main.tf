@@ -221,41 +221,31 @@ resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# S3 Malware Protection (Object-Level Scanning)
+# Note: S3 Malware Protection
 #
 # AWS Console: Protection Plans → Malware Protection → S3
 #
-# Purpose: Scan new S3 uploads for malware in real-time
+# S3 Malware Scanning is NOT available as a GuardDuty detector feature that can
+# be enabled via Terraform's aws_guardduty_detector_feature resource.
 #
-# How it works:
-# 1. Configure specific S3 buckets for scanning
-# 2. New objects uploaded to these buckets are automatically scanned
-# 3. Malware findings published to GuardDuty console
-# 4. Can trigger automatic remediation (quarantine, delete, etc.)
+# According to AWS API, valid detector features are:
+# - S3_DATA_EVENTS
+# - EKS_AUDIT_LOGS
+# - EBS_MALWARE_PROTECTION
+# - RDS_LOGIN_EVENTS
+# - EKS_RUNTIME_MONITORING
+# - LAMBDA_NETWORK_LOGS
+# - RUNTIME_MONITORING
 #
-# What it detects:
-# - Known malware signatures
-# - Trojans, ransomware, viruses
-# - Suspicious executable files
-# - Malicious scripts
+# S3 Malware Scanning must be configured separately:
+# 1. Via AWS Console: GuardDuty → Malware Protection → S3
+# 2. Or using a different Terraform resource (not aws_guardduty_detector_feature)
 #
-# Cost: Varies by usage (pay per scan)
-#
-# Note: This is DIFFERENT from enable_s3_data_events:
-#   - S3_DATA_EVENTS: Monitors access patterns (who accessed what, when)
-#   - S3_MALWARE_SCANNING: Scans file contents for malware
-#
-# Important: After enabling, you must configure which S3 buckets to scan
-#            via the GuardDuty console or additional Terraform resources.
+# This is a limitation of the current Terraform AWS provider.
+# The variable enable_s3_malware_protection is kept for future compatibility
+# but currently has no effect.
 # ──────────────────────────────────────────────────────────────────────────────
 
-resource "aws_guardduty_detector_feature" "s3_malware_protection" {
-  count = var.enable_guardduty ? 1 : 0
-
-  detector_id = aws_guardduty_detector.this[0].id
-  name        = "S3_MALWARE_SCANNING"
-  status      = var.enable_s3_malware_protection ? "ENABLED" : "DISABLED"
-}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Runtime Monitoring (EKS and ECS Fargate)
