@@ -47,6 +47,48 @@ resource "aws_iam_role_policy_attachment" "security_email_lambda_basic_logs" {
 }
 
 ################################################################################
+# CLOUDWATCH LOG GROUP – EMAIL LAMBDA
+# Purpose: Explicitly create log group with retention to prevent infinite growth
+# Note: Must match Lambda function name exactly: /aws/lambda/{function-name}
+################################################################################
+
+resource "aws_cloudwatch_log_group" "security_email_handler" {
+  count = var.enable_email_handler ? 1 : 0
+
+  name              = "/aws/lambda/${local.email_lambda_name}"
+  retention_in_days = 90  # 3 months retention for security logs
+
+  tags = {
+    Environment = var.env
+    Project     = var.project_id
+    ManagedBy   = "Terraform"
+    Purpose     = "SecurityEmailHandler"
+  }
+}
+
+# Additional policy to ensure Lambda can write to the specific log group we created
+resource "aws_iam_role_policy" "security_email_lambda_logs" {
+  count = var.enable_email_handler ? 1 : 0
+
+  name = "${var.env}-${var.project_id}-security-email-lambda-logs-policy"
+  role = aws_iam_role.security_email_lambda_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.security_email_handler[0].arn}:*"
+      }
+    ]
+  })
+}
+
+################################################################################
 # IAM POLICY – SES SEND EMAIL PERMISSIONS
 ################################################################################
 
@@ -77,24 +119,6 @@ resource "aws_iam_role_policy" "security_email_lambda_ses" {
   })
 }
 
-################################################################################
-# CLOUDWATCH LOG GROUP – EMAIL LAMBDA
-# Purpose: Explicitly create log group with retention to prevent infinite growth
-################################################################################
-
-resource "aws_cloudwatch_log_group" "security_email_handler" {
-  count = var.enable_email_handler ? 1 : 0
-
-  name              = "/aws/lambda/${local.email_lambda_name}"
-  retention_in_days = 90  # 3 months retention for security logs
-
-  tags = {
-    Environment = var.env
-    Project     = var.project_id
-    ManagedBy   = "Terraform"
-    Purpose     = "SecurityEmailHandler"
-  }
-}
 
 ################################################################################
 # LAMBDA FUNCTION – SECURITY EMAIL HANDLER
@@ -103,8 +127,11 @@ resource "aws_cloudwatch_log_group" "security_email_handler" {
 resource "aws_lambda_function" "security_email_handler" {
   count = var.enable_email_handler ? 1 : 0
 
-  # Create log group first to ensure retention is set before Lambda writes to it
-  depends_on = [aws_cloudwatch_log_group.security_email_handler]
+  # Ensure log group and IAM permissions exist before Lambda is created
+  depends_on = [
+    aws_cloudwatch_log_group.security_email_handler,
+    aws_iam_role_policy.security_email_lambda_logs
+  ]
 
   function_name = local.email_lambda_name
   // ...existing code...

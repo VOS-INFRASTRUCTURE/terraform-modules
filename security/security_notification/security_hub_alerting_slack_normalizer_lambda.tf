@@ -41,6 +41,7 @@ resource "aws_iam_role_policy_attachment" "security_alert_lambda_basic_logs" {
 ################################################################################
 # CLOUDWATCH LOG GROUP – SLACK LAMBDA
 # Purpose: Explicitly create log group with retention to prevent infinite growth
+# Note: Must match Lambda function name exactly: /aws/lambda/{function-name}
 ################################################################################
 
 resource "aws_cloudwatch_log_group" "security_alert_slack_handler" {
@@ -57,6 +58,28 @@ resource "aws_cloudwatch_log_group" "security_alert_slack_handler" {
   }
 }
 
+# Additional policy to ensure Lambda can write to the specific log group we created
+resource "aws_iam_role_policy" "security_alert_lambda_logs" {
+  count = var.enable_slack_alerts ? 1 : 0
+
+  name = "${var.env}-${var.project_id}-security-alert-lambda-logs-policy"
+  role = aws_iam_role.security_alert_lambda_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.security_alert_slack_handler[0].arn}:*"
+      }
+    ]
+  })
+}
+
 ################################################################################
 # LAMBDA FUNCTION – SECURITY ALERT NORMALIZER (SLACK)
 ################################################################################
@@ -64,10 +87,14 @@ resource "aws_cloudwatch_log_group" "security_alert_slack_handler" {
 resource "aws_lambda_function" "security_alert_slack_handler" {
   count = var.enable_slack_alerts ? 1 : 0
 
-  # Create log group first to ensure retention is set before Lambda writes to it
-  depends_on = [aws_cloudwatch_log_group.security_alert_slack_handler]
+  # Ensure log group and IAM permissions exist before Lambda is created
+  depends_on = [
+    aws_cloudwatch_log_group.security_alert_slack_handler,
+    aws_iam_role_policy.security_alert_lambda_logs
+  ]
 
   function_name = "${var.env}-${var.project_id}-security-alert-slack-handler"
+  // ...existing code...
   role          = aws_iam_role.security_alert_lambda_role[0].arn
   handler       = "security_alert_slack_handler.lambda_handler"
   runtime       = "python3.11"
