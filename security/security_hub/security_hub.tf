@@ -4,8 +4,6 @@
 # Toggle: Controlled via var.enable_security_hub
 ################################################################################
 
-data "aws_region" "current" {}
-
 # Optional shared tags (if you later add taggable SH resources)
 locals {
   sh_tags = {
