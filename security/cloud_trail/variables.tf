@@ -45,13 +45,13 @@ variable "enable_bucket_versioning" {
 ################################################################################
 
 variable "security_alerts_sns_topic_arn" {
-  description = "SNS topic ARN for CloudTrail security and infrastructure alarms (from security_notification module). Required if alarms are enabled."
+  description = "SNS topic ARN for CloudTrail security and infrastructure alarms (from security_notification module). Set to empty string \"\" to disable alarms."
   type        = string
-  default     = null
+  default     = ""
 
   validation {
-    condition     = var.security_alerts_sns_topic_arn == null || can(regex("^arn:aws:sns:[a-z0-9-]+:[0-9]{12}:.+$", var.security_alerts_sns_topic_arn))
-    error_message = "Must be a valid SNS topic ARN (e.g., arn:aws:sns:us-east-1:123456789012:my-topic) or null"
+    condition     = var.security_alerts_sns_topic_arn == "" || can(regex("^arn:aws:sns:[a-z0-9-]+:[0-9]{12}:.+$", var.security_alerts_sns_topic_arn))
+    error_message = "Must be a valid SNS topic ARN (e.g., arn:aws:sns:us-east-1:123456789012:my-topic) or empty string"
   }
 }
 

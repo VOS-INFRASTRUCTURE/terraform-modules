@@ -63,18 +63,3 @@ output "security_notification" {
     }
   }
 }
-
-################################################################################
-# Individual Outputs (for backward compatibility)
-################################################################################
-
-output "sns_topic_arn" {
-  description = "ARN of the security alerts SNS topic"
-  value       = aws_sns_topic.security_alerts.arn
-}
-
-output "sns_topic_name" {
-  description = "Name of the security alerts SNS topic"
-  value       = aws_sns_topic.security_alerts.name
-}
-

@@ -51,9 +51,9 @@ output "cloudtrail" {
     # ──────────────────────────────────────────────────────────────────────
     alarms = {
       # SNS topic used for alarms (external, from security_notification module)
-      sns_topic_arn = var.security_alerts_sns_topic_arn
+      sns_topic_arn = var.security_alerts_sns_topic_arn != "" ? var.security_alerts_sns_topic_arn : null
 
-      security = var.enable_cloudtrail_security_alarms && var.security_alerts_sns_topic_arn != null ? {
+      security = var.enable_cloudtrail_security_alarms && var.security_alerts_sns_topic_arn != "" ? {
         count = 5  # Number of security alarms configured
 
         alarms = {
@@ -68,7 +68,7 @@ output "cloudtrail" {
       } : null
 
       # Infrastructure change alarms
-      infrastructure = var.enable_cloudtrail_infra_alarms && var.security_alerts_sns_topic_arn != null ? {
+      infrastructure = var.enable_cloudtrail_infra_alarms && var.security_alerts_sns_topic_arn != "" ? {
         count = 3  # Number of infrastructure alarms configured
 
         alarms = {
