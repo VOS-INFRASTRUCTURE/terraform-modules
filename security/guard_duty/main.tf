@@ -82,6 +82,8 @@ resource "aws_guardduty_detector" "this" {
 # ──────────────────────────────────────────────────────────────────────────────
 # S3 Data Events Protection
 #
+# AWS Console: Protection Plans → S3 Protection
+#
 # Purpose: Monitor S3 object-level API calls for suspicious activity
 #
 # Detects:
@@ -108,6 +110,8 @@ resource "aws_guardduty_detector_feature" "s3_data_events" {
 # ──────────────────────────────────────────────────────────────────────────────
 # EKS Audit Logs Protection
 #
+# AWS Console: Protection Plans → EKS Protection
+#
 # Purpose: Analyze Kubernetes API audit logs for suspicious activity
 #
 # Detects:
@@ -133,6 +137,8 @@ resource "aws_guardduty_detector_feature" "eks_audit_logs" {
 
 # ──────────────────────────────────────────────────────────────────────────────
 # RDS Login Activity Protection
+#
+# AWS Console: Protection Plans → RDS Protection
 #
 # Purpose: Monitor database login attempts for suspicious activity
 #
@@ -161,6 +167,8 @@ resource "aws_guardduty_detector_feature" "rds_login_events" {
 # ──────────────────────────────────────────────────────────────────────────────
 # Lambda Network Activity Protection
 #
+# AWS Console: Protection Plans → Lambda Protection
+#
 # Purpose: Monitor Lambda function network activity for threats
 #
 # Detects:
@@ -187,6 +195,8 @@ resource "aws_guardduty_detector_feature" "lambda_network_logs" {
 # ──────────────────────────────────────────────────────────────────────────────
 # EBS Malware Protection
 #
+# AWS Console: Protection Plans → Malware Protection → EC2
+#
 # Purpose: Scan EBS volumes for malware when GuardDuty detects suspicious activity
 #
 # How it works:
@@ -212,6 +222,8 @@ resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
 
 # ──────────────────────────────────────────────────────────────────────────────
 # S3 Malware Protection (Object-Level Scanning)
+#
+# AWS Console: Protection Plans → Malware Protection → S3
 #
 # Purpose: Scan new S3 uploads for malware in real-time
 #
@@ -247,6 +259,8 @@ resource "aws_guardduty_detector_feature" "s3_malware_protection" {
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Runtime Monitoring (EKS and ECS Fargate)
+#
+# AWS Console: Protection Plans → Runtime Monitoring
 #
 # Purpose: Monitor runtime behavior of containerized workloads
 #
@@ -284,6 +298,8 @@ resource "aws_guardduty_detector_feature" "runtime_monitoring" {
 # ──────────────────────────────────────────────────────────────────────────────
 # Runtime Monitoring - EKS Add-on Management (Sub-feature)
 #
+# AWS Console: Protection Plans → Runtime Monitoring → EKS Add-on Management
+#
 # Purpose: Automatically manage GuardDuty agent on EKS clusters
 #
 # When enabled with RUNTIME_MONITORING:
@@ -308,6 +324,8 @@ resource "aws_guardduty_detector_feature" "eks_addon_management" {
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Runtime Monitoring - ECS Fargate Agent Management (Sub-feature)
+#
+# AWS Console: Protection Plans → Runtime Monitoring → ECS Fargate Agent Management
 #
 # Purpose: Automatically manage GuardDuty agent on ECS Fargate tasks
 #
