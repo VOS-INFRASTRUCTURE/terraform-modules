@@ -232,8 +232,9 @@ This table maps AWS Console Protection Plans to Terraform variables for easy ref
 | **Protection Plans → Malware Protection → AWS Backup** | N/A | AWS Backup Scanning | ❌ Not available via Terraform |
 
 **Important Notes**: 
-- Setting `enable_runtime_monitoring = true` automatically enables EKS Runtime Monitoring as a sub-feature
-- ECS Fargate runtime monitoring is automatically included with the main `RUNTIME_MONITORING` feature (no separate toggle)
+- `enable_runtime_monitoring = true` enables the base Runtime Monitoring feature
+- `enable_eks_runtime_agent = true` enables automated agent deployment for EKS (requires runtime_monitoring to be enabled first)
+- ⚠️ **ECS Fargate and EC2 agents** must be manually enabled in AWS Console after enabling runtime_monitoring
 - ⚠️ **Runtime Monitoring is ONLY supported for ECS Fargate** (serverless), NOT for ECS EC2 launch type
 - For ECS tasks running on EC2 instances, use `enable_ebs_malware_protection` instead
 - ⚠️ **S3 Malware Scanning is NOT available** via Terraform `aws_guardduty_detector_feature` - must configure manually in AWS Console
@@ -515,7 +516,11 @@ module "guardduty" {
 
 **What**: Amazon Elastic Kubernetes Service  
 **Runtime Monitoring**: ✅ Fully supported and automated via Terraform  
-**Terraform**: Both feature and agent configuration automated  
+**Terraform**: Both feature and agent configuration automated via separate variables  
+
+**Configuration Variables**:
+- `enable_runtime_monitoring = true` - Enables base Runtime Monitoring feature
+- `enable_eks_runtime_agent = true` - Enables automated EKS agent deployment
 
 **Example Configuration**:
 ```terraform
@@ -525,16 +530,27 @@ module "guardduty" {
   env        = "production"
   project_id = "my-app"
 
-  # ✅ Fully automated - both feature and agent deployment
+  # ✅ Enable base Runtime Monitoring feature
   enable_runtime_monitoring = true
+  
+  # ✅ Enable automated agent deployment for EKS
+  enable_eks_runtime_agent = true
 }
 ```
 
 **What happens**:
-1. Terraform enables `RUNTIME_MONITORING` feature
+1. Terraform enables `RUNTIME_MONITORING` feature (base capability)
 2. Terraform enables `EKS_RUNTIME_MONITORING` feature (automated agent configuration)
 3. GuardDuty automatically deploys agent to all EKS clusters
-4. No manual steps required! ✅
+4. Handles agent updates and lifecycle automatically
+5. No manual steps required! ✅
+
+**Advanced**: You can enable Runtime Monitoring without EKS agent if needed:
+```terraform
+# Enable feature but manually manage agent deployment
+enable_runtime_monitoring = true
+enable_eks_runtime_agent  = false  # You'll manually deploy agent via kubectl
+```
 
 ### Amazon EC2 Instances - ⚠️ MANUAL CONFIGURATION REQUIRED
 
@@ -565,7 +581,11 @@ There's no Terraform resource available to enable EC2 automated agent configurat
 ### Quick Decision Guide
 
 **You have EKS clusters?**  
-→ Enable `enable_runtime_monitoring = true`  
+→ Enable both runtime monitoring variables:
+```terraform
+enable_runtime_monitoring = true  # Base feature
+enable_eks_runtime_agent  = true  # EKS agent deployment
+```
 → ✅ Fully automated - no manual steps!
 
 **You have ECS Fargate tasks?**  
@@ -588,12 +608,13 @@ There's no Terraform resource available to enable EC2 automated agent configurat
 → Enable both:
 ```terraform
 enable_runtime_monitoring     = true  # For EKS, ECS Fargate, EC2 instances
+enable_eks_runtime_agent      = true  # Auto-deploy EKS agent
 enable_ebs_malware_protection = true  # For ECS EC2 launch type
 ```
 → ⚠️ Manual configuration required for:
   - ECS Fargate agent (enable in console)
   - EC2 instance agent (enable in console)
-→ ✅ EKS agent is fully automated!
+→ ✅ EKS agent is fully automated via `enable_eks_runtime_agent = true`!
 
 ## Outputs
 

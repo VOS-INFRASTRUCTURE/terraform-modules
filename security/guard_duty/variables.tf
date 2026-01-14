@@ -116,5 +116,12 @@ variable "enable_eks_runtime_agent" {
 }
 
 
+variable "enable_ecs__fargate_runtime_agent" {
+  description = "Enable automated agent deployment for ECS Fargate containers. Requires enable_runtime_monitoring = true. This is the ONLY runtime agent that can be automated via Terraform."
+  type        = bool
+  default     = false  # Only enable if you have EKS clusters
+}
+
+
 
 
