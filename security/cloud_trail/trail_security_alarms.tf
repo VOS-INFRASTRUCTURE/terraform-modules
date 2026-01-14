@@ -14,7 +14,6 @@
 # Shared locals for consistency
 # ----------------------------
 locals {
-  ct_log_group_name = "/aws/cloudtrail/${var.env}-audit-trail"
   metrics_namespace = "${upper(var.project_id)}/Security"
 }
 

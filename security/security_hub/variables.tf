@@ -136,24 +136,3 @@ variable "lambda_log_level" {
   }
 }
 
-################################################################################
-# CloudTrail Security Alarms (CIS Benchmark)
-################################################################################
-
-variable "enable_cloudtrail_security_alarms" {
-  description = "Enable CloudTrail security metric filters and alarms for CIS benchmark compliance (unauthorized API calls, root usage, MFA, IAM changes, CloudTrail changes)"
-  type        = bool
-  default     = true
-}
-
-################################################################################
-# CloudTrail Infrastructure Change Alarms
-################################################################################
-
-variable "enable_cloudtrail_infra_alarms" {
-  description = "Enable infrastructure change detection alarms (security groups, VPC changes, S3 bucket policy changes)"
-  type        = bool
-  default     = true
-}
-
-
