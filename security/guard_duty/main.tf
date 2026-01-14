@@ -285,6 +285,11 @@ resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
 resource "aws_guardduty_detector_feature" "runtime_monitoring" {
   count = var.enable_guardduty ? 1 : 0
 
+
+  lifecycle {
+    ignore_changes = [additional_configuration]
+  }
+
   detector_id = aws_guardduty_detector.this[0].id
   name        = "RUNTIME_MONITORING"
   status      = var.enable_runtime_monitoring ? "ENABLED" : "DISABLED"
