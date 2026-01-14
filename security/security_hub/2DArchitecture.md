@@ -169,7 +169,7 @@ This module sets up production-grade audit logging and security alerting by stit
     - Only HIGH/CRITICAL severities are forwarded; others are suppressed.
     - Includes remediation steps, color-coded severity, and responsive design.
     - Logs decisions and delivery outcomes to CloudWatch Logs.
-  - **Lambda Slack Handler** (security_alert_normalizer.py):
+  - **Lambda Slack Handler** (security_alert_slack_handler.py):
     - Formats Security Hub/GuardDuty findings into Slack messages.
     - Only HIGH/CRITICAL severities are forwarded; others are suppressed (configurable).
     - Sends via Slack webhook to specified channel.
@@ -249,7 +249,7 @@ This module sets up production-grade audit logging and security alerting by stit
 - `aws_config.tf`: AWS Config recorder + S3 bucket for config logs
 - `variables.tf`: Inputs and toggles
 - `outputs.tf`: Grouped outputs
-- `lambda/security_alert_normalizer.py`: Lambda source logic (suppression + Slack)
+- `lambda/security_alert_slack_handler.py`: Lambda source logic (suppression + Slack)
 
 ## Example Usage
 

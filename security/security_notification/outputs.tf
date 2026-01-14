@@ -43,8 +43,8 @@ output "security_notification" {
     slack = {
       enabled              = var.enable_slack_alerts
       webhook_configured   = var.enable_slack_alerts && var.security_slack_webhook_url != null
-      lambda_function_arn  = var.enable_slack_alerts ? aws_lambda_function.security_alert_normalizer[0].arn : null
-      lambda_function_name = var.enable_slack_alerts ? aws_lambda_function.security_alert_normalizer[0].function_name : null
+      lambda_function_arn  = var.enable_slack_alerts ? aws_lambda_function.security_alert_slack_handler[0].arn : null
+      lambda_function_name = var.enable_slack_alerts ? aws_lambda_function.security_alert_slack_handler[0].function_name : null
     }
 
     # ──────────────────────────────────────────────────────────────────────

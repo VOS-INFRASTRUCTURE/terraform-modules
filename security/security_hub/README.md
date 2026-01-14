@@ -38,6 +38,51 @@ security_hub/
 
 ## Prerequisites
 
+### ⚠️ CRITICAL: Manually Enable Security Hub First!
+
+**Before using this module**, you MUST manually enable Security Hub in your AWS account:
+
+#### Steps to Enable Security Hub:
+
+1. **Go to AWS Console** → Security Hub
+2. Click **"Enable Security Hub"**
+3. **Choose your capabilities**:
+   - Essential capabilities (included in base price)
+   - Threat analytics (optional, separate charges)
+   - Additional capabilities (optional, separate charges)
+4. **Choose regions**: Enable in all regions (recommended)
+5. Click **"Enable Security Hub"**
+
+#### Alternative: Enable via AWS CLI
+
+```bash
+# Enable Security Hub with default standards
+aws securityhub enable-security-hub \
+  --enable-default-standards \
+  --region <your-region>
+
+# Verify Security Hub is enabled
+aws securityhub describe-hub --region <your-region>
+```
+
+#### Why Manual Enablement is Required
+
+The `aws_securityhub_account` Terraform resource is **deprecated and no longer functional**. AWS now requires Security Hub to be enabled manually through the Console or CLI before Terraform can manage standards subscriptions.
+
+**What this module does**:
+- ✅ Subscribes to security standards (AWS Foundational, CIS, etc.)
+- ✅ Enables GuardDuty integration
+- ✅ Configures EventBridge findings routing
+
+**What this module does NOT do**:
+- ❌ Enable Security Hub itself (must be done manually)
+- ❌ Configure Security Hub capabilities
+- ❌ Configure cross-region aggregation
+
+---
+
+### Other Prerequisites
+
 - **AWS Config enabled** (required for Security Hub standards - many controls use Config Rules)
 - **security_notification module** (for SNS topic and alerting setup)
 - (Optional) GuardDuty enabled for threat detection
@@ -410,7 +455,7 @@ Ensures proper resource tagging for:
 
 ### Lambda Function Behavior
 
-The Lambda function (`security_alert_normalizer.py`) intelligently processes findings:
+The Lambda function (`security_alert_slack_handler.py`) intelligently processes findings:
 
 1. **Filtering**: Only `HIGH` and `CRITICAL` severity findings are forwarded
 2. **Normalization**: Supports both classic ASFF and new OCSF/V2 finding formats

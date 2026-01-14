@@ -17,7 +17,7 @@ security_notification/
 ├── security_hub_alerting_email_handler_lambda.tf   # SES-based email handler (optional)
 ├── security_hub_alerting_slack_normalizer_lambda.tf # Slack integration (optional)
 ├── lambda/                                          # Lambda function code (zipped)
-│   ├── security_alert_normalizer.zip               # Slack forwarder
+│   ├── security_alert_slack_handler.zip               # Slack forwarder
 │   └── security_alert_email_handler.zip            # Email formatter
 ├── variables.tf                                     # Input variables
 ├── outputs.tf                                       # Module outputs
@@ -44,7 +44,7 @@ security_notification/
 
 ### For Slack Integration
 - Slack Incoming Webhook URL
-- Lambda function deployment package (`security_alert_normalizer.zip`)
+- Lambda function deployment package (`security_alert_slack_handler.zip`)
 
 ## Usage
 
@@ -519,7 +519,7 @@ resource "aws_cloudwatch_event_target" "guardduty_sns" {
 To update Lambda functions:
 
 1. Modify Python code in `lambda/` directory
-2. Zip the function: `cd lambda && zip security_alert_normalizer.zip security_alert_normalizer.py`
+2. Zip the function: `cd lambda && zip security_alert_slack_handler.zip security_alert_slack_handler.py`
 3. Update `source_code_hash` will trigger redeployment
 
 ## License

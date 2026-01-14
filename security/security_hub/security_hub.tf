@@ -4,24 +4,40 @@
 # Toggle: Controlled via var.enable_security_hub
 ################################################################################
 
-# Optional shared tags (if you later add taggable SH resources)
-locals {
-  sh_tags = {
-    Environment = var.env
-    ManagedBy   = "Terraform"
-  }
-}
-
 ################################################################################
 # ACTIVATE SECURITY HUB FOR THIS ACCOUNT & REGION
-# Notes:
-# - Creates/activates the Security Hub service for the current account/region.
-# - Required before subscribing to standards or products.
+#
+# ⚠️ IMPORTANT: Security Hub MUST be manually enabled before using this module!
+#
+# The aws_securityhub_account resource is deprecated and no longer functional.
+# AWS now requires Security Hub to be enabled manually via AWS Console.
+#
+# Steps to Enable Security Hub:
+# ──────────────────────────────
+# 1. Go to AWS Console → Security Hub
+# 2. Click "Enable Security Hub"
+# 3. Choose your capabilities (Essential, Threat Analytics, etc.)
+# 4. Choose regions (Enable in all regions recommended)
+# 5. Click "Enable Security Hub"
+#
+# After enabling, this module will:
+# ✅ Subscribe to security standards (AWS Foundational, CIS, Resource Tagging)
+# ✅ Enable GuardDuty integration
+# ✅ Configure EventBridge findings routing to SNS
+#
+# The module does NOT:
+# ❌ Enable Security Hub itself (must be done manually)
+# ❌ Configure Security Hub capabilities (Essential, Threat Analytics, etc.)
+# ❌ Configure cross-region aggregation
+#
+# To check if Security Hub is enabled:
+#   aws securityhub describe-hub --region <your-region>
+#
+# To enable via AWS CLI (if you prefer):
+#   aws securityhub enable-security-hub \
+#     --enable-default-standards \
+#     --region <your-region>
 ################################################################################
-
-resource "aws_securityhub_account" "this" {
-  count = var.enable_security_hub ? 1 : 0
-}
 
 ################################################################################
 # STANDARDS SUBSCRIPTIONS
@@ -38,8 +54,7 @@ resource "aws_securityhub_account" "this" {
 resource "aws_securityhub_standards_subscription" "aws_foundational" {
   count = var.enable_security_hub && var.enable_aws_foundational_standard ? 1 : 0
 
-  depends_on = [aws_securityhub_account.this]
-
+  # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::standards/aws-foundational-security-best-practices/v/1.0.0
   standards_arn = "arn:aws:securityhub:${data.aws_region.current.name}::standards/aws-foundational-security-best-practices/v/1.0.0"
 }
@@ -48,8 +63,7 @@ resource "aws_securityhub_standards_subscription" "aws_foundational" {
 resource "aws_securityhub_standards_subscription" "cis_v500" {
   count = var.enable_security_hub && var.enable_cis_standard ? 1 : 0
 
-  depends_on = [aws_securityhub_account.this]
-
+  # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::standards/cis-aws-foundations-benchmark/v/5.0.0
   standards_arn = "arn:aws:securityhub:${data.aws_region.current.name}::standards/cis-aws-foundations-benchmark/v/5.0.0"
 }
@@ -58,8 +72,7 @@ resource "aws_securityhub_standards_subscription" "cis_v500" {
 resource "aws_securityhub_standards_subscription" "resource_tagging" {
   count = var.enable_security_hub && var.enable_resource_tagging_standard ? 1 : 0
 
-  depends_on = [aws_securityhub_account.this]
-
+  # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::standards/aws-resource-tagging-standard/v/1.0.0
   standards_arn = "arn:aws:securityhub:${data.aws_region.current.name}::standards/aws-resource-tagging-standard/v/1.0.0"
 }
@@ -73,8 +86,7 @@ resource "aws_securityhub_standards_subscription" "resource_tagging" {
 resource "aws_securityhub_product_subscription" "guardduty" {
   count = var.enable_security_hub && var.enable_guardduty_integration ? 1 : 0
 
-  depends_on = [aws_securityhub_account.this]
-
+  # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::product/aws/guardduty
   product_arn = "arn:aws:securityhub:${data.aws_region.current.name}::product/aws/guardduty"
 }
