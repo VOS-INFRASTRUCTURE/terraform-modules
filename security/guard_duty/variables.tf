@@ -114,14 +114,3 @@ variable "enable_eks_runtime_agent" {
   type        = bool
   default     = false  # Only enable if you have EKS clusters
 }
-
-
-variable "enable_ecs_fargate_runtime_agent" {
-  description = "Enable automated agent deployment for ECS Fargate containers. Requires enable_runtime_monitoring = true."
-  type        = bool
-  default     = false
-}
-
-
-
-
