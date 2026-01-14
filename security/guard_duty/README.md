@@ -26,10 +26,15 @@ guard_duty/
 
 ✅ **Base Detector**: CloudTrail, VPC Flow Logs, DNS logs analysis  
 ✅ **S3 Data Events**: Monitor S3 object-level API calls for suspicious activity  
+   - *AWS Console: Protection Plans → S3 Protection*  
 ✅ **EKS Protection**: Kubernetes audit log analysis  
+   - *AWS Console: Protection Plans → EKS Protection*  
 ✅ **RDS Protection**: Database login activity monitoring  
+   - *AWS Console: Protection Plans → RDS Protection*  
 ✅ **Lambda Protection**: Serverless function threat detection  
+   - *AWS Console: Protection Plans → Lambda Protection*  
 ✅ **Runtime Monitoring**: EKS/ECS Fargate runtime behavior analysis  
+   - *AWS Console: Protection Plans → Runtime Monitoring*  
 
 ### Malware Protection (3 Types)
 
@@ -39,12 +44,14 @@ GuardDuty provides three distinct malware protection capabilities:
    - **What**: GuardDuty-initiated scans of EBS volumes attached to EC2 instances
    - **When**: Triggered automatically when suspicious activity is detected
    - **Cost**: $0.10/GB scanned (only when triggered)
+   - **AWS Console**: Protection Plans → Malware Protection → EC2
    - **Status**: ✅ Fully supported by this module
 
 2. **S3 Malware Scanning** (`enable_s3_malware_protection`)
    - **What**: Scans new files uploaded to S3 buckets for malware
    - **When**: Real-time scanning of new uploads to configured buckets
    - **Cost**: Varies by usage (pay per scan)
+   - **AWS Console**: Protection Plans → Malware Protection → S3
    - **Status**: ✅ Fully supported by this module
    - **Note**: After enabling, configure buckets in GuardDuty console or via additional Terraform
 
@@ -52,6 +59,7 @@ GuardDuty provides three distinct malware protection capabilities:
    - **What**: Scans AWS Backup recovery points for malware
    - **When**: Automatic scans or on-demand
    - **Cost**: Varies by usage
+   - **AWS Console**: Protection Plans → Malware Protection → AWS Backup
    - **Status**: ❌ Not yet available via Terraform (configure manually in console)
 
 ✅ **Configurable Frequency**: 15 minutes to 6 hours finding publication  
@@ -81,18 +89,26 @@ module "guardduty" {
   finding_publishing_frequency = "FIFTEEN_MINUTES"  # Real-time alerting
 
   # Core protection features
-  enable_s3_protection       = true   # Monitor S3 for threats
-  enable_malware_protection  = true   # Scan EBS volumes for malware
-  enable_rds_protection      = true   # Monitor database logins
-  enable_lambda_protection   = true   # Monitor Lambda network activity
+  # Protection Plans → S3 Protection
+  enable_s3_data_events = true   # Monitor S3 access patterns
+  
+  # Protection Plans → Malware Protection → EC2
+  enable_ebs_malware_protection = true   # Scan EBS volumes for malware
+  
+  # Protection Plans → RDS Protection
+  enable_rds_protection = true   # Monitor database logins
+  
+  # Protection Plans → Lambda Protection
+  enable_lambda_protection = true   # Monitor Lambda network activity
 
-  # EKS protection (only if you have EKS clusters)
-  enable_eks_protection = false
+  # Protection Plans → EKS Protection (only if you have EKS clusters)
+  enable_eks_audit_logs = false
 
-  # Advanced features (additional cost)
-  enable_s3_data_events         = false  # Granular S3 monitoring
-  enable_eks_audit_logs         = false  # EKS Kubernetes API monitoring
-  enable_ebs_malware_protection = false  # EBS malware scanning
+  # Protection Plans → Malware Protection → S3
+  enable_s3_malware_protection = false  # Additional cost - enable if needed
+
+  # Protection Plans → Runtime Monitoring (only if you have EKS/ECS Fargate)
+  enable_runtime_monitoring = false
 
   tags = {
     ManagedBy   = "Terraform"
@@ -117,12 +133,27 @@ module "guardduty" {
   # Longer frequency for cost savings
   finding_publishing_frequency = "SIX_HOURS"
 
-  # Disable optional features
-  enable_s3_protection       = false
-  enable_malware_protection  = false
-  enable_rds_protection      = false
-  enable_lambda_protection   = false
-  enable_eks_protection      = false
+  # Disable all optional features for cost savings
+  # Protection Plans → S3 Protection
+  enable_s3_data_events = false
+  
+  # Protection Plans → Malware Protection → EC2
+  enable_ebs_malware_protection = false
+  
+  # Protection Plans → Malware Protection → S3
+  enable_s3_malware_protection = false
+  
+  # Protection Plans → RDS Protection
+  enable_rds_protection = false
+  
+  # Protection Plans → Lambda Protection
+  enable_lambda_protection = false
+  
+  # Protection Plans → EKS Protection
+  enable_eks_audit_logs = false
+  
+  # Protection Plans → Runtime Monitoring
+  enable_runtime_monitoring = false
 
   tags = {
     Environment = "dev"
@@ -142,17 +173,27 @@ module "guardduty" {
   enable_guardduty             = true
   finding_publishing_frequency = "FIFTEEN_MINUTES"
 
-  # Enable all core protections
-  enable_s3_protection       = true
-  enable_eks_protection      = true   # If you have EKS
-  enable_malware_protection  = true
-  enable_rds_protection      = true
-  enable_lambda_protection   = true
-
-  # Enable all advanced features
-  enable_s3_data_events         = true
-  enable_eks_audit_logs         = true   # If you have EKS
-  enable_ebs_malware_protection = true
+  # Enable all protection plans
+  # Protection Plans → S3 Protection
+  enable_s3_data_events = true   # Monitor S3 access patterns
+  
+  # Protection Plans → EKS Protection (only if you have EKS clusters)
+  enable_eks_audit_logs = true
+  
+  # Protection Plans → RDS Protection
+  enable_rds_protection = true   # Monitor database login attempts
+  
+  # Protection Plans → Lambda Protection
+  enable_lambda_protection = true   # Monitor Lambda network activity
+  
+  # Protection Plans → Malware Protection → EC2
+  enable_ebs_malware_protection = true   # Scan EBS volumes for malware
+  
+  # Protection Plans → Malware Protection → S3
+  enable_s3_malware_protection = true   # Scan S3 uploads for malware
+  
+  # Protection Plans → Runtime Monitoring (only if you have EKS/ECS Fargate)
+  enable_runtime_monitoring = true   # Monitor container runtime behavior
 
   tags = {
     ManagedBy   = "Terraform"
@@ -161,6 +202,25 @@ module "guardduty" {
   }
 }
 ```
+
+## Protection Plans Mapping
+
+This table maps AWS Console Protection Plans to Terraform variables for easy reference:
+
+| AWS Console Location | Terraform Variable | Feature Name | Status |
+|---------------------|-------------------|--------------|--------|
+| **Protection Plans → S3 Protection** | `enable_s3_data_events` | S3 Data Events | ✅ Supported |
+| **Protection Plans → EKS Protection** | `enable_eks_audit_logs` | EKS Audit Logs | ✅ Supported |
+| **Protection Plans → RDS Protection** | `enable_rds_protection` | RDS Login Events | ✅ Supported |
+| **Protection Plans → Lambda Protection** | `enable_lambda_protection` | Lambda Network Logs | ✅ Supported |
+| **Protection Plans → Runtime Monitoring** | `enable_runtime_monitoring` | Runtime Monitoring | ✅ Supported |
+| **Protection Plans → Runtime Monitoring → EKS Add-on** | `enable_runtime_monitoring` | EKS Add-on Management | ✅ Auto-enabled with Runtime Monitoring |
+| **Protection Plans → Runtime Monitoring → ECS Fargate** | `enable_runtime_monitoring` | ECS Fargate Agent | ✅ Auto-enabled with Runtime Monitoring |
+| **Protection Plans → Malware Protection → EC2** | `enable_ebs_malware_protection` | EBS Malware Scanning | ✅ Supported |
+| **Protection Plans → Malware Protection → S3** | `enable_s3_malware_protection` | S3 Malware Scanning | ✅ Supported |
+| **Protection Plans → Malware Protection → AWS Backup** | N/A | AWS Backup Scanning | ❌ Not available via Terraform |
+
+**Note**: Setting `enable_runtime_monitoring = true` automatically enables both EKS Add-on Management and ECS Fargate Agent Management sub-features.
 
 ## Important: Feature Toggle Behavior
 
@@ -240,6 +300,8 @@ If you still see "ENABLED" after 5 minutes:
 
 ### 1. S3 Data Events (`enable_s3_data_events`)
 
+**AWS Console**: Protection Plans → S3 Protection
+
 **What it does**: Monitors **WHO** accessed S3 and **WHAT** they did
 - Tracks S3 API calls (GetObject, PutObject, DeleteObject, etc.)
 - Analyzes access patterns for anomalies
@@ -256,6 +318,8 @@ If you still see "ENABLED" after 5 minutes:
 **AWS Console**: GuardDuty → Data sources → S3 logs
 
 ### 2. S3 Malware Scanning (`enable_s3_malware_protection`)
+
+**AWS Console**: Protection Plans → Malware Protection → S3
 
 **What it does**: Scans **FILE CONTENTS** for malware
 - Analyzes the actual bytes of uploaded files
@@ -308,9 +372,11 @@ module "guardduty" {
   env        = "production"
   project_id = "cerpac"
 
+  # Protection Plans → S3 Protection
   # Monitor S3 access patterns (WHO did WHAT)
   enable_s3_data_events = true
 
+  # Protection Plans → Malware Protection → S3
   # Scan S3 files for malware (WHAT is in the files)
   enable_s3_malware_protection = true
 
@@ -776,21 +842,20 @@ enable_rds_protection = true
 
 ## Variables Reference
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `enable_guardduty` | bool | `true` | Enable/disable GuardDuty |
-| `env` | string | Required | Environment name |
-| `project_id` | string | Required | Project identifier |
-| `tags` | map(string) | `{}` | Additional tags |
-| `finding_publishing_frequency` | string | `FIFTEEN_MINUTES` | Finding publication frequency |
-| `enable_s3_protection` | bool | `true` | Enable S3 protection |
-| `enable_eks_protection` | bool | `false` | Enable EKS protection |
-| `enable_malware_protection` | bool | `true` | Enable malware protection |
-| `enable_rds_protection` | bool | `true` | Enable RDS protection |
-| `enable_lambda_protection` | bool | `true` | Enable Lambda protection |
-| `enable_s3_data_events` | bool | `false` | Enable S3 data events |
-| `enable_eks_audit_logs` | bool | `false` | Enable EKS audit logs |
-| `enable_ebs_malware_protection` | bool | `false` | Enable EBS malware scanning |
+| Variable | Type | Default | Description | AWS Console |
+|----------|------|---------|-------------|-------------|
+| `enable_guardduty` | bool | `true` | Enable/disable GuardDuty | - |
+| `env` | string | Required | Environment name | - |
+| `project_id` | string | Required | Project identifier | - |
+| `tags` | map(string) | `{}` | Additional tags | - |
+| `finding_publishing_frequency` | string | `FIFTEEN_MINUTES` | Finding publication frequency | - |
+| `enable_s3_data_events` | bool | `true` | Enable S3 data events monitoring | Protection Plans → S3 Protection |
+| `enable_eks_audit_logs` | bool | `false` | Enable EKS audit logs monitoring | Protection Plans → EKS Protection |
+| `enable_rds_protection` | bool | `true` | Enable RDS login activity monitoring | Protection Plans → RDS Protection |
+| `enable_lambda_protection` | bool | `true` | Enable Lambda network monitoring | Protection Plans → Lambda Protection |
+| `enable_ebs_malware_protection` | bool | `true` | Enable EC2/EBS malware scanning | Protection Plans → Malware Protection → EC2 |
+| `enable_s3_malware_protection` | bool | `false` | Enable S3 malware scanning | Protection Plans → Malware Protection → S3 |
+| `enable_runtime_monitoring` | bool | `false` | Enable EKS/ECS Fargate runtime monitoring | Protection Plans → Runtime Monitoring |
 
 ## Related Modules
 
