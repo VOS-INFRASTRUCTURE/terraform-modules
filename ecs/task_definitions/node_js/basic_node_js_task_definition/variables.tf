@@ -182,6 +182,27 @@ variable "health_check_start_period" {
 }
 
 ################################################################################
+# Security Configuration
+################################################################################
+
+variable "enable_readonly_root_filesystem" {
+  description = <<-EOT
+    Enable read-only root filesystem for containers (Security Hub requirement).
+    When enabled:
+    - Container root filesystem is read-only (prevents malware from writing files)
+    - Writable volumes are mounted at /tmp and /app/.cache for temporary data
+    - Fixes Security Hub finding: "ECS.8 - Secrets should not be passed as container environment variables"
+
+    ⚠️ Important: Ensure your application doesn't write to filesystem outside /tmp or /app/.cache
+    Most Node.js apps are compatible as they typically only write to /tmp and node_modules cache.
+
+    Set to false only if your app absolutely requires writing to root filesystem.
+  EOT
+  type        = bool
+  default     = true
+}
+
+################################################################################
 # Tagging
 ################################################################################
 

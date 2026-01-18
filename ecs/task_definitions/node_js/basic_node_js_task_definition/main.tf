@@ -129,11 +129,44 @@ resource "aws_ecs_task_definition" "task_definition" {
   execution_role_arn = var.execution_role_arn
   task_role_arn      = var.task_role_arn
 
+  # Task volumes for writable directories (since root filesystem is read-only)
+  # These volumes are ephemeral and reset when container stops
+  dynamic "volume" {
+    for_each = var.enable_readonly_root_filesystem ? [
+      { name = "tmp" },
+      { name = "cache" }
+    ] : []
+
+    content {
+      name = volume.value.name
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name      = var.container_name
       image     = "${var.ecr_repository_url}:${var.image_tag}"
       essential = true
+
+      # Security: Read-only root filesystem (Security Hub requirement)
+      # Prevents malware from writing to container filesystem
+      # Writable directories are mounted as volumes below
+      readonlyRootFilesystem = var.enable_readonly_root_filesystem
+
+      # Mount writable volumes for directories that need write access
+      # Only used if readonlyRootFilesystem = true
+      mountPoints = var.enable_readonly_root_filesystem ? [
+        {
+          sourceVolume  = "tmp"
+          containerPath = "/tmp"
+          readOnly      = false
+        },
+        {
+          sourceVolume  = "cache"
+          containerPath = "/app/.cache"
+          readOnly      = false
+        }
+      ] : []
 
       portMappings = [
         {
