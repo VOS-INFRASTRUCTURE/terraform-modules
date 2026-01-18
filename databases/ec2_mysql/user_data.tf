@@ -1,0 +1,264 @@
+
+################################################################################
+# User Data Script
+################################################################################
+
+locals {
+  user_data = <<-EOF
+    #!/bin/bash
+    set -e
+
+    # Log everything to a file
+    exec > >(tee /var/log/mysql-setup.log)
+    exec 2>&1
+
+    echo "=== Starting MySQL EC2 setup at $(date) ==="
+
+    # Update system
+    apt-get update -y
+    apt-get upgrade -y
+
+    # Install required packages
+    apt-get install -y \
+      apt-transport-https \
+      ca-certificates \
+      curl \
+      software-properties-common \
+      gnupg-agent \
+      jq \
+      awscli
+
+    # Install Docker
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+
+    # Start and enable Docker
+    systemctl start docker
+    systemctl enable docker
+
+    # Add ubuntu user to docker group
+    usermod -aG docker ubuntu
+
+    %{if var.enable_cloudwatch_monitoring}
+    # Install CloudWatch agent
+    wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+    dpkg -i amazon-cloudwatch-agent.deb
+
+    # Configure CloudWatch agent
+    cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
+    {
+      "metrics": {
+        "namespace": "EC2/MySQL",
+        "metrics_collected": {
+          "mem": {
+            "measurement": [
+              {"name": "mem_used_percent", "rename": "MemoryUsed", "unit": "Percent"}
+            ],
+            "metrics_collection_interval": 60
+          },
+          "disk": {
+            "measurement": [
+              {"name": "used_percent", "rename": "DiskUsed", "unit": "Percent"}
+            ],
+            "metrics_collection_interval": 60,
+            "resources": ["*"]
+          }
+        }
+      },
+      "logs": {
+        "logs_collected": {
+          "files": {
+            "collect_list": [
+              {
+                "file_path": "/var/log/mysql-setup.log",
+                "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+                "log_stream_name": "{instance_id}/setup.log"
+              },
+              {
+                "file_path": "/home/ubuntu/mysql_data/error.log",
+                "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+                "log_stream_name": "{instance_id}/mysql-error.log"
+              }
+            ]
+          }
+        }
+      }
+    }
+    CWCONFIG
+
+    /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+      -a fetch-config \
+      -m ec2 \
+      -s \
+      -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+    %{endif}
+
+    # Retrieve secrets from Secrets Manager
+    echo "Retrieving MySQL passwords from Secrets Manager..."
+    MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
+      --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
+      --region ${data.aws_region.current.name} \
+      --query SecretString \
+      --output text)
+
+    MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
+      --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
+      --region ${data.aws_region.current.name} \
+      --query SecretString \
+      --output text)
+
+    # Create MySQL data directory
+    mkdir -p /home/ubuntu/mysql_data
+    chown -R ubuntu:ubuntu /home/ubuntu/mysql_data
+
+    # Create MySQL custom configuration
+    mkdir -p /home/ubuntu/mysql_config
+    cat > /home/ubuntu/mysql_config/my.cnf <<'MYSQLCONF'
+    [mysqld]
+    # Security
+    skip-name-resolve
+    local-infile=0
+
+    # Performance
+    max_connections=${var.mysql_max_connections}
+    innodb_buffer_pool_size=${var.innodb_buffer_pool_size}
+
+    # Logging
+    log_error=/var/lib/mysql/error.log
+    slow_query_log=1
+    slow_query_log_file=/var/lib/mysql/slow-query.log
+    long_query_time=2
+
+    # Character set
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+
+    # Binary logging for backups
+    log-bin=/var/lib/mysql/mysql-bin
+    binlog_expire_logs_seconds=604800
+    max_binlog_size=100M
+    MYSQLCONF
+
+    chown -R ubuntu:ubuntu /home/ubuntu/mysql_config
+
+    # Create MySQL startup script
+    cat > /usr/local/bin/start_mysql_container.sh <<'STARTSCRIPT'
+    #!/bin/bash
+
+    # Stop existing container if running
+    docker stop mysql-server 2>/dev/null || true
+    docker rm mysql-server 2>/dev/null || true
+
+    # Retrieve secrets from Secrets Manager
+    MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
+      --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
+      --region ${data.aws_region.current.name} \
+      --query SecretString \
+      --output text)
+
+    MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
+      --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
+      --region ${data.aws_region.current.name} \
+      --query SecretString \
+      --output text)
+
+    # Start MySQL container
+    docker run -d \
+      --name mysql-server \
+      -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+      -e MYSQL_DATABASE="${var.mysql_database}" \
+      -e MYSQL_USER="${var.mysql_user}" \
+      -e MYSQL_PASSWORD="$MYSQL_USER_PASSWORD" \
+      -v /home/ubuntu/mysql_data:/var/lib/mysql \
+      -v /home/ubuntu/mysql_config/my.cnf:/etc/mysql/conf.d/custom.cnf:ro \
+      -p 3306:3306 \
+      --restart always \
+      --health-cmd='mysqladmin ping -h localhost' \
+      --health-interval=10s \
+      --health-timeout=5s \
+      --health-retries=3 \
+      mysql:${var.mysql_version}
+
+    echo "MySQL container started at $(date)"
+    STARTSCRIPT
+
+    chmod +x /usr/local/bin/start_mysql_container.sh
+
+    %{if var.enable_automated_backups && var.backup_s3_bucket_name != ""}
+    # Create MySQL backup script
+    cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
+    #!/bin/bash
+    set -e
+
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    BACKUP_FILE="/tmp/mysql-backup-$TIMESTAMP.sql.gz"
+    S3_PATH="s3://${var.backup_s3_bucket_name}/mysql-backups/${var.env}/${var.project_id}/"
+
+    echo "Starting MySQL backup at $(date)"
+
+    # Get root password from Secrets Manager
+    MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
+      --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
+      --region ${data.aws_region.current.name} \
+      --query SecretString \
+      --output text)
+
+    # Backup all databases
+    docker exec mysql-server mysqldump \
+      -u root \
+      -p"$MYSQL_ROOT_PASSWORD" \
+      --all-databases \
+      --single-transaction \
+      --quick \
+      --lock-tables=false \
+      | gzip > $BACKUP_FILE
+
+    # Upload to S3
+    aws s3 cp $BACKUP_FILE $S3_PATH
+
+    # Cleanup old local backups
+    rm $BACKUP_FILE
+
+    # Cleanup old S3 backups (keep last ${var.backup_retention_days} days)
+    aws s3 ls $S3_PATH | while read -r line; do
+      file_date=$(echo $line | awk '{print $1}')
+      file_name=$(echo $line | awk '{print $4}')
+      file_epoch=$(date -d "$file_date" +%s)
+      current_epoch=$(date +%s)
+      days_old=$(( ($current_epoch - $file_epoch) / 86400 ))
+
+      if [ $days_old -gt ${var.backup_retention_days} ]; then
+        echo "Deleting old backup: $file_name (age: $days_old days)"
+        aws s3 rm "$S3_PATH$file_name"
+      fi
+    done
+
+    echo "MySQL backup completed at $(date)"
+    BACKUPSCRIPT
+
+    chmod +x /usr/local/bin/backup_mysql.sh
+
+    # Add backup to crontab (daily at 2 AM)
+    echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
+    %{endif}
+
+    # Add MySQL startup to crontab for reboot
+    (crontab -l 2>/dev/null; echo "@reboot /usr/local/bin/start_mysql_container.sh") | crontab -
+
+    # Start MySQL container
+    /usr/local/bin/start_mysql_container.sh
+
+    # Wait for MySQL to be ready
+    echo "Waiting for MySQL to be ready..."
+    for i in {1..30}; do
+      if docker exec mysql-server mysqladmin ping -h localhost --silent; then
+        echo "MySQL is ready!"
+        break
+      fi
+      echo "Waiting for MySQL... ($i/30)"
+      sleep 2
+    done
+
+    echo "=== MySQL EC2 setup completed at $(date) ==="
+    EOF
+}

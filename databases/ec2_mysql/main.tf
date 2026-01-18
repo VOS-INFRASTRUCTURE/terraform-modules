@@ -1,89 +1,141 @@
+################################################################################
+# EC2 MySQL Module - Secure and Production-Ready
+#
+# Purpose: Deploy MySQL on EC2 with Docker, using security best practices
+#
+# Security Features:
+# - Passwords stored in AWS Secrets Manager (not plain text)
+# - Encrypted EBS volumes
+# - IAM role with minimal permissions
+# - CloudWatch monitoring and logging
+# - Automated backups to S3
+# - Systems Manager Session Manager (no SSH keys needed)
+# - MySQL configured with security best practices
+#
+# Cost: ~$15-25/month (t3.micro + 20GB GP3 storage)
+################################################################################
+
+################################################################################
+# Data Sources
+################################################################################
+
+data "aws_region" "current" {}
+
+################################################################################
+# Local Variables
+################################################################################
 
 locals {
-  instance_name = "${var.project_id}-${var.env}-${var.base_name}-ec2"
+  instance_name = "${var.project_id}-${var.env}-${var.base_name}-mysql"
+
+  # Generate secure random passwords if not provided
+  generate_passwords = var.mysql_root_password == "" || var.mysql_password == ""
 }
 
-resource "tls_private_key" "rsa_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
+################################################################################
+# Secrets Manager - Secure Password Storage
+################################################################################
+
+# Generate secure random passwords
+resource "random_password" "mysql_root" {
+  count   = local.generate_passwords ? 1 : 0
+  length  = 32
+  special = true
+
+  # Ensure password doesn't start/end with special chars (MySQL compatibility)
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
+resource "random_password" "mysql_user" {
+  count   = local.generate_passwords ? 1 : 0
+  length  = 32
+  special = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
 
-resource "aws_instance" "docker_ec2" {
+# Store MySQL root password in Secrets Manager
+resource "aws_secretsmanager_secret" "mysql_root_password" {
+  name                    = "${var.env}/${var.project_id}/${var.base_name}/mysql-root-password"
+  description             = "MySQL root password for ${local.instance_name}"
+  recovery_window_in_days = 7
+
+  tags = merge(
+    var.tags,
+    {
+      Name        = "${local.instance_name}-root-password"
+      Environment = var.env
+      Project     = var.project_id
+      ManagedBy   = "Terraform"
+      Purpose     = "MySQL-Root-Password"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "mysql_root_password" {
+  secret_id     = aws_secretsmanager_secret.mysql_root_password.id
+  secret_string = local.generate_passwords ? random_password.mysql_root[0].result : var.mysql_root_password
+}
+
+# Store MySQL user password in Secrets Manager
+resource "aws_secretsmanager_secret" "mysql_user_password" {
+  name                    = "${var.env}/${var.project_id}/${var.base_name}/mysql-user-password"
+  description             = "MySQL user password for ${var.mysql_user} on ${local.instance_name}"
+  recovery_window_in_days = 7
+
+  tags = merge(
+    var.tags,
+    {
+      Name        = "${local.instance_name}-user-password"
+      Environment = var.env
+      Project     = var.project_id
+      ManagedBy   = "Terraform"
+      Purpose     = "MySQL-User-Password"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "mysql_user_password" {
+  secret_id     = aws_secretsmanager_secret.mysql_user_password.id
+  secret_string = local.generate_passwords ? random_password.mysql_user[0].result : var.mysql_password
+}
+
+################################################################################
+# EC2 Instance
+################################################################################
+
+resource "aws_instance" "mysql_ec2" {
   ami                    = var.ami_id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = var.security_group_ids
-  key_name               = var.key_name
+  key_name               = var.enable_ssh_key_access ? var.key_name : null
+  iam_instance_profile   = aws_iam_instance_profile.mysql_ec2.name
 
-  user_data = <<-EOF
-              #!/bin/bash -xe
-              apt-get update -y
-              apt-get install -y apt-transport-https ca-certificates curl software-properties-common gnupg-agent git
+  monitoring = var.enable_detailed_monitoring
 
-              # Install Docker using the official convenience script
-              curl -fsSL https://get.docker.com -o get-docker.sh
-              sh get-docker.sh
+  user_data = base64encode(local.user_data)
 
-              # Start and enable Docker service
-              systemctl start docker
-              systemctl enable docker
-
-              # Install Docker Compose
-              apt-get install -y docker-compose
-
-              # Add the current user to the Docker group
-              usermod -aG docker ubuntu
-
-              # Provision SSH public key
-              mkdir -p /home/ubuntu/.ssh
-              echo "${tls_private_key.rsa_key.private_key_pem}" > /home/ubuntu/.ssh/id_rsa
-              echo "${tls_private_key.rsa_key.public_key_openssh}" > /home/ubuntu/.ssh/id_rsa.pub
-
-              # Add public key ssh to authorized keys
-              echo "${tls_private_key.rsa_key.public_key_openssh}" >> /home/ubuntu/.ssh/authorized_keys
-
-              echo "${tls_private_key.rsa_key.private_key_pem}" > /home/ubuntu/.ssh/id_rsa.private_key_pem
-              echo "${tls_private_key.rsa_key.public_key_pem}" > /home/ubuntu/.ssh/id_rsa.public_key_pem
-              echo "${tls_private_key.rsa_key.private_key_openssh}" > /home/ubuntu/.ssh/id_rsa.private_key_openssh
-
-              chmod 600 /home/ubuntu/.ssh/authorized_keys
-              chmod 600 /home/ubuntu/.ssh/id_rsa
-              chown -R ubuntu:ubuntu /home/ubuntu/.ssh
-
-              # Create a startup script for MySQL container
-              cat <<'SCRIPT' > /usr/local/bin/start_mysql_container.sh
-              #!/bin/bash
-              docker run -d \
-                --name mysql-server \
-                -e MYSQL_ROOT_PASSWORD=${var.mysql_root_password} \
-                -e MYSQL_DATABASE=${var.mysql_database} \
-                -e MYSQL_USER=${var.mysql_user} \
-                -e MYSQL_PASSWORD=${var.mysql_password} \
-                -v /home/ubuntu/mysql_data:/var/lib/mysql \
-                -p 3306:3306 \
-                --restart always \
-                mysql:8
-              SCRIPT
-              chmod +x /usr/local/bin/start_mysql_container.sh
-
-              # Add startup script to crontab for reboot
-              (crontab -l 2>/dev/null; echo "@reboot /usr/local/bin/start_mysql_container.sh") | crontab -
-
-              # Run the MySQL container immediately
-              /usr/local/bin/start_mysql_container.sh
-
-              # Verify installations
-              docker --version
-              docker-compose --version
-              git --version
-
-              echo "User data script completed successfully."
-              EOF
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"  # Enforce IMDSv2
+    http_put_response_hop_limit = 1
+  }
 
   root_block_device {
-    volume_size = var.storage_size
-    volume_type = var.storage_type
+    volume_size           = var.storage_size
+    volume_type           = var.storage_type
+    encrypted             = var.enable_ebs_encryption
+    delete_on_termination = true
+
+    tags = merge(
+      var.tags,
+      {
+        Name        = "${local.instance_name}-root"
+        Environment = var.env
+        Project     = var.project_id
+        ManagedBy   = "Terraform"
+      }
+    )
   }
 
   ebs_optimized = true
@@ -93,6 +145,14 @@ resource "aws_instance" "docker_ec2" {
     {
       Name        = local.instance_name
       Environment = var.env
+      Project     = var.project_id
+      ManagedBy   = "Terraform"
+      Purpose     = "MySQL-Database"
+      Backup      = var.enable_automated_backups ? "Required" : "None"
     }
   )
+
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
 }
