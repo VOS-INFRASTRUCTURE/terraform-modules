@@ -61,6 +61,32 @@ resource "aws_iam_role_policy" "redis_cloudwatch" {
         ]
         Resource = "*"
       }
+      # TODO: Future Enhancement - SSM Parameter Store Integration
+      # When implementing Redis configuration via SSM Parameter Store:
+      # {
+      #   Effect = "Allow"
+      #   Action = [
+      #     "ssm:GetParameter",        # Read Redis password/config from Parameter Store
+      #     "ssm:PutParameter"         # Update Redis parameters dynamically
+      #   ]
+      #   Resource = [
+      #     "arn:aws:ssm:${region}:${account}:parameter/${var.env}/${var.project_id}/redis/*"
+      #   ]
+      # },
+      # {
+      #   Effect = "Allow"
+      #   Action = [
+      #     "ec2:DescribeInstances",   # Required for auto-discovery in multi-instance setups
+      #     "ec2:DescribeTags"         # Read instance tags for configuration
+      #   ]
+      #   Resource = "*"
+      # }
+      #
+      # Use Cases:
+      # - Store Redis password in SSM Parameter Store instead of user_data
+      # - Dynamic configuration updates without instance restart
+      # - Auto-discovery of Redis cluster nodes (future clustering support)
+      # - Centralized configuration management across environments
     ]
   })
 }
