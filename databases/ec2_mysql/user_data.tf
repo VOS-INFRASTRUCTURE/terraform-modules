@@ -219,19 +219,11 @@ locals {
     # Cleanup old local backups
     rm $BACKUP_FILE
 
-    # Cleanup old S3 backups (keep last ${var.backup_retention_days} days)
-    aws s3 ls $S3_PATH | while read -r line; do
-      file_date=$(echo $line | awk '{print $1}')
-      file_name=$(echo $line | awk '{print $4}')
-      file_epoch=$(date -d "$file_date" +%s)
-      current_epoch=$(date +%s)
-      days_old=$(( ($current_epoch - $file_epoch) / 86400 ))
-
-      if [ $days_old -gt ${var.backup_retention_days} ]; then
-        echo "Deleting old backup: $file_name (age: $days_old days)"
-        aws s3 rm "$S3_PATH$file_name"
-      fi
-    done
+    # Note: S3 backup retention is managed by S3 lifecycle rules
+    # EC2 instance does NOT have s3:DeleteObject permission for security
+    # To enable automatic cleanup, configure S3 lifecycle policy:
+    #   - Expire objects after ${var.backup_retention_days} days
+    #   - Or use S3 Intelligent-Tiering for cost optimization
 
     echo "MySQL backup completed at $(date)"
     BACKUPSCRIPT
