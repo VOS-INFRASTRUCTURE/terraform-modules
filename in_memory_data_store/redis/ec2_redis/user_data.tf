@@ -122,7 +122,44 @@ locals {
               {
                 "file_path": "/var/log/redis/redis-server.log",
                 "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
-                "log_stream_name": "{instance_id}/redis.log"
+                "log_stream_name": "{instance_id}/redis.log",
+                "timezone": "UTC"
+              },
+              {
+                "file_path": "/var/log/redis-setup.log",
+                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
+                "log_stream_name": "{instance_id}/setup.log",
+                "timezone": "UTC"
+              },
+              {
+                "file_path": "/var/log/redis-backup.log",
+                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
+                "log_stream_name": "{instance_id}/backup.log",
+                "timezone": "UTC"
+              },
+              {
+                "file_path": "/var/log/syslog",
+                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
+                "log_stream_name": "{instance_id}/syslog",
+                "timezone": "UTC"
+              },
+              {
+                "file_path": "/var/log/auth.log",
+                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
+                "log_stream_name": "{instance_id}/auth.log",
+                "timezone": "UTC"
+              },
+              {
+                "file_path": "/var/log/cloud-init.log",
+                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
+                "log_stream_name": "{instance_id}/cloud-init.log",
+                "timezone": "UTC"
+              },
+              {
+                "file_path": "/var/log/cloud-init-output.log",
+                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
+                "log_stream_name": "{instance_id}/cloud-init-output.log",
+                "timezone": "UTC"
               }
             ]
           }
