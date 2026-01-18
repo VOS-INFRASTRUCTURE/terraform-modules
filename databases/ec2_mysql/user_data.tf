@@ -184,7 +184,7 @@ locals {
 
     chmod +x /usr/local/bin/start_mysql_container.sh
 
-    %{if var.enable_automated_backups && var.backup_s3_bucket_name != ""}
+    %{if var.enable_automated_backups && local.backup_bucket_name != ""}
     # Create MySQL backup script
     cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
     #!/bin/bash
@@ -192,7 +192,7 @@ locals {
 
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     BACKUP_FILE="/tmp/mysql-backup-$TIMESTAMP.sql.gz"
-    S3_PATH="s3://${var.backup_s3_bucket_name}/mysql-backups/${var.env}/${var.project_id}/"
+    S3_PATH="s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/"
 
     echo "Starting MySQL backup at $(date)"
 

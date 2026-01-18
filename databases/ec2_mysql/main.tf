@@ -27,6 +27,11 @@ data "aws_region" "current" {}
 
 locals {
   instance_name = "${var.project_id}-${var.env}-${var.base_name}-mysql"
+
+  # Return created bucket name or provided bucket name
+  backup_bucket_name = var.enable_automated_backups ? (
+    var.create_backup_bucket ? "${var.env}-${var.project_id}-${var.base_name}-mysql-backups" : var.backup_s3_bucket_name
+  ) : ""
 }
 
 ################################################################################

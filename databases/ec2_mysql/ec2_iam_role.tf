@@ -100,7 +100,7 @@ resource "aws_iam_role_policy" "cloudwatch_access" {
 # Backup retention is managed by S3 lifecycle rules or administrators.
 # This prevents accidental or malicious deletion of backups by compromised EC2.
 resource "aws_iam_role_policy" "s3_backup_write_only" {
-  count = var.enable_automated_backups && var.backup_s3_bucket_name != "" ? 1 : 0
+  count = var.enable_automated_backups && local.backup_bucket_name != "" ? 1 : 0
   name  = "${local.instance_name}-s3-backup-write-only"
   role  = aws_iam_role.mysql_ec2.id
 
@@ -118,8 +118,8 @@ resource "aws_iam_role_policy" "s3_backup_write_only" {
           # Backup deletion managed by S3 lifecycle rules or administrators only
         ]
         Resource = [
-          "arn:aws:s3:::${var.backup_s3_bucket_name}",
-          "arn:aws:s3:::${var.backup_s3_bucket_name}/*"
+          "arn:aws:s3:::${local.backup_bucket_name}",
+          "arn:aws:s3:::${local.backup_bucket_name}/*"
         ]
       }
     ]
