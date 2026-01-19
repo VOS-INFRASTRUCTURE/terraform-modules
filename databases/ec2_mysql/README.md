@@ -83,6 +83,12 @@ module "mysql_prod" {
   backup_schedule          = "0 * * * *"  # Hourly backups
   backup_retention_days    = 14
 
+  # EBS snapshots for full instance backup
+  enable_ebs_snapshots        = true
+  ebs_snapshot_interval_hours = 24
+  ebs_snapshot_time           = "03:00"  # 3 AM UTC daily
+  ebs_snapshot_retention_count = 14  # Keep 2 weeks
+
   tags = {
     Environment = "production"
     Critical    = "true"
@@ -137,6 +143,10 @@ output "backup_bucket" {
 | `enable_automated_backups` | Enable S3 backups (creates S3 bucket) | `false` |
 | `backup_schedule` | Cron schedule for backups | `"0 * * * *"` (hourly) |
 | `backup_retention_days` | Backup retention days | `7` |
+| `enable_ebs_snapshots` | Enable EBS volume snapshots | `false` |
+| `ebs_snapshot_interval_hours` | Hours between snapshots | `24` |
+| `ebs_snapshot_time` | Daily snapshot time (UTC) | `"03:00"` |
+| `ebs_snapshot_retention_count` | Number of snapshots to keep | `7` |
 
 ## Outputs
 
@@ -343,7 +353,13 @@ aws secretsmanager get-secret-value \
 
 ## Backups
 
-### Automated Backups
+This module provides **two types of backups** for comprehensive disaster recovery:
+
+### 1. MySQL Database Backups (to S3)
+
+**What**: Logical backups using `mysqldump` → compressed → stored in S3  
+**When**: Hourly by default (configurable)  
+**Restore**: Database-level restore, fast, cross-region compatible
 
 When `enable_automated_backups = true`:
 - **S3 Bucket**: Created automatically by the module (no need to create separately)
@@ -372,7 +388,56 @@ s3://env-project-mysql-backups/
           ...
 ```
 
-### Manual Backup
+### 2. EBS Volume Snapshots (Full Disk)
+
+**What**: Complete EBS volume snapshot (OS + Docker + MySQL data + configs)  
+**When**: Daily at 3 AM UTC by default (configurable)  
+**Restore**: Full instance restore, launch new EC2 from snapshot
+
+When `enable_ebs_snapshots = true`:
+- **Technology**: AWS Data Lifecycle Manager (DLM)
+- **Schedule**: Daily at 3 AM UTC by default (configurable via `ebs_snapshot_time`)
+- **Retention**: Keeps last 7 snapshots by default (configurable via `ebs_snapshot_retention_count`)
+- **Cost**: ~$0.05/GB/month (incremental snapshots, only changed blocks stored)
+- **Automatic**: Fully managed by AWS, no maintenance required
+- **Tagged**: Snapshots tagged with environment, project, purpose for easy identification
+
+### Comparison
+
+| Feature | MySQL Backups (S3) | EBS Snapshots |
+|---------|-------------------|---------------|
+| **Frequency** | Hourly | Daily |
+| **Size** | Small (compressed SQL) | Larger (full disk) |
+| **Restore Speed** | Fast (minutes) | Medium (launch new EC2) |
+| **Restore Scope** | Database only | Entire system |
+| **Cross-Region** | Yes (S3 replication) | Yes (copy snapshots) |
+| **Cost** | Lower (S3 storage) | Medium (snapshot storage) |
+| **Use Case** | DB corruption, data recovery | Instance failure, DR |
+
+### Recommended Configuration
+
+**Development/Staging:**
+```hcl
+enable_automated_backups = true   # MySQL backups only
+backup_schedule          = "0 2 * * *"  # Daily at 2 AM
+backup_retention_days    = 7
+enable_ebs_snapshots     = false  # Optional
+```
+
+**Production:**
+```hcl
+# Both backup types for maximum protection
+enable_automated_backups = true
+backup_schedule          = "0 * * * *"  # Hourly
+backup_retention_days    = 14
+
+enable_ebs_snapshots        = true
+ebs_snapshot_interval_hours = 24
+ebs_snapshot_time           = "03:00"  # 3 AM UTC
+ebs_snapshot_retention_count = 14
+```
+
+### Manual MySQL Backup
 
 ```bash
 # Connect to instance
@@ -385,7 +450,7 @@ sudo /usr/local/bin/backup_mysql.sh
 tail -f /var/log/mysql-backup.log
 ```
 
-### Restore from Backup
+### Restore from MySQL Backup (S3)
 
 ```bash
 # 1. List available backups
@@ -408,6 +473,45 @@ aws ssm start-session --target i-0123456789abcdef
 
 # On instance:
 docker exec -i mysql-server mysql -u root -p"$MYSQL_ROOT_PASSWORD" < 143022.sql
+```
+
+### Restore from EBS Snapshot (Full Instance)
+
+**Scenario**: EC2 instance failed, need to launch new instance from snapshot
+
+```bash
+# 1. List available snapshots
+aws ec2 describe-snapshots \
+  --filters "Name=tag:Name,Values=*mysql*" \
+  --query 'Snapshots[*].[SnapshotId,StartTime,VolumeSize,Description]' \
+  --output table
+
+# 2. Create new volume from snapshot
+aws ec2 create-volume \
+  --snapshot-id snap-0123456789abcdef \
+  --availability-zone eu-west-2a \
+  --volume-type gp3
+
+# 3. Launch new EC2 instance
+# Option A: Use AWS Console → Launch Instance → Select snapshot as root volume
+# Option B: Update Terraform with new instance, import snapshot volume
+
+# 4. Test MySQL connectivity
+aws ssm start-session --target i-NEW-INSTANCE-ID
+docker ps | grep mysql-server
+docker exec mysql-server mysql -u root -p -e "SHOW DATABASES;"
+```
+
+**Alternative: Quick Launch from Snapshot**
+```bash
+# Create AMI from snapshot (easier to launch)
+aws ec2 create-image \
+  --instance-id i-ORIGINAL-INSTANCE-ID \
+  --name "mysql-backup-$(date +%Y%m%d)" \
+  --description "MySQL instance backup from snapshot"
+
+# Launch new instance from AMI
+# Update terraform ami_id variable with new AMI ID
 ```
 
 ## Monitoring

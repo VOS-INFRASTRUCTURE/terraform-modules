@@ -62,10 +62,32 @@ output "mysql" {
 
     # Backup configuration
     backup = {
-      enabled            = var.enable_automated_backups
-      s3_bucket          = var.backup_s3_bucket_name
-      schedule           = var.backup_schedule
-      retention_days     = var.backup_retention_days
+      # MySQL database backups (mysqldump to S3)
+      mysql_backups = {
+        enabled            = var.enable_automated_backups
+        s3_bucket_name     = local.backup_bucket_name
+        schedule           = var.backup_schedule
+        retention_days     = var.backup_retention_days
+        s3_path            = var.enable_automated_backups ? "s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/" : null
+        backup_script_path = "/usr/local/bin/backup_mysql.sh"
+        log_file          = "/var/log/mysql-backup.log"
+      }
+
+      # EBS volume snapshots (full disk image)
+      ebs_snapshots = {
+        enabled             = var.enable_ebs_snapshots
+        interval_hours      = var.enable_ebs_snapshots ? var.ebs_snapshot_interval_hours : null
+        snapshot_time       = var.enable_ebs_snapshots ? var.ebs_snapshot_time : null
+        retention_count     = var.enable_ebs_snapshots ? var.ebs_snapshot_retention_count : null
+        dlm_policy_id       = var.enable_ebs_snapshots ? aws_dlm_lifecycle_policy.mysql_ebs_snapshots[0].id : null
+        dlm_policy_arn      = var.enable_ebs_snapshots ? aws_dlm_lifecycle_policy.mysql_ebs_snapshots[0].arn : null
+      }
+
+      # Restore instructions
+      restore_instructions = {
+        mysql_from_s3 = var.enable_automated_backups ? "aws s3 ls s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/ --recursive" : "MySQL backups not enabled"
+        ebs_from_snapshot = var.enable_ebs_snapshots ? "aws ec2 describe-snapshots --filters 'Name=tag:Name,Values=${local.instance_name}-dlm-policy' --query 'Snapshots[*].[SnapshotId,StartTime,VolumeSize]' --output table" : "EBS snapshots not enabled"
+      }
     }
 
     # MySQL configuration

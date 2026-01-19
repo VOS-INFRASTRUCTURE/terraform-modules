@@ -187,6 +187,34 @@ variable "backup_retention_days" {
 }
 
 ################################################################################
+# EBS Snapshot Configuration
+################################################################################
+
+variable "enable_ebs_snapshots" {
+  description = "Enable automated EBS volume snapshots using AWS Data Lifecycle Manager"
+  type        = bool
+  default     = false
+}
+
+variable "ebs_snapshot_interval_hours" {
+  description = "Interval in hours between EBS snapshots (12 or 24 recommended)"
+  type        = number
+  default     = 24
+}
+
+variable "ebs_snapshot_time" {
+  description = "Time to take daily snapshots in UTC (HH:MM format, e.g., '03:00')"
+  type        = string
+  default     = "03:00"
+}
+
+variable "ebs_snapshot_retention_count" {
+  description = "Number of EBS snapshots to retain (older snapshots are automatically deleted)"
+  type        = number
+  default     = 7
+}
+
+################################################################################
 # Tags
 ################################################################################
 
