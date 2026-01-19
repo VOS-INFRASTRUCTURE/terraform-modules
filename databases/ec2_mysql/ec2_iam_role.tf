@@ -126,6 +126,9 @@ resource "aws_iam_role_policy" "s3_backup_write_only" {
   })
 }
 
+# Instance profile is required to attach IAM role to EC2 instance
+# Only a profile can be attached to an EC2 instance
+# IAM role cannot be attached directly
 resource "aws_iam_instance_profile" "mysql_ec2" {
   name = "${local.instance_name}-profile"
   role = aws_iam_role.mysql_ec2.name
