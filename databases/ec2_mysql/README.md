@@ -42,20 +42,6 @@ module "mysql_dev" {
 ### Production Example (with all features)
 
 ```hcl
-# S3 bucket for backups
-resource "aws_s3_bucket" "mysql_backups" {
-  bucket = "production-mysql-backups"
-}
-
-resource "aws_s3_bucket_versioning" "mysql_backups" {
-  bucket = aws_s3_bucket.mysql_backups.id
-  
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# Deploy MySQL
 module "mysql_prod" {
   source = "../../databases/ec2_mysql"
 
@@ -82,7 +68,7 @@ module "mysql_prod" {
   mysql_version      = "8.0"
   mysql_database     = "production_db"
   mysql_user         = "app_user"
-  # Passwords auto-generated
+  # Passwords auto-generated and stored in Secrets Manager
   
   # Performance tuning
   mysql_max_connections   = 200
@@ -92,10 +78,9 @@ module "mysql_prod" {
   enable_cloudwatch_monitoring = true
   log_retention_days          = 30
 
-  # Backups
+  # Backups (S3 bucket created automatically by module)
   enable_automated_backups = true
-  backup_s3_bucket_name    = aws_s3_bucket.mysql_backups.id
-  backup_schedule          = "0 2 * * *"  # 2 AM daily
+  backup_schedule          = "0 * * * *"  # Hourly backups
   backup_retention_days    = 14
 
   tags = {
@@ -108,6 +93,11 @@ module "mysql_prod" {
 # Output connection details
 output "mysql_connection" {
   value = module.mysql_prod.mysql.connection
+}
+
+# Access the auto-created backup bucket
+output "backup_bucket" {
+  value = module.mysql_prod.mysql.backup.s3_bucket_name
 }
 ```
 
@@ -144,9 +134,8 @@ output "mysql_connection" {
 | `innodb_buffer_pool_size` | InnoDB buffer pool size | `"128M"` |
 | `enable_cloudwatch_monitoring` | Enable CloudWatch | `true` |
 | `log_retention_days` | Log retention days | `7` |
-| `enable_automated_backups` | Enable S3 backups | `false` |
-| `backup_s3_bucket_name` | S3 bucket for backups | `""` |
-| `backup_schedule` | Cron schedule for backups | `"0 2 * * *"` |
+| `enable_automated_backups` | Enable S3 backups (creates S3 bucket) | `false` |
+| `backup_schedule` | Cron schedule for backups | `"0 * * * *"` (hourly) |
 | `backup_retention_days` | Backup retention days | `7` |
 
 ## Outputs
@@ -357,12 +346,31 @@ aws secretsmanager get-secret-value \
 ### Automated Backups
 
 When `enable_automated_backups = true`:
-- Runs daily at 2 AM (configurable)
-- Creates mysqldump of all databases
-- Compresses with gzip
-- Uploads to S3
-- Manages retention automatically
-- Logs to `/var/log/mysql-backup.log`
+- **S3 Bucket**: Created automatically by the module (no need to create separately)
+- **Schedule**: Runs hourly by default (`0 * * * *` - configurable via `backup_schedule`)
+- **Naming**: Folder-based structure: `YYYY-MM-DD-database-name/HHMMSS.sql.gz`
+  - Example: `2026-01-19-production_db/143022.sql.gz`
+  - All hourly backups for the same day are grouped in one folder
+- **Process**: Creates mysqldump of all databases → compresses with gzip → uploads to S3
+- **Retention**: Managed automatically by S3 lifecycle rules based on `backup_retention_days`
+- **Logs**: Check `/var/log/mysql-backup.log` for backup execution logs
+
+**S3 Bucket Structure:**
+```
+s3://env-project-mysql-backups/
+  mysql-backups/
+    production/
+      myapp/
+        2026-01-19-production_db/
+          010000.sql.gz  # 1 AM backup
+          020000.sql.gz  # 2 AM backup
+          030000.sql.gz  # 3 AM backup
+          ...
+          230000.sql.gz  # 11 PM backup
+        2026-01-18-production_db/
+          010000.sql.gz
+          ...
+```
 
 ### Manual Backup
 
@@ -372,28 +380,34 @@ aws ssm start-session --target i-0123456789abcdef
 
 # Run backup script manually
 sudo /usr/local/bin/backup_mysql.sh
+
+# Check backup logs
+tail -f /var/log/mysql-backup.log
 ```
 
 ### Restore from Backup
 
 ```bash
-# 1. Download backup from S3
-aws s3 cp s3://bucket/mysql-backups/production/myapp/mysql-backup-20260119.sql.gz .
+# 1. List available backups
+aws s3 ls s3://production-myapp-mysql-backups/mysql-backups/production/myapp/ --recursive
 
-# 2. Extract
-gunzip mysql-backup-20260119.sql.gz
+# 2. Download specific backup
+aws s3 cp s3://bucket/mysql-backups/production/myapp/2026-01-19-production_db/143022.sql.gz .
 
-# 3. Get root password
+# 3. Extract
+gunzip 143022.sql.gz
+
+# 4. Get root password
 MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
   --secret-id production/myapp/mysql/mysql-root-password \
   --query SecretString \
   --output text)
 
-# 4. Connect to instance and restore
+# 5. Connect to instance and restore
 aws ssm start-session --target i-0123456789abcdef
 
 # On instance:
-docker exec -i mysql-server mysql -u root -p"$MYSQL_ROOT_PASSWORD" < mysql-backup-20260119.sql
+docker exec -i mysql-server mysql -u root -p"$MYSQL_ROOT_PASSWORD" < 143022.sql
 ```
 
 ## Monitoring

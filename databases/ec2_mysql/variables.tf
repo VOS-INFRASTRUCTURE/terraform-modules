@@ -25,6 +25,7 @@ variable "base_name" {
 variable "ami_id" {
   description = "The AMI ID to use for the instance (Ubuntu 22.04 recommended)"
   type        = string
+  default = "ami-05c172c7f0d3aed00" # Canonical, Ubuntu, 24.04, amd64 image
 }
 
 variable "instance_type" {
