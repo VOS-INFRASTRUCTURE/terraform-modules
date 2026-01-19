@@ -130,6 +130,8 @@ output "backup_bucket" {
 | `storage_size` | EBS volume size (GB) | `20` |
 | `storage_type` | EBS volume type | `"gp3"` |
 | `enable_ebs_encryption` | Encrypt EBS volumes | `true` |
+| `enable_detailed_monitoring` | Detailed CloudWatch monitoring | `false` |
+| `enable_termination_protection` | Prevent accidental deletion | `false` |
 | `key_name` | SSH key pair name | `""` |
 | `enable_ssh_key_access` | Enable SSH key access | `false` |
 | `enable_ssm_access` | Enable SSM Session Manager | `true` |
@@ -370,6 +372,10 @@ When `enable_automated_backups = true`:
 - **Process**: Creates mysqldump of all databases → compresses with gzip → uploads to S3
 - **Retention**: Managed automatically by S3 lifecycle rules based on `backup_retention_days`
 - **Logs**: Check `/var/log/mysql-backup.log` for backup execution logs
+- **Versioning**: Optional (disabled by default) - enable with `enable_backup_versioning = true`
+  - **Not required** because backups use unique timestamps (no overwrites)
+  - **Enable for**: Extra protection against accidental deletions or script bugs
+  - **Cost**: Higher storage costs (keeps version history)
 
 **S3 Bucket Structure:**
 ```

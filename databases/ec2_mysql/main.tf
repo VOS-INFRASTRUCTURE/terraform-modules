@@ -48,6 +48,10 @@ resource "aws_instance" "mysql_ec2" {
 
   monitoring = var.enable_detailed_monitoring
 
+  # Termination protection (optional, recommended for production)
+  # Note: Even if instance is terminated, EBS snapshots persist independently
+  disable_api_termination = var.enable_termination_protection
+
   user_data = base64encode(local.user_data)
 
   metadata_options {
@@ -60,6 +64,7 @@ resource "aws_instance" "mysql_ec2" {
     volume_size           = var.storage_size
     volume_type           = var.storage_type
     encrypted             = var.enable_ebs_encryption
+    # Delete volume when instance is terminated (safe - EBS snapshots persist independently)
     delete_on_termination = true
 
     tags = merge(

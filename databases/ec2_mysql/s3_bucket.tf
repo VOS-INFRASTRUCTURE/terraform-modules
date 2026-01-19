@@ -66,11 +66,18 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "mysql_backups" {
 }
 
 ################################################################################
-# Versioning
+# Versioning (Optional)
+#
+# Note: Versioning provides extra protection but is NOT required because:
+# - Backups use unique timestamps (YYYY-MM-DD-database-name/HHMMSS.sql.gz)
+# - Each backup has a different filename, so overwrites don't happen
+# - Enable this for extra protection against accidental deletions
+#
+# Cost impact: Keeping old versions increases storage costs
 ################################################################################
 
 resource "aws_s3_bucket_versioning" "mysql_backups" {
-  count  = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count  = var.enable_automated_backups && var.create_backup_bucket && var.enable_backup_versioning ? 1 : 0
   bucket = aws_s3_bucket.mysql_backups[0].id
 
   versioning_configuration {
@@ -102,19 +109,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "mysql_backups" {
     expiration {
       days = var.backup_retention_days
     }
-  }
 
-  # Rule 2: Delete old versions after retention period (if versioning enabled)
-  rule {
-    id     = "delete-old-versions"
-    status = "Enabled"
-
-    filter {
-      prefix = "mysql-backups/"
-    }
-
-    noncurrent_version_expiration {
-      noncurrent_days = var.backup_retention_days
+    # Only apply version cleanup if versioning is enabled
+    dynamic "noncurrent_version_expiration" {
+      for_each = var.enable_backup_versioning ? [1] : []
+      content {
+        noncurrent_days = var.backup_retention_days
+      }
     }
   }
 

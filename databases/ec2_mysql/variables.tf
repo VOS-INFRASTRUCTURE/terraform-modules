@@ -68,6 +68,12 @@ variable "enable_detailed_monitoring" {
   default     = false
 }
 
+variable "enable_termination_protection" {
+  description = "Enable EC2 termination protection to prevent accidental deletion (recommended for production)"
+  type        = bool
+  default     = false
+}
+
 ################################################################################
 # Access Configuration
 ################################################################################
@@ -184,6 +190,12 @@ variable "backup_retention_days" {
   description = "Number of days to retain backups in S3"
   type        = number
   default     = 7
+}
+
+variable "enable_backup_versioning" {
+  description = "Enable S3 versioning for backup bucket (optional - backups use unique timestamps, so overwrites are unlikely)"
+  type        = bool
+  default     = false
 }
 
 ################################################################################
