@@ -174,9 +174,9 @@ variable "backup_s3_bucket_name" {
 }
 
 variable "backup_schedule" {
-  description = "Cron expression for backup schedule (e.g., '0 2 * * *' for 2 AM daily)"
+  description = "Cron expression for backup schedule (e.g., '0 * * * *' for hourly, '0 2 * * *' for 2 AM daily)"
   type        = string
-  default     = "0 2 * * *"
+  default     = "0 * * * *"
 }
 
 variable "backup_retention_days" {

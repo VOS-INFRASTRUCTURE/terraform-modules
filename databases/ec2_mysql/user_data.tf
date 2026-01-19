@@ -228,9 +228,11 @@ locals {
     #!/bin/bash
     set -e
 
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    TODAY=$(date +"%Y-%m-%d")
+    TIMESTAMP=$(date +"%H%M%S")
+    FOLDER_NAME="$TODAY-${var.mysql_database}"
     BACKUP_FILE="/tmp/mysql-backup-$TIMESTAMP.sql.gz"
-    S3_PATH="s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/"
+    S3_PATH="s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/$FOLDER_NAME/"
 
     echo "Starting MySQL backup at $(date)"
 
@@ -251,10 +253,10 @@ locals {
       --lock-tables=false \
       | gzip > $BACKUP_FILE
 
-    # Upload to S3
+    # Upload to S3 with folder structure: YYYY-MM-DD-database-name/HHMMSS.sql.gz
     aws s3 cp $BACKUP_FILE $S3_PATH
 
-    # Cleanup old local backups
+    # Cleanup local backup
     rm $BACKUP_FILE
 
     # Note: S3 backup retention is managed by S3 lifecycle rules
@@ -264,11 +266,12 @@ locals {
     #   - Or use S3 Intelligent-Tiering for cost optimization
 
     echo "MySQL backup completed at $(date)"
+    echo "Backup stored in: $S3_PATH"
     BACKUPSCRIPT
 
     chmod +x /usr/local/bin/backup_mysql.sh
 
-    # Add backup to crontab (daily at 2 AM)
+    # Add backup to crontab (runs per schedule: ${var.backup_schedule})
     echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
     %{endif}
 
