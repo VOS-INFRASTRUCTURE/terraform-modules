@@ -1,7 +1,16 @@
 ################################################################################
-# EC2 MySQL Module - Secure and Production-Ready
+# EC2 MySQL ARM Module - Native Installation (No Docker)
 #
-# Purpose: Deploy MySQL on EC2 with Docker, using security best practices
+# Purpose: Deploy MySQL 8.x natively on EC2 ARM (Graviton) instances
+#          for maximum performance and cost efficiency
+#
+# Benefits over Docker version:
+# - 5-10% better performance (no Docker overhead)
+# - 200-500MB less memory usage (no Docker daemon)
+# - Simpler architecture (direct MySQL installation)
+# - 20-25% cost savings (ARM Graviton vs x86)
+#
+# Default: m7g.large (2 vCPU, 8GB RAM, ~$67/month)
 #
 # Security Features:
 # - Passwords stored in AWS Secrets Manager (not plain text)
@@ -11,8 +20,6 @@
 # - Automated backups to S3
 # - Systems Manager Session Manager (no SSH keys needed)
 # - MySQL configured with security best practices
-#
-# Cost: ~$15-25/month (t3.micro + 20GB GP3 storage)
 ################################################################################
 
 ################################################################################

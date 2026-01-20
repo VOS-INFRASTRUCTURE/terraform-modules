@@ -133,13 +133,13 @@ variable "mysql_password" {
 variable "mysql_max_connections" {
   description = "Maximum number of simultaneous MySQL connections"
   type        = number
-  default     = 151
+  default     = 200
 }
 
 variable "innodb_buffer_pool_size" {
   description = "InnoDB buffer pool size (e.g., '128M', '256M', '512M', '1G')"
   type        = string
-  default     = "128M"
+  default     = "1G"
 }
 
 ################################################################################

@@ -23,15 +23,22 @@ variable "base_name" {
 ################################################################################
 
 variable "ami_id" {
-  description = "The AMI ID to use for the instance (Ubuntu 22.04 recommended)"
+  description = "The AMI ID to use for the instance (Ubuntu 24.04 ARM64 recommended)"
   type        = string
-  default = "ami-05c172c7f0d3aed00" # Canonical, Ubuntu, 24.04, amd64 image
+  default     = "ami-0d90c137bb8f87162" # Canonical, Ubuntu, 24.04 LTS, arm64 noble image (us-east-1)
+  # Note: Update this AMI ID for your region. Find ARM64 AMIs with:
+  # aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-noble-24.04-arm64-server-*" --query 'Images[*].[ImageId,CreationDate]' --output table
 }
 
 variable "instance_type" {
-  description = "The type of instance to launch (e.g., t3.micro, t3.small, t3.medium)"
+  description = "The type of instance to launch (ARM/Graviton recommended for better price/performance)"
   type        = string
-  default     = "t3.micro"
+  default     = "m7g.large" # 2 vCPU, 8 GB RAM, ~$67/month - Best for medium production workloads
+  # Other good ARM options:
+  # - t4g.medium: $24.53/month (burstable, good for staging)
+  # - t4g.large: $49.06/month (burstable, small production)
+  # - m7g.xlarge: $134.30/month (large production)
+  # - r7g.large: $83.95/month (memory-heavy, 16GB RAM)
 }
 
 variable "subnet_id" {
@@ -133,13 +140,19 @@ variable "mysql_password" {
 variable "mysql_max_connections" {
   description = "Maximum number of simultaneous MySQL connections"
   type        = number
-  default     = 151
+  default     = 200 # Good for m7g.large (8GB RAM) with connection pooling
 }
 
 variable "innodb_buffer_pool_size" {
-  description = "InnoDB buffer pool size (e.g., '128M', '256M', '512M', '1G')"
+  description = "InnoDB buffer pool size (75% of RAM recommended for dedicated MySQL servers)"
   type        = string
-  default     = "128M"
+  default     = "6G" # 75% of 8GB RAM for m7g.large (dedicated MySQL server)
+  # Adjust based on instance:
+  # - t4g.medium (4GB): "3G"
+  # - t4g.large (8GB): "6G"
+  # - m7g.large (8GB): "6G" (default)
+  # - m7g.xlarge (16GB): "12G"
+  # - r7g.large (16GB): "12G"
 }
 
 ################################################################################
