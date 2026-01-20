@@ -28,14 +28,25 @@
 
 data "aws_region" "current" {}
 
-# Auto-detect latest Ubuntu 24.04 ARM64 AMI for current region
+# Auto-detect latest Ubuntu ARM64 AMI for current region
+# Tries Ubuntu 24.04 (Noble) first, falls back to 22.04 (Jammy) if unavailable
+#
+# If auto-detection fails ("Your query returned no results"):
+# 1. Find AMI in AWS Console: EC2 → Launch Instance → Browse AMIs → Search "ubuntu 24.04" → Filter by ARM64
+# 2. Copy AMI ID (e.g., ami-065e6c5bbcd47041e)
+# 3. Specify in module: ami_id = "ami-xxxxxxxxx"
+# 4. See documentations/KNOWN_AMIS.md for common AMI IDs
 data "aws_ami" "ubuntu_arm64" {
   most_recent = true
   owners      = ["099720109477"] # Canonical (Ubuntu)
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-noble-24.04-arm64-server-*"]
+    values = [
+      "ubuntu/images/hvm-ssd/ubuntu-noble-24.04-arm64-server-*",
+      "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*",
+      "Ubuntu Server 24.04 LTS*",
+    ]
   }
 
   filter {
@@ -51,6 +62,11 @@ data "aws_ami" "ubuntu_arm64" {
   filter {
     name   = "state"
     values = ["available"]
+  }
+
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
   }
 }
 
