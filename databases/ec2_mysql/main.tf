@@ -52,7 +52,7 @@ resource "aws_instance" "mysql_ec2" {
   # Note: Even if instance is terminated, EBS snapshots persist independently
   disable_api_termination = var.enable_termination_protection
 
-  user_data = base64encode(local.user_data)
+  user_data = base64gzip(local.user_data)
 
   metadata_options {
     http_endpoint               = "enabled"
