@@ -2,6 +2,8 @@
 ################################################################################
 # User Data Script
 ################################################################################
+# Note that session manager agent is pre-installed on Ubuntu 24.04, so no need
+# to install it separately.
 
 locals {
   user_data = <<-EOF
@@ -26,7 +28,13 @@ locals {
       software-properties-common \
       gnupg-agent \
       jq \
-      awscli
+      unzip
+
+    # Install AWS CLI v2 (awscli package not available in Ubuntu 24.04)
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    /tmp/aws/install
+    rm -rf /tmp/awscliv2.zip /tmp/aws
 
     # Install Docker
     curl -fsSL https://get.docker.com -o get-docker.sh
@@ -39,13 +47,13 @@ locals {
     # Add ubuntu user to docker group
     usermod -aG docker ubuntu
 
-    %{if var.enable_cloudwatch_monitoring}
-    # Install CloudWatch agent
-    wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-    dpkg -i amazon-cloudwatch-agent.deb
+    # Install CloudWatch agent (conditional based on variable)
+    if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
+      wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+      dpkg -i amazon-cloudwatch-agent.deb
 
-    # Configure CloudWatch agent
-    cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
+      # Configure CloudWatch agent
+      cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
     {
       "metrics": {
         "namespace": "EC2/MySQL",
@@ -124,12 +132,12 @@ locals {
     }
     CWCONFIG
 
-    /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-      -a fetch-config \
-      -m ec2 \
-      -s \
-      -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
-    %{endif}
+      /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+        -a fetch-config \
+        -m ec2 \
+        -s \
+        -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+    fi
 
     # Retrieve secrets from Secrets Manager
     echo "Retrieving MySQL passwords from Secrets Manager..."
@@ -222,9 +230,9 @@ locals {
 
     chmod +x /usr/local/bin/start_mysql_container.sh
 
-    %{if var.enable_automated_backups && local.backup_bucket_name != ""}
-    # Create MySQL backup script
-    cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
+    # Create MySQL backup script (conditional based on variable)
+    if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
+      cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
     #!/bin/bash
     set -e
 
@@ -269,11 +277,11 @@ locals {
     echo "Backup stored in: $S3_PATH"
     BACKUPSCRIPT
 
-    chmod +x /usr/local/bin/backup_mysql.sh
+      chmod +x /usr/local/bin/backup_mysql.sh
 
-    # Add backup to crontab (runs per schedule: ${var.backup_schedule})
-    echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
-    %{endif}
+      # Add backup to crontab (runs per schedule: ${var.backup_schedule})
+      echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
+    fi
 
     # Add MySQL startup to crontab for reboot
     (crontab -l 2>/dev/null; echo "@reboot /usr/local/bin/start_mysql_container.sh") | crontab -
@@ -291,6 +299,13 @@ locals {
       echo "Waiting for MySQL... ($i/30)"
       sleep 2
     done
+
+
+    # Disable and remove SSH (Session Manager only)
+    systemctl stop ssh || true
+    systemctl disable ssh || true
+    apt-get remove -y openssh-server
+
 
     echo "=== MySQL EC2 setup completed at $(date) ==="
     EOF
