@@ -90,6 +90,12 @@ locals {
                 "timezone": "UTC"
               },
               {
+                "file_path": "/home/ubuntu/mysql_data/slow-query.log",
+                "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+                "log_stream_name": "{instance_id}/mysql-slow.log",
+                "timezone": "UTC"
+              },
+              {
                 "file_path": "/var/log/mysql-backup.log",
                 "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
                 "log_stream_name": "{instance_id}/backup.log",
