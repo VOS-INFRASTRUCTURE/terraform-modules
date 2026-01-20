@@ -25,4 +25,8 @@ resource "aws_sns_topic_policy" "security_alerts_policy" {
       }
     ]
   })
+
+  lifecycle {
+    ignore_changes = [policy]
+  }
 }
