@@ -101,7 +101,11 @@ resource "aws_instance" "mysql_ec2" {
   # Note: Even if instance is terminated, EBS snapshots persist independently
   disable_api_termination = var.enable_termination_protection
 
-  user_data = base64encode(local.user_data)
+  # Use gzip compression for user_data to reduce size and stay within AWS 16KB limit
+  # AWS EC2 natively supports gzipped user_data and automatically decompresses it
+  # base64gzip() compresses the script (~60-80% size reduction) then base64 encodes it
+  # This allows larger initialization scripts while staying under the 16KB limit
+  user_data = base64gzip(local.user_data)
 
   metadata_options {
     http_endpoint               = "enabled"
