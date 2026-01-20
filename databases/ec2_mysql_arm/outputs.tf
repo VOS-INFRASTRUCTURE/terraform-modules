@@ -13,6 +13,9 @@ output "mysql" {
       public_ip         = aws_instance.mysql_ec2.public_ip
       availability_zone = aws_instance.mysql_ec2.availability_zone
       instance_type     = aws_instance.mysql_ec2.instance_type
+      ami_id            = aws_instance.mysql_ec2.ami
+      ami_name          = data.aws_ami.ubuntu_arm64.name
+      ami_description   = data.aws_ami.ubuntu_arm64.description
     }
 
     # MySQL connection details

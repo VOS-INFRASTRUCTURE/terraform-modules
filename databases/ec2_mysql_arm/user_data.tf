@@ -124,7 +124,10 @@ locals {
 
     # Create custom MySQL configuration from template
     cat > /etc/mysql/mysql.conf.d/custom.cnf <<'MYSQLCONF'
-${file("${path.module}/mysql.cnf")}
+${templatefile("${path.module}/mysql.cnf", {
+  innodb_buffer_pool_size = var.innodb_buffer_pool_size
+  mysql_max_connections   = var.mysql_max_connections
+})}
 MYSQLCONF
 
     # Create MySQL log directory

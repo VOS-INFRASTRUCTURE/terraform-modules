@@ -23,11 +23,11 @@ variable "base_name" {
 ################################################################################
 
 variable "ami_id" {
-  description = "The AMI ID to use for the instance (Ubuntu 24.04 ARM64 recommended)"
+  description = "The AMI ID to use for the instance (leave empty to auto-detect latest Ubuntu 24.04 ARM64 for your region)"
   type        = string
-  default     = "ami-0d90c137bb8f87162" # Canonical, Ubuntu, 24.04 LTS, arm64 noble image (us-east-1)
-  # Note: Update this AMI ID for your region. Find ARM64 AMIs with:
-  # aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-noble-24.04-arm64-server-*" --query 'Images[*].[ImageId,CreationDate]' --output table
+  default     = ""
+  # Auto-detection uses data source to find latest Ubuntu 24.04 ARM64 AMI
+  # Only specify this if you need a specific AMI version
 }
 
 variable "instance_type" {

@@ -28,6 +28,32 @@
 
 data "aws_region" "current" {}
 
+# Auto-detect latest Ubuntu 24.04 ARM64 AMI for current region
+data "aws_ami" "ubuntu_arm64" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical (Ubuntu)
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-noble-24.04-arm64-server-*"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["arm64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
 ################################################################################
 # Local Variables
 ################################################################################
@@ -46,7 +72,7 @@ locals {
 ################################################################################
 
 resource "aws_instance" "mysql_ec2" {
-  ami                    = var.ami_id
+  ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu_arm64.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = var.security_group_ids
