@@ -96,7 +96,27 @@ default_storage_engine=InnoDB
 #   - Shared server (with app): 50-60% of total RAM
 # Examples:
 #   - 4 GB RAM (t4g.medium): innodb_buffer_pool_size=3G
-#   - 8 GB RAM (t4g.large):  innodb_buffer_pool_size=6G
+#   - 8 GB RAM (t4g.lar# Most Critical Settings:
+innodb_buffer_pool_size=${var.innodb_buffer_pool_size}  # 70-75% RAM
+innodb_buffer_pool_instances=4                          # Concurrency
+max_connections=${var.mysql_max_connections}            # 100-300
+
+# Security & Durability:
+innodb_flush_log_at_trx_commit=1  # ACID compliance
+sync_binlog=1                       # No binlog data loss
+local-infile=0                      # Security hardening
+
+# Performance:
+innodb_io_capacity=2000             # Match EBS gp3 IOPS
+innodb_flush_method=O_DIRECT        # No double buffering
+thread_cache_size=100               # Thread reuse
+
+# Monitoring:
+slow_query_log=1                    # Track slow queries
+long_query_time=1                   # 1 second threshold
+
+# Backups:
+binlog_expire_logs_seconds=172800   # 2 days (with hourly backups)ge):  innodb_buffer_pool_size=6G
 #   - 16 GB RAM (r7g.large): innodb_buffer_pool_size=12G
 # ⚠️ Allocate as much as possible (up to 70-75% of RAM) for best performance.
 # Adjust based on instance RAM and workload (especially for read-heavy workloads).
