@@ -13,12 +13,14 @@ This module currently implements **Volume Snapshots** via AWS Data Lifecycle Man
 ## Table of Contents
 
 1. [Current Implementation](#current-implementation)
-2. [Volume Snapshots vs Instance Snapshots](#volume-snapshots-vs-instance-snapshots)
-3. [What the Module Does](#what-the-module-does)
-4. [When to Use Each Type](#when-to-use-each-type)
-5. [How to Create Manual Snapshots](#how-to-create-manual-snapshots)
-6. [Restore from Snapshots](#restore-from-snapshots)
-7. [Cost Comparison](#cost-comparison)
+2. [Snapshot Storage & Availability](#snapshot-storage--availability)
+3. [Cross-Region Disaster Recovery](#cross-region-disaster-recovery)
+4. [Volume Snapshots vs Instance Snapshots](#volume-snapshots-vs-instance-snapshots)
+5. [What the Module Does](#what-the-module-does)
+6. [When to Use Each Type](#when-to-use-each-type)
+7. [How to Create Manual Snapshots](#how-to-create-manual-snapshots)
+8. [Restore from Snapshots](#restore-from-snapshots)
+9. [Cost Comparison](#cost-comparison)
 
 ---
 
@@ -166,6 +168,425 @@ module "mysql_db" {
 
 **What's NOT Included:**
 - Additional EBS volumes (if you add any)
+
+---
+
+## Snapshot Storage & Availability
+
+### ⚠️ Critical: Snapshots Are Region-Specific
+
+**Default Behavior:**
+```
+EBS Volume (eu-west-2) → Snapshot → Stored in eu-west-2 ONLY
+```
+
+**Key Facts:**
+
+| Aspect | Details |
+|--------|---------|
+| **Storage Location** | **Same region as the source volume** |
+| **Multi-Region by Default** | ❌ **NO** - Snapshots are region-locked |
+| **Cross-Region Access** | ❌ Cannot restore in different region without copying |
+| **Cross-AZ Access** | ✅ Can restore in any AZ within the same region |
+| **Disaster Recovery** | Requires manual or automated copy to other regions |
+
+---
+
+### Storage Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AWS Region: eu-west-2                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  AZ: eu-west-2a              AZ: eu-west-2b                 │
+│  ┌──────────────┐            ┌──────────────┐              │
+│  │ EC2 Instance │            │              │              │
+│  │ + EBS Volume │            │              │              │
+│  └──────┬───────┘            └──────────────┘              │
+│         │                                                   │
+│         ▼                                                   │
+│  ┌─────────────────────────────────────────┐               │
+│  │      Regional EBS Snapshot Storage      │               │
+│  │  (Redundantly stored across all AZs)    │               │
+│  │                                          │               │
+│  │  Snapshot 1: 2026-01-19 03:00 UTC       │               │
+│  │  Snapshot 2: 2026-01-20 03:00 UTC       │               │
+│  │  Snapshot 3: 2026-01-21 03:00 UTC       │               │
+│  └─────────────────────────────────────────┘               │
+│         │                                                   │
+│         ▼                                                   │
+│  Can restore to ANY AZ in eu-west-2                        │
+│  ✅ eu-west-2a                                             │
+│  ✅ eu-west-2b                                             │
+│  ✅ eu-west-2c                                             │
+│                                                             │
+│  ❌ Cannot restore to eu-west-1 (different region)         │
+│  ❌ Cannot restore to us-east-1 (different region)         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Important:**
+- Snapshots are stored **redundantly across multiple AZs** in the same region
+- If one AZ fails, snapshots remain accessible from other AZs
+- **If entire region fails**, snapshots are NOT accessible
+
+---
+
+### Restore Scope
+
+#### ✅ What You CAN Do (Same Region)
+
+```bash
+# Volume in eu-west-2a → Snapshot → Restore in eu-west-2b
+aws ec2 create-volume \
+  --snapshot-id snap-0123456789abcdef \
+  --availability-zone eu-west-2b  # Different AZ, same region ✅
+```
+
+**Use case:** AZ-level failure recovery
+
+---
+
+#### ❌ What You CANNOT Do (Different Region)
+
+```bash
+# Volume in eu-west-2 → Snapshot → Try to restore in us-east-1
+aws ec2 create-volume \
+  --snapshot-id snap-0123456789abcdef \
+  --availability-zone us-east-1a  # ❌ ERROR: Snapshot not found
+```
+
+**Error:** `InvalidSnapshot.NotFound: The snapshot 'snap-xxx' does not exist.`
+
+**Reason:** Snapshot exists in eu-west-2, not in us-east-1
+
+---
+
+## Cross-Region Disaster Recovery
+
+### Why Cross-Region Copies Are Important
+
+**Disaster Scenarios:**
+
+| Disaster Type | Region-Local Snapshot | Cross-Region Snapshot |
+|---------------|----------------------|----------------------|
+| **Single AZ failure** | ✅ Protected | ✅ Protected |
+| **Multiple AZ failure** | ✅ Protected (redundant) | ✅ Protected |
+| **Entire region failure** | ❌ **LOST** | ✅ **SAFE** |
+| **Data center fire** | ❌ **LOST** | ✅ **SAFE** |
+| **Regional outage** | ❌ Inaccessible | ✅ Accessible |
+
+**Bottom line:** For true disaster recovery, you need **cross-region snapshot copies**.
+
+---
+
+### Method 1: Manual Cross-Region Copy
+
+#### Via AWS CLI:
+
+```bash
+# Source: eu-west-2
+# Destination: us-east-1
+
+# 1. Create snapshot in eu-west-2 (source region)
+SNAPSHOT_ID=$(aws ec2 create-snapshot \
+  --region eu-west-2 \
+  --volume-id vol-0123456789abcdef \
+  --description "MySQL backup $(date +%Y-%m-%d)" \
+  --query 'SnapshotId' \
+  --output text)
+
+# 2. Copy to us-east-1 (DR region)
+aws ec2 copy-snapshot \
+  --region us-east-1 \
+  --source-region eu-west-2 \
+  --source-snapshot-id $SNAPSHOT_ID \
+  --description "DR copy from eu-west-2" \
+  --encrypted \
+  --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Purpose,Value=DR},{Key=SourceRegion,Value=eu-west-2}]'
+```
+
+**Result:**
+- Original snapshot: `snap-abc123` in eu-west-2
+- DR copy: `snap-xyz789` in us-east-1
+
+---
+
+### Method 2: Automated Cross-Region Copy (DLM)
+
+**Update DLM policy to include cross-region copy:**
+
+```terraform
+resource "aws_dlm_lifecycle_policy" "mysql_ebs_snapshots" {
+  description        = "MySQL EBS snapshot policy with DR copy"
+  execution_role_arn = aws_iam_role.dlm_lifecycle_role.arn
+  state              = "ENABLED"
+
+  policy_details {
+    resource_types = ["VOLUME"]
+
+    schedule {
+      name = "Daily snapshots with DR copy"
+
+      create_rule {
+        interval      = 24
+        interval_unit = "HOURS"
+        times         = ["03:00"]
+      }
+
+      retain_rule {
+        count = 7
+      }
+
+      # Cross-region copy for disaster recovery
+      cross_region_copy_rule {
+        target    = "us-east-1"  # DR region
+        encrypted = true
+        
+        retain_rule {
+          interval      = 7
+          interval_unit = "DAYS"
+        }
+
+        copy_tags = true
+      }
+
+      tags_to_add = {
+        SnapshotType = "DLM-automated"
+      }
+
+      copy_tags = true
+    }
+
+    target_tags = {
+      Name = "${local.instance_name}-root"
+    }
+  }
+}
+```
+
+**Result:**
+- Snapshot created in **source region** (e.g., eu-west-2)
+- Automatically copied to **DR region** (e.g., us-east-1)
+- Both retained for 7 days
+- No manual intervention needed
+
+**Cost:** Snapshot storage in both regions + data transfer
+
+---
+
+### Method 3: AWS Backup (Comprehensive DR)
+
+**AWS Backup** provides centralized backup with built-in cross-region copy:
+
+```terraform
+resource "aws_backup_plan" "mysql_dr" {
+  name = "${var.env}-mysql-dr-backup"
+
+  rule {
+    rule_name         = "daily_backup_with_dr"
+    target_vault_name = aws_backup_vault.mysql.name
+    schedule          = "cron(0 3 * * ? *)"  # 3 AM daily
+
+    lifecycle {
+      delete_after = 7
+    }
+
+    # Cross-region copy
+    copy_action {
+      destination_vault_arn = aws_backup_vault.mysql_dr.arn  # In DR region
+
+      lifecycle {
+        delete_after = 7
+      }
+    }
+  }
+}
+
+# DR region vault (us-east-1)
+resource "aws_backup_vault" "mysql_dr" {
+  provider = aws.us_east_1
+  name     = "${var.env}-mysql-dr-vault"
+}
+```
+
+---
+
+### Cross-Region Copy Cost
+
+**Example: 20 GB snapshot, eu-west-2 → us-east-1**
+
+| Cost Component | Amount | Notes |
+|---------------|--------|-------|
+| **Snapshot storage (eu-west-2)** | $1.00/month | $0.05/GB × 20 GB |
+| **Snapshot storage (us-east-1)** | $1.00/month | $0.05/GB × 20 GB |
+| **Data transfer** | $0.18 one-time | $0.009/GB × 20 GB |
+| **Total (first month)** | $2.18 | Initial copy |
+| **Total (ongoing)** | $2.00/month | After initial transfer |
+
+**Note:** Data transfer is charged only once when copying. Incremental snapshots only transfer changed blocks.
+
+---
+
+### Best Practices for DR
+
+#### Option 1: Single Region (Basic Protection)
+
+```
+Primary Region: eu-west-2
+├── Daily snapshots (7 retained)
+├── Protection: AZ failure ✅
+└── Protection: Region failure ❌
+```
+
+**Cost:** ~$1.70/month  
+**Recovery:** Fast (same region)  
+**Risk:** Total loss if region fails
+
+---
+
+#### Option 2: Cross-Region Copy (Full DR)
+
+```
+Primary Region: eu-west-2          DR Region: us-east-1
+├── Daily snapshots (7 retained)   ├── Daily copies (7 retained)
+├── Production restores            └── DR restores only
+└── Protection: AZ + Region ✅
+```
+
+**Cost:** ~$3.50/month (+$1.80 for DR)  
+**Recovery:** 
+- Primary region: Fast (same region)
+- DR region: Slower (cross-region restore)
+**Risk:** Protected against region failure
+
+---
+
+#### Option 3: Multi-Region Active (High Availability)
+
+```
+Region A: eu-west-2               Region B: us-east-1
+├── Production instance           ├── Standby instance
+├── Daily snapshots               ├── Daily snapshots
+└── Real-time replication ────────┴── MySQL replication
+```
+
+**Cost:** 2× instance cost + snapshots  
+**Recovery:** Near-instant (failover)  
+**Risk:** Maximum protection
+
+---
+
+### Disaster Recovery Procedures
+
+#### Scenario 1: AZ Failure (Same Region)
+
+**Problem:** eu-west-2a fails, instance down
+
+**Recovery (5-10 minutes):**
+```bash
+# 1. Find latest snapshot
+SNAPSHOT_ID=$(aws ec2 describe-snapshots \
+  --region eu-west-2 \
+  --filters "Name=tag:Name,Values=*mysql*" \
+  --query 'Snapshots | sort_by(@, &StartTime) | [-1].SnapshotId' \
+  --output text)
+
+# 2. Create volume in different AZ
+aws ec2 create-volume \
+  --region eu-west-2 \
+  --snapshot-id $SNAPSHOT_ID \
+  --availability-zone eu-west-2b  # Different AZ
+
+# 3. Launch new instance in eu-west-2b
+terraform apply -var="availability_zone=eu-west-2b"
+```
+
+**Downtime:** ~10 minutes  
+**Data loss:** Minimal (last snapshot point)
+
+---
+
+#### Scenario 2: Region Failure (Cross-Region)
+
+**Problem:** Entire eu-west-2 region down
+
+**Recovery (20-30 minutes):**
+```bash
+# 1. Find DR snapshot in us-east-1
+SNAPSHOT_ID=$(aws ec2 describe-snapshots \
+  --region us-east-1 \
+  --filters "Name=tag:Purpose,Values=DR" \
+  --query 'Snapshots | sort_by(@, &StartTime) | [-1].SnapshotId' \
+  --output text)
+
+# 2. Create volume in DR region
+aws ec2 create-volume \
+  --region us-east-1 \
+  --snapshot-id $SNAPSHOT_ID \
+  --availability-zone us-east-1a
+
+# 3. Deploy infrastructure in DR region
+cd terraform/dr
+terraform apply -var="region=us-east-1"
+
+# 4. Update DNS to point to DR region
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z123456 \
+  --change-batch file://failover.json
+```
+
+**Downtime:** ~30 minutes  
+**Data loss:** Last cross-region copy (typically < 1 hour old)
+
+---
+
+## Summary: Snapshot Availability
+
+### Default Module Behavior
+
+**Current implementation:**
+```
+✅ Snapshots stored in source region only
+✅ Protected against AZ failure
+❌ NOT protected against region failure
+✅ Can restore in any AZ in same region
+❌ Cannot restore in different region (without copy)
+```
+
+### Recommended DR Strategy
+
+| Environment | Strategy | Why |
+|-------------|----------|-----|
+| **Development** | Single region snapshots | Cost-effective, region failure acceptable |
+| **Staging** | Single region snapshots | Can recreate quickly if needed |
+| **Production (Low criticality)** | Single region snapshots | Balance cost vs risk |
+| **Production (Critical)** | Cross-region copy | Full DR protection |
+| **Production (Mission-critical)** | Multi-region active-active | Zero downtime tolerance |
+
+### Enable Cross-Region DR
+
+To add cross-region disaster recovery to this module:
+
+```hcl
+module "mysql_prod" {
+  source = "../../databases/ec2_mysql_arm"
+  
+  # ... other config ...
+  
+  # Enable snapshots
+  enable_ebs_snapshots = true
+  
+  # TODO: Add these variables to module
+  # enable_cross_region_copy = true
+  # dr_region                = "us-east-1"
+  # dr_retention_days        = 7
+}
+```
+
+**Note:** Cross-region copy currently requires manual DLM configuration or AWS Backup.
 
 ---
 

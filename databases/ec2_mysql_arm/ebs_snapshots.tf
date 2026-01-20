@@ -9,12 +9,25 @@
 #
 # Why both?
 # - MySQL backups: Fast database-level restore, cross-region possible
-# - EBS snapshots: Full system restore including OS, Docker, configs
+# - EBS snapshots: Full system restore including OS, configs
 #
 # Recovery scenarios:
 # - Database corruption: Restore from S3 MySQL backup
 # - EC2 instance failure: Launch new EC2 from EBS snapshot
 # - Complete disaster: Both available for maximum flexibility
+#
+# Cross-Region Disaster Recovery:
+# - enable_cross_region_snapshot_copy: true/false
+# - snapshot_dr_region: Target region for DR copies (e.g., "us-east-1")
+# - snapshot_dr_retention_days: How long to keep DR copies
+#
+# Default: Snapshots stored in same region only
+# With DR: Snapshots automatically copied to secondary region
+#
+# Storage locations:
+# - Primary snapshots: Same region as EC2 instance
+# - DR snapshots: Specified in snapshot_dr_region variable
+# - Can restore from either region based on disaster scenario
 ################################################################################
 
 ################################################################################
@@ -72,7 +85,9 @@ resource "aws_iam_role_policy" "dlm_lifecycle_policy" {
           "ec2:DeleteSnapshot",
           "ec2:DescribeInstances",
           "ec2:DescribeVolumes",
-          "ec2:DescribeSnapshots"
+          "ec2:DescribeSnapshots",
+          "ec2:CopySnapshot",
+          "ec2:ModifySnapshotAttribute"
         ]
         Resource = "*"
       },
@@ -128,6 +143,23 @@ resource "aws_dlm_lifecycle_policy" "mysql_ebs_snapshots" {
       }
 
       copy_tags = true
+
+      # Cross-region copy for disaster recovery (optional)
+      dynamic "cross_region_copy_rule" {
+        for_each = var.enable_cross_region_snapshot_copy && var.snapshot_dr_region != "" ? [1] : []
+
+        content {
+          target    = var.snapshot_dr_region
+          encrypted = true
+
+          retain_rule {
+            interval      = var.snapshot_dr_retention_days
+            interval_unit = "DAYS"
+          }
+
+          copy_tags = true
+        }
+      }
     }
   }
 

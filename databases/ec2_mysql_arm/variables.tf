@@ -239,6 +239,28 @@ variable "ebs_snapshot_retention_count" {
   default     = 7
 }
 
+variable "enable_cross_region_snapshot_copy" {
+  description = "Enable cross-region EBS snapshot copy for disaster recovery"
+  type        = bool
+  default     = false
+}
+
+variable "snapshot_dr_region" {
+  description = "AWS region for disaster recovery snapshot copies (e.g., 'us-east-1', 'eu-west-1')"
+  type        = string
+  default     = ""
+  # Common DR region pairs:
+  # - eu-west-2 → us-east-1
+  # - us-east-1 → us-west-2
+  # - ap-southeast-1 → ap-northeast-1
+}
+
+variable "snapshot_dr_retention_days" {
+  description = "Number of days to retain DR snapshots in the target region"
+  type        = number
+  default     = 7
+}
+
 ################################################################################
 # Tags
 ################################################################################
