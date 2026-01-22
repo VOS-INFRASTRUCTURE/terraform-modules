@@ -1,196 +1,95 @@
 ################################################################################
-# Outputs for EC2 MySQL Module
+# Outputs for EC2 PostgreSQL Module
 ################################################################################
 
-output "mysql" {
-  description = "Complete EC2 MySQL instance configuration and connection details"
+output "pgsql" {
+  description = "Complete EC2 PostgreSQL instance configuration and connection details"
   value = {
     # Instance details
     instance = {
-      id                = aws_instance.mysql_ec2.id
-      arn               = aws_instance.mysql_ec2.arn
-      private_ip        = aws_instance.mysql_ec2.private_ip
-      public_ip         = aws_instance.mysql_ec2.public_ip
-      availability_zone = aws_instance.mysql_ec2.availability_zone
-      instance_type     = aws_instance.mysql_ec2.instance_type
-      ami_id            = aws_instance.mysql_ec2.ami
+      id                = aws_instance.pgsql_ec2.id
+      arn               = aws_instance.pgsql_ec2.arn
+      private_ip        = aws_instance.pgsql_ec2.private_ip
+      public_ip         = aws_instance.pgsql_ec2.public_ip
+      availability_zone = aws_instance.pgsql_ec2.availability_zone
+      instance_type     = aws_instance.pgsql_ec2.instance_type
+      ami_id            = aws_instance.pgsql_ec2.ami
       ami_name          = data.aws_ami.ubuntu_arm64.name
       ami_description   = data.aws_ami.ubuntu_arm64.description
     }
 
-    # MySQL connection details
+    # PostgreSQL connection details
     connection = {
-      host     = aws_instance.mysql_ec2.private_ip
-      port     = 3306
-      database = var.mysql_database
-      user     = var.mysql_user
+      host     = aws_instance.pgsql_ec2.private_ip
+      port     = 5432
+      database = var.pgsql_database
+      user     = var.pgsql_user
 
       # Connection string examples (password must be retrieved separately)
-      mysql_cli_command = "mysql -h ${aws_instance.mysql_ec2.private_ip} -P 3306 -u ${var.mysql_user} -p ${var.mysql_database}"
-      jdbc_url          = "jdbc:mysql://${aws_instance.mysql_ec2.private_ip}:3306/${var.mysql_database}"
-      node_js_url       = "mysql://${var.mysql_user}:***PASSWORD***@${aws_instance.mysql_ec2.private_ip}:3306/${var.mysql_database}"
-      python_url        = "mysql+pymysql://${var.mysql_user}:***PASSWORD***@${aws_instance.mysql_ec2.private_ip}:3306/${var.mysql_database}"
-      php_dsn           = "mysql:host=${aws_instance.mysql_ec2.private_ip};port=3306;dbname=${var.mysql_database}"
+      psql_command = "psql -h ${aws_instance.pgsql_ec2.private_ip} -p 5432 -U ${var.pgsql_user} -d ${var.pgsql_database}"
+      jdbc_url     = "jdbc:postgresql://${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
+      node_url     = "postgresql://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
+      python_url   = "postgresql://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
+      django_dsn   = "postgres://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
     }
 
-    # Secrets Manager ARNs
+    # Secrets Manager references
     secrets = {
-      root_password_secret_arn = aws_secretsmanager_secret.mysql_root_password.arn
-      root_password_secret_name = aws_secretsmanager_secret.mysql_root_password.name
-      user_password_secret_arn = aws_secretsmanager_secret.mysql_user_password.arn
-      user_password_secret_name = aws_secretsmanager_secret.mysql_user_password.name
+      postgres_password_secret_arn = aws_secretsmanager_secret.pgsql_postgres_password.arn
+      postgres_password_secret_id  = aws_secretsmanager_secret.pgsql_postgres_password.id
+      user_password_secret_arn     = aws_secretsmanager_secret.pgsql_user_password.arn
+      user_password_secret_id      = aws_secretsmanager_secret.pgsql_user_password.id
 
-      # Commands to retrieve passwords
-      get_root_password_command = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} --query SecretString --output text"
-      get_user_password_command = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} --query SecretString --output text"
-    }
-
-    # Security configuration
-    security = {
-      ebs_encrypted        = var.enable_ebs_encryption
-      iam_role_arn         = aws_iam_role.mysql_ec2.arn
-      iam_instance_profile = aws_iam_instance_profile.mysql_ec2.name
-      security_group_ids   = var.security_group_ids
-      ssm_access_enabled   = var.enable_ssm_access
-      ssh_key_access       = var.enable_ssh_key_access
-    }
-
-    # Monitoring configuration
-    monitoring = {
-      enabled            = var.enable_cloudwatch_monitoring
-      log_group_name     = var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : null
-      log_group_arn      = var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].arn : null
-      log_retention_days = var.log_retention_days
+      # Command to retrieve passwords
+      get_postgres_password_cmd = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.id} --query SecretString --output text"
+      get_user_password_cmd     = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.id} --query SecretString --output text"
     }
 
     # Backup configuration
-    backup = {
-      # MySQL database backups (mysqldump to S3)
-      mysql_backups = {
-        enabled            = var.enable_automated_backups
-        s3_bucket_name     = local.backup_bucket_name
-        schedule           = var.backup_schedule
-        retention_days     = var.backup_retention_days
-        s3_path            = var.enable_automated_backups ? "s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/" : null
-        backup_script_path = "/usr/local/bin/backup_mysql.sh"
-        log_file          = "/var/log/mysql-backup.log"
-      }
-
-      # EBS volume snapshots (full disk image)
-      ebs_snapshots = {
-        enabled             = var.enable_ebs_snapshots
-        interval_hours      = var.enable_ebs_snapshots ? var.ebs_snapshot_interval_hours : null
-        snapshot_time       = var.enable_ebs_snapshots ? var.ebs_snapshot_time : null
-        retention_count     = var.enable_ebs_snapshots ? var.ebs_snapshot_retention_count : null
-        dlm_policy_id       = var.enable_ebs_snapshots ? aws_dlm_lifecycle_policy.mysql_ebs_snapshots[0].id : null
-        dlm_policy_arn      = var.enable_ebs_snapshots ? aws_dlm_lifecycle_policy.mysql_ebs_snapshots[0].arn : null
-      }
-
-      # Restore instructions
-      restore_instructions = {
-        mysql_from_s3 = var.enable_automated_backups ? "aws s3 ls s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/ --recursive" : "MySQL backups not enabled"
-        ebs_from_snapshot = var.enable_ebs_snapshots ? "aws ec2 describe-snapshots --filters 'Name=tag:Name,Values=${local.instance_name}-dlm-policy' --query 'Snapshots[*].[SnapshotId,StartTime,VolumeSize]' --output table" : "EBS snapshots not enabled"
-      }
+    backups = var.enable_automated_backups ? {
+      enabled         = true
+      s3_bucket       = local.backup_bucket_name
+      schedule        = var.backup_schedule
+      retention_days  = var.backup_retention_days
+      backup_path     = "s3://${local.backup_bucket_name}/pgsql-backups/${var.env}/${var.project_id}/"
+      ebs_snapshots   = var.enable_ebs_snapshots
+      cross_region_dr = var.enable_cross_region_snapshot_copy
+      dr_region       = var.enable_cross_region_snapshot_copy ? var.snapshot_dr_region : null
+    } : {
+      enabled = false
     }
 
-    # MySQL configuration
-    mysql_config = {
-      version           = var.mysql_version
-      database          = var.mysql_database
-      user              = var.mysql_user
-      max_connections   = var.mysql_max_connections
-      buffer_pool_size  = var.innodb_buffer_pool_size
+    # CloudWatch monitoring
+    monitoring = var.enable_cloudwatch_monitoring ? {
+      enabled         = true
+      log_group       = aws_cloudwatch_log_group.pgsql_logs[0].name
+      log_group_arn   = aws_cloudwatch_log_group.pgsql_logs[0].arn
+      retention_days  = var.cloudwatch_retention_days
+      detailed_ec2    = var.enable_detailed_monitoring
+    } : {
+      enabled = false
     }
 
-    # Access instructions
-    access = {
-      ssm_session_command = var.enable_ssm_access ? "aws ssm start-session --target ${aws_instance.mysql_ec2.id}" : "SSM access not enabled"
-      ssh_command         = var.enable_ssh_key_access && var.key_name != "" ? "ssh -i /path/to/${var.key_name}.pem ubuntu@${aws_instance.mysql_ec2.private_ip}" : "SSH key access not configured"
-
-      # MySQL client access (after connecting to instance)
-      mysql_client_commands = {
-        connect_as_root = "docker exec -it mysql-server mysql -u root -p"
-        connect_as_user = "docker exec -it mysql-server mysql -u ${var.mysql_user} -p ${var.mysql_database}"
-        view_logs       = "docker logs mysql-server -f"
-        container_status = "docker ps | grep mysql-server"
-      }
-    }
-
-    # Application configuration examples
-    app_config_examples = {
-      node_js = {
-        package = "mysql2"
-        install = "npm install mysql2"
-        connection = <<-EOF
-          const mysql = require('mysql2/promise');
-          const connection = await mysql.createConnection({
-            host: '${aws_instance.mysql_ec2.private_ip}',
-            port: 3306,
-            user: '${var.mysql_user}',
-            password: process.env.MYSQL_PASSWORD, // From Secrets Manager
-            database: '${var.mysql_database}'
-          });
-        EOF
-      }
-      python = {
-        package = "pymysql"
-        install = "pip install pymysql"
-        connection = <<-EOF
-          import pymysql
-          import os
-          connection = pymysql.connect(
-              host='${aws_instance.mysql_ec2.private_ip}',
-              port=3306,
-              user='${var.mysql_user}',
-              password=os.environ['MYSQL_PASSWORD'],  # From Secrets Manager
-              database='${var.mysql_database}'
-          )
-        EOF
-      }
-      php = {
-        package = "Built-in mysqli or PDO"
-        install = "Already included in PHP"
-        connection = <<-EOF
-          $mysqli = new mysqli(
-              '${aws_instance.mysql_ec2.private_ip}',
-              '${var.mysql_user}',
-              getenv('MYSQL_PASSWORD'),  // From Secrets Manager
-              '${var.mysql_database}',
-              3306
-          );
-        EOF
-      }
-      environment_variables = {
-        MYSQL_HOST     = aws_instance.mysql_ec2.private_ip
-        MYSQL_PORT     = "3306"
-        MYSQL_DATABASE = var.mysql_database
-        MYSQL_USER     = var.mysql_user
-        MYSQL_PASSWORD = "***RETRIEVE_FROM_SECRETS_MANAGER***"
-      }
+    # IAM role
+    iam_role = {
+      name = aws_iam_role.pgsql_ec2.name
+      arn  = aws_iam_role.pgsql_ec2.arn
     }
   }
-
-  sensitive = false
 }
 
-# Separate sensitive output for passwords (requires explicit query)
-output "mysql_passwords" {
-  description = <<-EOT
-    MySQL passwords (sensitive - only shown if explicitly queried).
+output "connect_via_session_manager" {
+  description = "Command to connect to the instance via AWS Systems Manager Session Manager"
+  value       = "aws ssm start-session --target ${aws_instance.pgsql_ec2.id}"
+}
 
-    To view: terraform output -json mysql_passwords | jq -r '.root_password'
+output "postgres_password_retrieval" {
+  description = "Command to retrieve postgres password from Secrets Manager"
+  value       = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.id} --query SecretString --output text"
+}
 
-    Security Note: Passwords are stored in AWS Secrets Manager.
-    Retrieve them programmatically using the AWS CLI or SDK.
-  EOT
-  value = {
-    root_password = local.generate_passwords ? random_password.mysql_root[0].result : var.mysql_root_password
-    user_password = local.generate_passwords ? random_password.mysql_user[0].result : var.mysql_password
-
-    # Alternative: Retrieve from Secrets Manager (recommended)
-    retrieve_root_password = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} --query SecretString --output text"
-    retrieve_user_password = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} --query SecretString --output text"
-  }
-  sensitive = true
+output "user_password_retrieval" {
+  description = "Command to retrieve user password from Secrets Manager"
+  value       = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.id} --query SecretString --output text"
 }
 

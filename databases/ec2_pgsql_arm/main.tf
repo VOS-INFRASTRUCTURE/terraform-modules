@@ -1,13 +1,13 @@
 ################################################################################
-# EC2 MySQL ARM Module - Native Installation (No Docker)
+# EC2 PostgreSQL ARM Module - Native Installation (No Docker)
 #
-# Purpose: Deploy MySQL 8.x natively on EC2 ARM (Graviton) instances
+# Purpose: Deploy PostgreSQL 15 natively on EC2 ARM (Graviton) instances
 #          for maximum performance and cost efficiency
 #
 # Benefits over Docker version:
 # - 5-10% better performance (no Docker overhead)
 # - 200-500MB less memory usage (no Docker daemon)
-# - Simpler architecture (direct MySQL installation)
+# - Simpler architecture (direct PostgreSQL installation)
 # - 20-25% cost savings (ARM Graviton vs x86)
 #
 # Default: m7g.large (2 vCPU, 8GB RAM, ~$67/month)
@@ -19,7 +19,7 @@
 # - CloudWatch monitoring and logging
 # - Automated backups to S3
 # - Systems Manager Session Manager (no SSH keys needed)
-# - MySQL configured with security best practices
+# - PostgreSQL configured with security best practices
 ################################################################################
 
 ################################################################################
@@ -75,11 +75,11 @@ data "aws_ami" "ubuntu_arm64" {
 ################################################################################
 
 locals {
-  instance_name = "${var.project_id}-${var.env}-${var.base_name}-mysql"
+  instance_name = "${var.project_id}-${var.env}-${var.base_name}-pgsql"
 
   # Return created bucket name or provided bucket name
   backup_bucket_name = var.enable_automated_backups ? (
-    var.create_backup_bucket ? "${var.env}-${var.project_id}-${var.base_name}-mysql-backups" : var.backup_s3_bucket_name
+    var.create_backup_bucket ? "${var.env}-${var.project_id}-${var.base_name}-pgsql-backups" : var.backup_s3_bucket_name
   ) : ""
 }
 
@@ -87,13 +87,13 @@ locals {
 # EC2 Instance
 ################################################################################
 
-resource "aws_instance" "mysql_ec2" {
+resource "aws_instance" "pgsql_ec2" {
   ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu_arm64.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = var.security_group_ids
   key_name               = var.enable_ssh_key_access ? var.key_name : null
-  iam_instance_profile   = aws_iam_instance_profile.mysql_ec2.name
+  iam_instance_profile   = aws_iam_instance_profile.pgsql_ec2.name
 
   monitoring = var.enable_detailed_monitoring
 
@@ -101,11 +101,10 @@ resource "aws_instance" "mysql_ec2" {
   # Note: Even if instance is terminated, EBS snapshots persist independently
   disable_api_termination = var.enable_termination_protection
 
-  # Use gzip compression for user_data to reduce size and stay within AWS 16KB limit
-  # AWS EC2 natively supports gzipped user_data and automatically decompresses it
-  # base64gzip() compresses the script (~60-80% size reduction) then base64 encodes it
-  # This allows larger initialization scripts while staying under the 16KB limit
-  user_data = base64encode(local.user_data)
+  # User data - Terraform automatically base64 encodes this
+  # For large scripts, we use user_data_replace_on_change to avoid the 16KB limit
+  user_data                   = local.user_data
+  user_data_replace_on_change = false  # Don't replace instance if user_data changes
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -140,7 +139,7 @@ resource "aws_instance" "mysql_ec2" {
       Environment = var.env
       Project     = var.project_id
       ManagedBy   = "Terraform"
-      Purpose     = "MySQL-Database"
+      Purpose     = "PostgreSQL-Database"
       Backup      = var.enable_automated_backups ? "Required" : "None"
     }
   )
