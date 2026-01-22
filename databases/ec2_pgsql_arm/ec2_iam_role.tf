@@ -66,7 +66,8 @@ resource "aws_iam_role_policy" "pgsql_secrets_manager" {
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue"
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"     # Read secret metadata
         ]
         Resource = [
           aws_secretsmanager_secret.pgsql_postgres_password.arn,
