@@ -84,6 +84,12 @@ if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
             "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/cloud-init-output.log",
             "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/mysql-backup.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/backup.log",
+            "timezone": "UTC"
           }
         ]
       }
