@@ -124,7 +124,7 @@ locals {
 
     # Create custom MySQL configuration from template
     cat > /etc/mysql/mysql.conf.d/custom.cnf <<'MYSQLCONF'
-${templatefile("${path.module}/mysql.cnf", {
+${templatefile("${path.module}/mysql.min.cnf", {
   innodb_buffer_pool_size = var.innodb_buffer_pool_size
   mysql_max_connections   = var.mysql_max_connections
 })}
