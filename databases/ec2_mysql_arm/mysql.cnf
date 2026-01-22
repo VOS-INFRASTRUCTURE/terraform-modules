@@ -204,28 +204,18 @@ max_heap_table_size=64M  # Must match tmp_table_size
 internal_tmp_mem_storage_engine=TempTable
 
 ################################################################################
-# QUERY CACHE (MySQL 8.0: REMOVED/DISABLED)
-################################################################################
-
-# Query cache was removed in MySQL 8.0 (caused more harm than good)
-# These settings have no effect in MySQL 8.0+
-# Kept for backward compatibility if downgrading
-query_cache_type=0
-query_cache_size=0
-
-################################################################################
 # LOGGING (MONITORING & DEBUGGING)
 ################################################################################
 
 # Error log location (startup issues, crashes, warnings)
 # Always enabled, check this file for problems
-log_error=/var/lib/mysql/error.log
+log_error=/var/log/mysql/error.log
 
 # Slow query log (identify performance bottlenecks)
 # Enable: 1, Disable: 0
 # Essential for production monitoring and optimization
 slow_query_log=1
-slow_query_log_file=/var/lib/mysql/slow-query.log
+slow_query_log_file=/var/log/mysql/slow-query.log
 
 # Queries taking longer than this are logged (in seconds)
 # 1 second is a good starting point

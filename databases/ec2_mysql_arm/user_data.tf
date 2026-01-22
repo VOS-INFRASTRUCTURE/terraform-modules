@@ -12,218 +12,218 @@
 
 locals {
   user_data = <<-EOF
-    #!/bin/bash
-    set -e
+#!/bin/bash
+set -e
 
-    # Log everything to a file
-    exec > >(tee /var/log/mysql-setup.log)
-    exec 2>&1
+# Log everything to a file
+exec > >(tee /var/log/mysql-setup.log)
+exec 2>&1
 
-    echo "=== Starting Native MySQL EC2 setup at $(date) ==="
-    echo "Architecture: $(uname -m)"
-    echo "Instance type: ARM64 (Graviton)"
+echo "=== Starting Native MySQL EC2 setup at $(date) ==="
+echo "Architecture: $(uname -m)"
+echo "Instance type: ARM64 (Graviton)"
 
-    # Update system
-    apt-get update -y
-    apt-get upgrade -y
+# Update system
+apt-get update -y
+apt-get upgrade -y
 
-    # Install required packages
-    apt-get install -y \
-      apt-transport-https \
-      ca-certificates \
-      curl \
-      software-properties-common \
-      gnupg-agent \
-      jq \
-      unzip
+# Install required packages
+apt-get install -y \
+  apt-transport-https \
+  ca-certificates \
+  curl \
+  software-properties-common \
+  gnupg-agent \
+  jq \
+  unzip
 
-    # Install AWS CLI v2 (for backups and Secrets Manager)
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
-    unzip -q /tmp/awscliv2.zip -d /tmp
-    /tmp/aws/install
-    rm -rf /tmp/awscliv2.zip /tmp/aws
+# Install AWS CLI v2 (for backups and Secrets Manager)
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
 
-    # Install CloudWatch agent (conditional based on variable)
-    if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
-      wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
-      dpkg -i amazon-cloudwatch-agent.deb
+# Install CloudWatch agent (conditional based on variable)
+if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
+  wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+  dpkg -i amazon-cloudwatch-agent.deb
 
-      # Configure CloudWatch agent
-      cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
-    {
-      "logs": {
-        "logs_collected": {
-          "files": {
-            "collect_list": [
-              {
-                "file_path": "/var/log/mysql/error.log",
-                "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
-                "log_stream_name": "{instance_id}/mysql-error",
-                "timezone": "UTC"
-              },
-              {
-                "file_path": "/var/log/mysql/slow-query.log",
-                "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
-                "log_stream_name": "{instance_id}/mysql-slow-query",
-                "timezone": "UTC"
-              },
-              {
-                "file_path": "/var/log/syslog",
-                "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
-                "log_stream_name": "{instance_id}/syslog",
-                "timezone": "UTC"
-              }
-            ]
-          }
-        }
-      },
-      "metrics": {
-        "namespace": "MySQL/EC2",
-        "metrics_collected": {
-          "cpu": {
-            "measurement": [{"name": "cpu_usage_idle", "rename": "CPU_IDLE", "unit": "Percent"}],
-            "totalcpu": false
+  # Configure CloudWatch agent
+  cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/mysql/error.log",
+            "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
+            "log_stream_name": "{instance_id}/mysql-error",
+            "timezone": "UTC"
           },
-          "disk": {
-            "measurement": [{"name": "used_percent", "rename": "DISK_USED", "unit": "Percent"}],
-            "resources": ["*"]
+          {
+            "file_path": "/var/log/mysql/slow-query.log",
+            "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
+            "log_stream_name": "{instance_id}/mysql-slow-query",
+            "timezone": "UTC"
           },
-          "mem": {
-            "measurement": [{"name": "mem_used_percent", "rename": "MEM_USED", "unit": "Percent"}]
+          {
+            "file_path": "/var/log/syslog",
+            "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
+            "log_stream_name": "{instance_id}/syslog",
+            "timezone": "UTC"
           }
-        }
+        ]
       }
     }
-    CWCONFIG
+  },
+  "metrics": {
+    "namespace": "MySQL/EC2",
+    "metrics_collected": {
+      "cpu": {
+        "measurement": [{"name": "cpu_usage_idle", "rename": "CPU_IDLE", "unit": "Percent"}],
+        "totalcpu": false
+      },
+      "disk": {
+        "measurement": [{"name": "used_percent", "rename": "DISK_USED", "unit": "Percent"}],
+        "resources": ["*"]
+      },
+      "mem": {
+        "measurement": [{"name": "mem_used_percent", "rename": "MEM_USED", "unit": "Percent"}]
+      }
+    }
+  }
+}
+CWCONFIG
 
-      # Start CloudWatch agent
-      /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-        -a fetch-config \
-        -m ec2 \
-        -s \
-        -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
-    fi
+  # Start CloudWatch agent
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config \
+    -m ec2 \
+    -s \
+    -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+fi
 
-    # Retrieve secrets from Secrets Manager
-    echo "Retrieving MySQL passwords from Secrets Manager..."
-    MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-      --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-      --region ${data.aws_region.current.name} \
-      --query SecretString \
-      --output text)
+# Retrieve secrets from Secrets Manager
+echo "Retrieving MySQL passwords from Secrets Manager..."
+MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
+  --region ${data.aws_region.current.name} \
+  --query SecretString \
+  --output text)
 
-    # Install MySQL Server 8.0 natively
-    echo "Installing MySQL Server 8.0..."
-    apt-get install -y mysql-server
+# Install MySQL Server 8.0 natively
+echo "Installing MySQL Server 8.0..."
+apt-get install -y mysql-server
 
-    # Stop MySQL to configure it
-    systemctl stop mysql
+# Stop MySQL to configure it
+systemctl stop mysql
 
-    # Create MySQL configuration directory
-    mkdir -p /etc/mysql/mysql.conf.d
+# Create MySQL configuration directory
+mkdir -p /etc/mysql/mysql.conf.d
 
-    # Create custom MySQL configuration from template
-    cat > /etc/mysql/mysql.conf.d/custom.cnf <<'MYSQLCONF'
+# Create custom MySQL configuration from template
+cat > /etc/mysql/mysql.conf.d/custom.cnf <<'MYSQLCONF'
 ${templatefile("${path.module}/mysql.min.cnf", {
   innodb_buffer_pool_size = var.innodb_buffer_pool_size
   mysql_max_connections   = var.mysql_max_connections
 })}
 MYSQLCONF
 
-    # Create MySQL log directory
-    mkdir -p /var/log/mysql
-    chown mysql:mysql /var/log/mysql
+# Create MySQL log directory
+mkdir -p /var/log/mysql
+chown mysql:mysql /var/log/mysql
 
-    # Create MySQL data directory (if not exists)
-    mkdir -p /var/lib/mysql
-    chown mysql:mysql /var/lib/mysql
+# Create MySQL data directory (if not exists)
+mkdir -p /var/lib/mysql
+chown mysql:mysql /var/lib/mysql
 
-    # Start MySQL
-    systemctl start mysql
-    systemctl enable mysql
+# Start MySQL
+systemctl start mysql
+systemctl enable mysql
 
-    echo "Waiting for MySQL to start..."
-    sleep 10
+echo "Waiting for MySQL to start..."
+sleep 10
 
-    # Set root password
-    mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASSWORD';"
+# Set root password
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASSWORD';"
 
-    # Create application database
-    mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS ${var.mysql_database};"
+# Create application database
+mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS ${var.mysql_database};"
 
-    # Create application user
-    MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
-      --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
-      --region ${data.aws_region.current.name} \
-      --query SecretString \
-      --output text)
+# Create application user
+MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
+  --region ${data.aws_region.current.name} \
+  --query SecretString \
+  --output text)
 
-    mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
-    CREATE USER IF NOT EXISTS '${var.mysql_user}'@'%' IDENTIFIED BY '$MYSQL_USER_PASSWORD';
-    GRANT ALL PRIVILEGES ON ${var.mysql_database}.* TO '${var.mysql_user}'@'%';
-    FLUSH PRIVILEGES;
-    MYSQL_SCRIPT
+mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
+CREATE USER IF NOT EXISTS '${var.mysql_user}'@'%' IDENTIFIED BY '$MYSQL_USER_PASSWORD';
+GRANT ALL PRIVILEGES ON ${var.mysql_database}.* TO '${var.mysql_user}'@'%';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
 
-    # Create MySQL restart script for reboot
-    cat > /usr/local/bin/restart_mysql.sh <<'RESTART_SCRIPT'
-    #!/bin/bash
-    systemctl restart mysql
-    RESTART_SCRIPT
+# Create MySQL restart script for reboot
+cat > /usr/local/bin/restart_mysql.sh <<'RESTART_SCRIPT'
+#!/bin/bash
+systemctl restart mysql
+RESTART_SCRIPT
 
-    chmod +x /usr/local/bin/restart_mysql.sh
+chmod +x /usr/local/bin/restart_mysql.sh
 
-    # Create MySQL backup script (conditional based on variable)
-    if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
-      cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
-    #!/bin/bash
-    set -e
-    TODAY=$(date +"%Y-%m-%d")
-    TIME=$(date +"%H%M%S")
-    BACKUP_FILE="/tmp/$TIME-all-databases.sql.gz"
-    MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-      --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-      --region ${data.aws_region.current.name} \
-      --query SecretString \
-      --output text)
+# Create MySQL backup script (conditional based on variable)
+if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
+  cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
+#!/bin/bash
+set -e
+TODAY=$(date +"%Y-%m-%d")
+TIME=$(date +"%H%M%S")
+BACKUP_FILE="/tmp/$TIME-all-databases.sql.gz"
+MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
+  --region ${data.aws_region.current.name} \
+  --query SecretString \
+  --output text)
 
-    mysqldump \
-      -u root \
-      -p"$MYSQL_ROOT_PASSWORD" \
-      --all-databases \
-      --single-transaction \
-      --quick \
-      --lock-tables=false \
-      --routines \
-      --triggers \
-      --events \
-      | gzip > $BACKUP_FILE
+mysqldump \
+  -u root \
+  -p"$MYSQL_ROOT_PASSWORD" \
+  --all-databases \
+  --single-transaction \
+  --quick \
+  --lock-tables=false \
+  --routines \
+  --triggers \
+  --events \
+  | gzip > $BACKUP_FILE
 
-    aws s3 cp $BACKUP_FILE s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/$TODAY/$TIME-all-databases.sql.gz
-    rm -f $BACKUP_FILE
-    echo "Backup completed at $(date)"
-    BACKUPSCRIPT
+aws s3 cp $BACKUP_FILE s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/$TODAY/$TIME-all-databases.sql.gz
+rm -f $BACKUP_FILE
+echo "Backup completed at $(date)"
+BACKUPSCRIPT
 
-      chmod +x /usr/local/bin/backup_mysql.sh
-      echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
-    fi
+  chmod +x /usr/local/bin/backup_mysql.sh
+  echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
+fi
 
-    # Add MySQL startup to crontab for reboot
-    (crontab -l 2>/dev/null; echo "@reboot /usr/local/bin/restart_mysql.sh") | crontab -
+# Add MySQL startup to crontab for reboot
+(crontab -l 2>/dev/null; echo "@reboot /usr/local/bin/restart_mysql.sh") | crontab -
 
-    echo "=== MySQL installation completed at $(date) ==="
-    echo "MySQL Status:"
-    systemctl status mysql --no-pager
-    echo "MySQL Version:"
-    mysql --version
+echo "=== MySQL installation completed at $(date) ==="
+echo "MySQL Status:"
+systemctl status mysql --no-pager
+echo "MySQL Version:"
+mysql --version
 
-    # Run initial backup if enabled
-    if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
-      echo "Running initial backup..."
-      /usr/local/bin/backup_mysql.sh
-    fi
+# Run initial backup if enabled
+if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
+  echo "Running initial backup..."
+  /usr/local/bin/backup_mysql.sh
+fi
 
-    echo "=== Setup Complete ==="
-    EOF
+echo "=== Setup Complete ==="
+EOF
 }
 
 ################################################################################
