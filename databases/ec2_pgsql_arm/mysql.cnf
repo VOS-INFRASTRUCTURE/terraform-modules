@@ -1,0 +1,326 @@
+[mysqld]
+
+################################################################################
+# BASICS & SECURITY
+################################################################################
+
+# Run MySQL as this system user. user mysql is default if not specified.
+# Test: ps -ef | grep mysqld
+user=mysql
+
+# Skip DNS lookups for connecting hosts (improves connection speed)
+# Security: Prevents DNS-based attacks
+# Performance: Faster connections (no DNS resolution delay)
+# Use IP addresses in GRANT statements when this is enabled
+skip-name-resolve
+
+# Disable LOAD DATA LOCAL INFILE (security hardening)
+# Prevents local file system access via SQL injection
+# Keep disabled unless you specifically need this feature
+local-infile=0
+
+# ===============================================
+# MySQL 8 SQL Mode – Strict Error Handling & Data Integrity
+# ===============================================
+# ONLY_FULL_GROUP_BY        : Prevents ambiguous queries using GROUP BY; ensures deterministic results
+# STRICT_TRANS_TABLES       : Rejects invalid or truncated data instead of silently adjusting
+# NO_ZERO_IN_DATE           : Prevents invalid dates like '2026-00-15'
+# NO_ZERO_DATE              : Prevents completely zero dates like '0000-00-00'
+# ERROR_FOR_DIVISION_BY_ZERO: Raises an error on division by zero instead of returning NULL
+# NO_ENGINE_SUBSTITUTION    : Prevents silent substitution of storage engines if the requested engine is unavailable
+# ===============================================
+sql_mode=ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+
+################################################################################
+# CONNECTION HANDLING
+################################################################################
+
+# Maximum simultaneous client connections
+# Rule: Set based on your app's connection pool size
+# Too high: Wastes memory (each connection uses ~256KB-1MB)
+# Too low: Connection errors during traffic spikes
+# For most apps: 100-300 is sufficient (use connection pooling!)
+max_connections=${mysql_max_connections}
+
+# ===============================================
+# Prevent Host Blocking After Failed Connection Attempts
+# ===============================================
+# max_connect_errors : Number of consecutive failed connection attempts
+# from a host before MySQL blocks further connections from it.
+# Default is 100 (very low), which can cause accidental lockouts
+# during deployments or automated scripts.
+# Setting this high (100000) reduces the risk of accidental blocks,
+# while still allowing legitimate hosts to reconnect normally.
+max_connect_errors=100000
+
+# Seconds before closing inactive non-interactive connections
+# Interactive = mysql CLI, Non-interactive = app connections
+# 600s (10 min) is reasonable for most apps with connection pooling
+# Too low: Frequent reconnections (overhead)
+# Too high: Idle connections waste resources
+wait_timeout=600
+interactive_timeout=600
+
+# ===============================================
+# Thread Cache Size – Reduce Thread Creation Overhead
+# ===============================================
+# thread_cache_size : Number of threads MySQL keeps in cache for reuse.
+# When a client disconnects, the thread is put into this cache.
+# Reusing threads avoids the overhead of creating new threads for
+# each connection, improving performance under high connection churn.
+#
+# Recommended: roughly 10–50% of max_connections, or roughly equal to
+# the number of connections you expect to cycle frequently.
+# Example: for max_connections=200, a thread_cache_size of 100 is ideal.
+thread_cache_size=100
+
+################################################################################
+# InnoDB CORE SETTINGS (⚠️ MOST IMPORTANT FOR PERFORMANCE)
+################################################################################
+
+# ===============================================
+# InnoDB – Default Storage Engine and Buffer Pool
+# ===============================================
+# Use InnoDB as default storage engine (ACID-compliant, transactional)
+# InnoDB is the only production-grade engine in MySQL 8
+default_storage_engine=InnoDB
+
+# InnoDB buffer pool size (THE MOST CRITICAL SETTING)
+# Purpose: Caches table data and indexes in memory for high performance.
+# Rules of thumb:
+#   - Dedicated DB server: 70-75% of total RAM
+#   - Shared server (with app): 50-60% of total RAM
+# Examples:
+#   - 4 GB RAM (t4g.medium): innodb_buffer_pool_size=3G
+#   - 8 GB RAM (t4g.large/m7g.large): innodb_buffer_pool_size=6G
+#   - 16 GB RAM (r7g.large): innodb_buffer_pool_size=12G
+# ⚠️ Allocate as much as possible (up to 70-75% of RAM) for best performance.
+# Adjust based on instance RAM and workload (especially for read-heavy workloads).
+innodb_buffer_pool_size=${innodb_buffer_pool_size}
+
+# ===============================================
+# InnoDB Buffer Pool Instances – Improve Concurrency
+# ===============================================
+# innodb_buffer_pool_instances : Number of separate memory instances for the buffer pool.
+# Purpose: Reduces internal locking contention and improves concurrency
+# when multiple threads access the buffer pool.
+#
+# Rule of thumb:
+#   - 1 instance per GB of buffer pool (up to 8–16)
+#   - For buffer pool >= 4GB: use 4–8 instances
+#   - For buffer pool < 4GB: use 1–4 instances
+#
+# Example: For a 3G buffer pool (t4g.medium), 4 instances is reasonable
+innodb_buffer_pool_instances=4
+
+
+# ===============================================
+# InnoDB Redo Log File Size – Transaction Logging
+# ===============================================
+# innodb_log_file_size : Size of each InnoDB redo (transaction) log file.
+# Purpose: Write-ahead logging for crash recovery and durability.
+#
+# Sizing guidance:
+#   - Larger log files → Better write performance, fewer checkpoints,
+#     but slower crash recovery.
+#   - Smaller log files → Faster recovery, more frequent checkpoints,
+#     which can slow down write-heavy workloads.
+#
+# Recommended total redo log space: 1G – 4G
+# Modern MySQL 8.x: 1G–2G per file is safe and performant.
+innodb_log_file_size=1G
+
+# ===============================================
+# InnoDB Log Buffer Size – Memory for Redo Log Writes
+# ===============================================
+# innodb_log_buffer_size : Memory allocated to store redo log entries before
+# flushing them to disk.
+#
+# Sizing guidance:
+#   - Larger buffer → Fewer disk writes, better performance for write-heavy workloads
+#   - Smaller buffer → More frequent flushes, which can slow down writes
+#
+# Default is 16M, which is often too small for modern workloads.
+# Recommended: 64M–256M depending on transaction volume.
+innodb_log_buffer_size=64M
+# ===============================================
+# InnoDB I/O and Flush Settings – Optimize Disk Performance
+# ===============================================
+
+# Flush method – how MySQL writes data to disk
+# O_DIRECT: Bypasses OS cache to prevent double buffering
+# Recommended for dedicated DB servers for consistent performance
+# Alternatives:
+#   - fsync: Uses OS cache (slower, double buffering)
+#   - O_DSYNC: Direct I/O for logs only
+innodb_flush_method=O_DIRECT
+
+# Durability vs. performance: log flushing on transaction commit
+# 1 = Flush log to disk on every commit (ACID-safe, slowest, safest)
+# 2 = Flush logs every second (~1 sec potential data loss, faster)
+# 0 = Flush every second without OS write (risky, not recommended)
+# ⚠️ Keep at 1 for production unless temporary data loss is acceptable
+innodb_flush_log_at_trx_commit=1
+
+# Store each InnoDB table in its own .ibd file
+# Benefits: easier backups, reclaim space on DROP TABLE, better I/O
+# Default in MySQL 8.x – keep enabled for clarity
+innodb_file_per_table=1
+
+# I/O capacity for background tasks (flushes, checkpoints)
+# Based on disk type and IOPS capability:
+#   - HDD: ~200
+#   - SSD gp2: ~3000
+#   - SSD gp3: baseline 12000, max 16000
+#   - NVMe: 10000+
+# For EC2 gp3 volumes: 2000–4000 is reasonable for good performance
+innodb_io_capacity=2000
+innodb_io_capacity_max=4000
+
+# Number of I/O threads for read and write operations
+# Default: 4 each
+# For SSD: 4–8 each is good
+# High-performance workloads: 8–16 each
+# ARM/Graviton instances: 4 is sufficient unless heavy I/O
+innodb_read_io_threads=4
+innodb_write_io_threads=4
+
+################################################################################
+# TEMPORARY TABLES & MEMORY
+################################################################################
+
+# Maximum size for in-memory temporary tables
+# When exceeded, temp table is written to disk (slower)
+# Used for: GROUP BY, ORDER BY, DISTINCT, UNION
+# 64M-256M is reasonable for most apps
+# Too high: Wastes memory
+# Too low: Frequent disk writes for temp tables
+tmp_table_size=64M
+max_heap_table_size=64M  # Must match tmp_table_size
+
+# Internal temporary table storage engine
+# TempTable: New in MySQL 8, faster than MEMORY engine
+# Keep this setting (default in MySQL 8.0.16+)
+internal_tmp_mem_storage_engine=TempTable
+
+################################################################################
+# LOGGING (MONITORING & DEBUGGING)
+################################################################################
+
+# Error log location (startup issues, crashes, warnings)
+# Always enabled, check this file for problems
+log_error=/var/lib/mysql/error.log
+
+# Slow query log (identify performance bottlenecks)
+# Enable: 1, Disable: 0
+# Essential for production monitoring and optimization
+slow_query_log=1
+slow_query_log_file=/var/lib/mysql/slow-query.log
+
+# Queries taking longer than this are logged (in seconds)
+# 1 second is a good starting point
+# For high-performance apps: 0.5 or 0.1
+# For reporting/analytics: 5-10
+long_query_time=1
+
+# Log queries that don't use indexes (useful during development)
+# 0 = Don't log (recommended for production - too noisy)
+# 1 = Log (useful for dev/staging to find missing indexes)
+log_queries_not_using_indexes=0
+
+################################################################################
+# BINARY LOGGING (BACKUPS & POINT-IN-TIME RECOVERY)
+################################################################################
+
+# Enable binary logging for backups and replication
+# Required for: mysqldump with --single-transaction, point-in-time recovery
+# Stores all data-modifying queries (INSERT, UPDATE, DELETE)
+log-bin=mysql-bin
+
+# Binary log format
+# ROW: Logs actual row changes (safest, recommended)
+#   - Pros: Safest for replication, no ambiguity
+#   - Cons: Larger log files
+# STATEMENT: Logs SQL statements (smaller logs, replication issues)
+# MIXED: Automatic switching (not recommended)
+binlog_format=ROW
+
+# Binary log retention period (in seconds)
+# Old value: 604800 (7 days) - TOO LONG when you have hourly backups
+# New value: 172800 (2 days) - Sufficient for point-in-time recovery
+# Why 2 days is enough:
+#   - You have hourly mysqldump backups to S3
+#   - You have daily EBS snapshots
+#   - Binary logs only needed for recovery between backup intervals
+#   - Saves disk space (binary logs can grow large)
+# Formula: retention >= (backup_interval × 2)
+#   - Hourly backups → 2-4 hours of binlogs sufficient
+#   - Daily backups → 48 hours (2 days) is safe
+binlog_expire_logs_seconds=172800  # 2 days (recommended with frequent backups)
+
+# Sync binary log to disk after every N commits
+# 1 = Sync on every commit (safest, no binlog data loss)
+#   - Best for production (ACID compliance)
+# 100 = Sync every 100 commits (faster, small data loss risk)
+# 0 = Let OS decide (fastest, higher data loss risk)
+# ⚠️ Keep at 1 for production unless you accept binlog data loss
+sync_binlog=1
+
+# Maximum size of a single binary log file before rotation
+# When reached, MySQL creates a new binlog file
+# 100M is good (rotates frequently, easier to manage)
+# Too large: Hard to transfer/backup individual files
+# Too small: Too many files, overhead
+max_binlog_size=100M
+
+################################################################################
+# CHARACTER SET & COLLATION
+################################################################################
+
+# Default character set for all databases and tables
+# utf8mb4: Full UTF-8 support (including emojis, 4-byte characters)
+# utf8: Legacy, only supports 3-byte UTF-8 (don't use)
+# ⚠️ Always use utf8mb4 for new applications
+character-set-server=utf8mb4
+
+# Default collation (sorting/comparison rules)
+# utf8mb4_unicode_ci: Better sorting for international characters
+# utf8mb4_general_ci: Faster, but less accurate for non-English
+# utf8mb4_0900_ai_ci: MySQL 8.0 default (even better, accent-insensitive)
+# Recommended: utf8mb4_unicode_ci (widely compatible)
+collation-server=utf8mb4_unicode_ci
+
+################################################################################
+# NETWORKING
+################################################################################
+
+# IP address to bind to
+# 0.0.0.0: Listen on all interfaces (allows remote connections)
+# 127.0.0.1: Listen only on localhost (local connections only)
+# For Docker/EC2: Use 0.0.0.0, control access via firewall/security groups
+bind-address=0.0.0.0
+mysqlx-bind-address = 0.0.0.0
+
+# Disable internal host cache (related to skip-name-resolve)
+# Prevents issues with cached DNS lookups
+# Recommended when skip-name-resolve is enabled
+skip-host-cache
+
+################################################################################
+# OPTIONAL: PRODUCTION HARDENING
+################################################################################
+
+# Enable performance schema for monitoring (small overhead)
+# Provides detailed performance metrics and query statistics
+# Useful for troubleshooting and optimization
+# Disable only if you need maximum performance (not recommended)
+# performance_schema=ON
+
+# Prevent creation of symbolic links (security)
+# Disables DATA DIRECTORY and INDEX DIRECTORY options
+# Prevents symlink-based privilege escalation
+# skip-symbolic-links
+
+# Restrict LOAD DATA INFILE and SELECT INTO OUTFILE to this directory
+# Prevents reading/writing arbitrary files on the server
+# secure-file-priv=/var/lib/mysql-files
