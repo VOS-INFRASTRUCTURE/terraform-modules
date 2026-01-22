@@ -6,11 +6,11 @@
 ################################################################################
 
 locals {
-  # PostgreSQL configuration content (not embedded in user_data)
-  pgsql_config = templatefile("${path.module}/postgresql.conf", {
-    shared_buffers      = var.shared_buffers
+  # PostgreSQL configuration content (minified version without comments for size reduction)
+  pgsql_config = templatefile("${path.module}/postgresql.min.conf", {
+    shared_buffers       = var.shared_buffers
     effective_cache_size = var.effective_cache_size
-    max_connections     = var.max_connections
+    max_connections      = var.max_connections
   })
 
   # pg_hba.conf content
