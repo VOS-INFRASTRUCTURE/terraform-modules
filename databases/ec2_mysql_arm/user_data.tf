@@ -148,25 +148,21 @@ MYSQLCONF
     # Set root password
     mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASSWORD';"
 
-    # Create application database if specified
-    if [ "${var.mysql_database}" != "" ]; then
-      mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS ${var.mysql_database};"
-    fi
+    # Create application database
+    mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS ${var.mysql_database};"
 
-    # Create application user if specified
-    if [ "${var.mysql_user}" != "" ]; then
-      MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
-        --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
-        --region ${data.aws_region.current.name} \
-        --query SecretString \
-        --output text)
+    # Create application user
+    MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
+      --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
+      --region ${data.aws_region.current.name} \
+      --query SecretString \
+      --output text)
 
-      mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
+    mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_SCRIPT
     CREATE USER IF NOT EXISTS '${var.mysql_user}'@'%' IDENTIFIED BY '$MYSQL_USER_PASSWORD';
     GRANT ALL PRIVILEGES ON ${var.mysql_database}.* TO '${var.mysql_user}'@'%';
     FLUSH PRIVILEGES;
     MYSQL_SCRIPT
-    fi
 
     # Create MySQL restart script for reboot
     cat > /usr/local/bin/restart_mysql.sh <<'RESTART_SCRIPT'
@@ -181,66 +177,33 @@ MYSQLCONF
       cat > /usr/local/bin/backup_mysql.sh <<'BACKUPSCRIPT'
     #!/bin/bash
     set -e
-
-    # Configuration
-    BACKUP_DIR="/tmp/mysql-backups"
-    S3_BUCKET="${local.backup_bucket_name}"
-    REGION="${data.aws_region.current.name}"
-    TIMESTAMP=$(date +%H%M%S)
-
-    # Get today's date folder
     TODAY=$(date +"%Y-%m-%d")
-
-    # Get database list
-    DATABASES=$(mysql -u root -p$(aws secretsmanager get-secret-value \
+    TIME=$(date +"%H%M%S")
+    BACKUP_FILE="/tmp/$TIME-all-databases.sql.gz"
+    MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
       --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-      --region $REGION \
+      --region ${data.aws_region.current.name} \
       --query SecretString \
-      --output text) \
-      -e "SHOW DATABASES;" | grep -Ev "Database|information_schema|performance_schema|mysql|sys")
+      --output text)
 
-    # Create backup directory
-    mkdir -p $BACKUP_DIR
+    mysqldump \
+      -u root \
+      -p"$MYSQL_ROOT_PASSWORD" \
+      --all-databases \
+      --single-transaction \
+      --quick \
+      --lock-tables=false \
+      --routines \
+      --triggers \
+      --events \
+      | gzip > $BACKUP_FILE
 
-    # Backup each database
-    for DB in $DATABASES; do
-      echo "Backing up database: $DB"
-      FOLDER_NAME="$TODAY-$DB"
-      BACKUP_FILE="$BACKUP_DIR/$TIMESTAMP.sql"
-
-      # Create mysqldump
-      mysqldump -u root -p$(aws secretsmanager get-secret-value \
-        --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-        --region $REGION \
-        --query SecretString \
-        --output text) \
-        --single-transaction \
-        --routines \
-        --triggers \
-        --events \
-        $DB > $BACKUP_FILE
-
-      # Compress backup
-      gzip $BACKUP_FILE
-
-      # Upload to S3
-      aws s3 cp $BACKUP_FILE.gz s3://$S3_BUCKET/mysql-backups/${var.env}/${var.project_id}/$FOLDER_NAME/$TIMESTAMP.sql.gz
-
-      # Clean up local backup
-      rm -f $BACKUP_FILE.gz
-
-      echo "Backup completed: $DB -> s3://$S3_BUCKET/mysql-backups/${var.env}/${var.project_id}/$FOLDER_NAME/$TIMESTAMP.sql.gz"
-    done
-
-    # Clean up backup directory
-    rm -rf $BACKUP_DIR
-
-    echo "All backups completed at $(date)"
+    aws s3 cp $BACKUP_FILE s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/$TODAY/$TIME-all-databases.sql.gz
+    rm -f $BACKUP_FILE
+    echo "Backup completed at $(date)"
     BACKUPSCRIPT
 
       chmod +x /usr/local/bin/backup_mysql.sh
-
-      # Add backup to crontab (runs per schedule: ${var.backup_schedule})
       echo "${var.backup_schedule} /usr/local/bin/backup_mysql.sh >> /var/log/mysql-backup.log 2>&1" | crontab -
     fi
 
