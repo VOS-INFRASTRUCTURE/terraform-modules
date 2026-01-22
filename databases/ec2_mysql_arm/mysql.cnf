@@ -209,13 +209,13 @@ internal_tmp_mem_storage_engine=TempTable
 
 # Error log location (startup issues, crashes, warnings)
 # Always enabled, check this file for problems
-log_error=/var/log/mysql/error.log
+log_error=/var/lib/mysql/error.log
 
 # Slow query log (identify performance bottlenecks)
 # Enable: 1, Disable: 0
 # Essential for production monitoring and optimization
 slow_query_log=1
-slow_query_log_file=/var/log/mysql/slow-query.log
+slow_query_log_file=/var/lib/mysql/slow-query.log
 
 # Queries taking longer than this are logged (in seconds)
 # 1 second is a good starting point

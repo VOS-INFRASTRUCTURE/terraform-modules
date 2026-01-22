@@ -56,13 +56,19 @@ if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
       "files": {
         "collect_list": [
           {
-            "file_path": "/var/log/mysql/error.log",
+            "file_path": "/var/log/mysql-setup.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/setup.log",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/lib/mysql/error.log",
             "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
             "log_stream_name": "{instance_id}/mysql-error",
             "timezone": "UTC"
           },
           {
-            "file_path": "/var/log/mysql/slow-query.log",
+            "file_path": "/var/lib/mysql/slow-query.log",
             "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
             "log_stream_name": "{instance_id}/mysql-slow-query",
             "timezone": "UTC"
@@ -71,6 +77,12 @@ if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
             "file_path": "/var/log/syslog",
             "log_group_name": "${aws_cloudwatch_log_group.mysql_logs[0].name}",
             "log_stream_name": "{instance_id}/syslog",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/cloud-init-output.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/cloud-init-output.log",
             "timezone": "UTC"
           }
         ]
