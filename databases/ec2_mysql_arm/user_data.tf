@@ -135,7 +135,7 @@ systemctl stop mysql
 mkdir -p /etc/mysql/mysql.conf.d
 
 # Create custom MySQL configuration from template
-cat > /etc/mysql/mysql.conf.d/custom.cnf <<'MYSQLCONF'
+cat > /etc/mysql/mysql.conf.d/z-custom.cnf <<'MYSQLCONF'
 ${templatefile("${path.module}/mysql.min.cnf", {
   innodb_buffer_pool_size = var.innodb_buffer_pool_size
   mysql_max_connections   = var.mysql_max_connections
@@ -233,6 +233,12 @@ if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_na
   echo "Running initial backup..."
   /usr/local/bin/backup_mysql.sh
 fi
+
+
+# Disable and remove SSH (Session Manager only)
+systemctl stop ssh || true
+systemctl disable ssh || true
+apt-get remove -y openssh-server
 
 echo "=== Setup Complete ==="
 EOF

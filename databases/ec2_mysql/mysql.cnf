@@ -299,6 +299,7 @@ collation-server=utf8mb4_unicode_ci
 # 127.0.0.1: Listen only on localhost (local connections only)
 # For Docker/EC2: Use 0.0.0.0, control access via firewall/security groups
 bind-address=0.0.0.0
+mysqlx-bind-address = 0.0.0.0
 
 # Disable internal host cache (related to skip-name-resolve)
 # Prevents issues with cached DNS lookups
