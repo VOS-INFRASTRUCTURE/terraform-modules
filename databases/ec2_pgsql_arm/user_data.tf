@@ -1,7 +1,7 @@
 ################################################################################
-# User Data Script - Native PostgreSQL 15 Installation (No Docker)
+# User Data Script - Native PostgreSQL 16 Installation (No Docker)
 #
-# Purpose: Install PostgreSQL 15 natively on Ubuntu 24.04 ARM64
+# Purpose: Install PostgreSQL 16 natively on Ubuntu 24.04 ARM64
 # Strategy: Minimal bootstrap script to stay under 16KB limit
 ################################################################################
 
@@ -25,7 +25,7 @@ exec > >(tee /var/log/pgsql-setup.log) 2>&1
 echo "=== PostgreSQL ARM Setup Started: $(date) ==="
 
 # Install essentials
-apt-get update -y && apt-get install -y curl unzip jq postgresql-15 postgresql-contrib-15
+apt-get update -y && apt-get install -y curl unzip jq postgresql postgresql-contrib
 
 # Install AWS CLI
 curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/aws.zip"
@@ -38,19 +38,19 @@ POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secret
 systemctl stop postgresql
 
 # Configure PostgreSQL
-cat > /etc/postgresql/15/main/postgresql.conf << 'PGSQLCONF'
+cat > /etc/postgresql/16/main/postgresql.conf << 'PGSQLCONF'
 ${local.pgsql_config}
 PGSQLCONF
 
-cat > /etc/postgresql/15/main/pg_hba.conf << 'PGHBACONF'
+cat > /etc/postgresql/16/main/pg_hba.conf << 'PGHBACONF'
 ${local.pg_hba_config}
 PGHBACONF
 
 # Set ownership
-chown postgres:postgres /etc/postgresql/15/main/postgresql.conf
-chown postgres:postgres /etc/postgresql/15/main/pg_hba.conf
-chmod 640 /etc/postgresql/15/main/postgresql.conf
-chmod 640 /etc/postgresql/15/main/pg_hba.conf
+chown postgres:postgres /etc/postgresql/16/main/postgresql.conf
+chown postgres:postgres /etc/postgresql/16/main/pg_hba.conf
+chmod 640 /etc/postgresql/16/main/postgresql.conf
+chmod 640 /etc/postgresql/16/main/pg_hba.conf
 
 # Create log directory
 mkdir -p /var/log/postgresql
@@ -72,7 +72,7 @@ sudo -u postgres psql -c "CREATE USER ${var.pgsql_user} WITH PASSWORD '$PGSQL_US
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${var.pgsql_database} TO ${var.pgsql_user};"
 sudo -u postgres psql -d ${var.pgsql_database} -c "GRANT ALL ON SCHEMA public TO ${var.pgsql_user};"
 
-%{if var.enable_cloudwatch_monitoring}
+%{~ if var.enable_cloudwatch_monitoring ~}
 # Install CloudWatch agent
 wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
 dpkg -i amazon-cloudwatch-agent.deb
@@ -80,9 +80,9 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << 'CWCFG'
 {"logs":{"logs_collected":{"files":{"collect_list":[{"file_path":"/var/log/postgresql/postgresql-*.log","log_group_name":"${try(aws_cloudwatch_log_group.pgsql_logs[0].name, "")}","log_stream_name":"{instance_id}/postgres"},{"file_path":"/var/log/pgsql-setup.log","log_group_name":"${try(aws_cloudwatch_log_group.pgsql_logs[0].name, "")}","log_stream_name":"{instance_id}/setup"}]}}},"metrics":{"namespace":"PostgreSQL/EC2","metrics_collected":{"cpu":{"measurement":[{"name":"cpu_usage_idle"}]},"disk":{"measurement":[{"name":"used_percent"}],"resources":["*"]},"mem":{"measurement":[{"name":"mem_used_percent"}]}}}}
 CWCFG
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
-%{endif}
+%{~ endif ~}
 
-%{if var.enable_automated_backups && local.backup_bucket_name != ""}
+%{~ if var.enable_automated_backups && local.backup_bucket_name != "" ~}
 # Backup script
 cat > /usr/local/bin/backup_pgsql.sh << 'BACKUP'
 #!/bin/bash
@@ -97,7 +97,7 @@ BACKUP
 chmod +x /usr/local/bin/backup_pgsql.sh
 echo "${var.backup_schedule} /usr/local/bin/backup_pgsql.sh >> /var/log/pgsql-backup.log 2>&1" | crontab -
 /usr/local/bin/backup_pgsql.sh  # Initial backup
-%{endif}
+%{~ endif ~}
 
 echo "=== PostgreSQL Setup Complete: $(date) ==="
 EOF
