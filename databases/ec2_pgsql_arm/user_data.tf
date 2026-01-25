@@ -95,7 +95,6 @@ CWCFG
 
 # Backup script
 cat > /usr/local/bin/backup_pgsql.sh << 'BACKUP'
-
 #!/bin/bash
 
 TODAY=$(date +"%Y-%m-%d")
@@ -116,16 +115,22 @@ DB_USERNAME=postgres
 DB_DATABASE=${var.pgsql_database}
 
 # Backup and compress in one step
-pg_dump --no-owner --no-privileges -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_DATABASE" | gzip > /tmp/${TIME}-${DB_DATABASE}.sql.gz
+pg_dump --no-owner --no-privileges \
+  -h "$DB_HOST" \
+  -p "$DB_PORT" \
+  -U "$DB_USERNAME" \
+  -d "$DB_DATABASE" \
+  | gzip > /tmp/$${TIME}-$${DB_DATABASE}.sql.gz
 
 # Upload to S3
-aws s3 cp /tmp/${TIME}-${DB_DATABASE}.sql.gz s3://${local.backup_bucket_name}/$TODAY/
+aws s3 cp /tmp/$${TIME}-$${DB_DATABASE}.sql.gz s3://${local.backup_bucket_name}/$${TODAY}/
 
 # Remove local dump
-rm /tmp/${TIME}-${DB_DATABASE}.sql.gz
+rm /tmp/$${TIME}-$${DB_DATABASE}.sql.gz
 
 echo "Backup completed for $DB_DATABASE on $TODAY"
 BACKUP
+
 
 chmod +x /usr/local/bin/backup_pgsql.sh
 echo "${var.backup_schedule} /usr/local/bin/backup_pgsql.sh >> /var/log/pgsql-backup.log 2>&1" | crontab -
