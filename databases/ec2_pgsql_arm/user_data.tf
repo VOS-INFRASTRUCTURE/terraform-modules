@@ -90,7 +90,9 @@ CWCFG
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
 %{~ endif ~}
 
+
 %{~ if var.enable_automated_backups && local.backup_bucket_name != "" ~}
+
 # Backup script
 cat > /usr/local/bin/backup_pgsql.sh << 'BACKUP'
 #!/bin/bash
