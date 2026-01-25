@@ -38,9 +38,13 @@ POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secret
 systemctl stop postgresql
 
 # Configure PostgreSQL
-cat > /etc/postgresql/16/main/postgresql.conf << 'PGSQLCONF'
+if ! grep -q "### CUSTOM_PG_CONF ###" /etc/postgresql/16/main/postgresql.conf; then
+  cat >> /etc/postgresql/16/main/postgresql.conf << 'PGSQLCONF'
+### CUSTOM_PG_CONF ###
 ${local.pgsql_config}
+### END CUSTOM_PG_CONF ###
 PGSQLCONF
+fi
 
 cat > /etc/postgresql/16/main/pg_hba.conf << 'PGHBACONF'
 ${local.pg_hba_config}
@@ -74,8 +78,12 @@ sudo -u postgres psql -d ${var.pgsql_database} -c "GRANT ALL ON SCHEMA public TO
 
 %{~ if var.enable_cloudwatch_monitoring ~}
 # Install CloudWatch agent
-wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
-dpkg -i amazon-cloudwatch-agent.deb
+if [ ! -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent ]; then
+  CW_DEB=/tmp/amazon-cloudwatch-agent.deb
+  wget -q -O "$CW_DEB" \
+    https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+  dpkg -i "$CW_DEB"
+fi
 cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << 'CWCFG'
 {"logs":{"logs_collected":{"files":{"collect_list":[{"file_path":"/var/log/postgresql/postgresql-*.log","log_group_name":"${try(aws_cloudwatch_log_group.pgsql_logs[0].name, "")}","log_stream_name":"{instance_id}/postgres"},{"file_path":"/var/log/pgsql-setup.log","log_group_name":"${try(aws_cloudwatch_log_group.pgsql_logs[0].name, "")}","log_stream_name":"{instance_id}/setup"}]}}},"metrics":{"namespace":"PostgreSQL/EC2","metrics_collected":{"cpu":{"measurement":[{"name":"cpu_usage_idle"}]},"disk":{"measurement":[{"name":"used_percent"}],"resources":["*"]},"mem":{"measurement":[{"name":"mem_used_percent"}]}}}}
 CWCFG
