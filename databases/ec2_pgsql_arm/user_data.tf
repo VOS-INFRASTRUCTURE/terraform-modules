@@ -95,15 +95,38 @@ CWCFG
 
 # Backup script
 cat > /usr/local/bin/backup_pgsql.sh << 'BACKUP'
+
 #!/bin/bash
+
 TODAY=$(date +"%Y-%m-%d")
 TIME=$(date +"%H%M%S")
-POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} --region ${data.aws_region.current.name} --query SecretString --output text)
+
+# Get Postgres password from AWS Secrets Manager
+POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value \
+    --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} \
+    --region ${data.aws_region.current.name} \
+    --query SecretString --output text)
+
 export PGPASSWORD="$POSTGRES_PASSWORD"
-pg_dumpall -U postgres | gzip > /tmp/$TIME-all-databases.sql.gz
-aws s3 cp /tmp/$TIME-all-databases.sql.gz s3://${local.backup_bucket_name}/pgsql-backups/${var.env}/${var.project_id}/$TODAY/
-rm /tmp/$TIME-all-databases.sql.gz
+
+# Database connection info
+DB_HOST=0.0.0.0
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_DATABASE=${var.pgsql_database}
+
+# Backup and compress in one step
+pg_dump --no-owner --no-privileges -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_DATABASE" | gzip > /tmp/${TIME}-${DB_DATABASE}.sql.gz
+
+# Upload to S3
+aws s3 cp /tmp/${TIME}-${DB_DATABASE}.sql.gz s3://${local.backup_bucket_name}/$TODAY/
+
+# Remove local dump
+rm /tmp/${TIME}-${DB_DATABASE}.sql.gz
+
+echo "Backup completed for $DB_DATABASE on $TODAY"
 BACKUP
+
 chmod +x /usr/local/bin/backup_pgsql.sh
 echo "${var.backup_schedule} /usr/local/bin/backup_pgsql.sh >> /var/log/pgsql-backup.log 2>&1" | crontab -
 /usr/local/bin/backup_pgsql.sh  # Initial backup
