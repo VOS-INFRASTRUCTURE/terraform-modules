@@ -140,5 +140,8 @@ output "s3_endpoint" {
     # Policy configuration
     policy_scope      = "RestrictedToBackupBucket"
     backup_bucket_arn = local.should_create_endpoint ? aws_s3_bucket.mysql_backups[0].arn : null
+
+    # Cost estimate
+    monthly_cost_estimate = "FREE (Gateway endpoint has no hourly charge, and data transfer between EC2 and S3 in same region is FREE)"
   }
 }
