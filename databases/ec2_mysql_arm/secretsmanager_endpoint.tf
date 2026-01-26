@@ -23,12 +23,7 @@
 ################################################################################
 
 ################################################################################
-# Data Sources - Auto-discover network configuration from EC2 instance
-################################################################################
-
-
-################################################################################
-# VPC Endpoints Configuration
+# Variable - Toggle for Secrets Manager Endpoint Creation
 ################################################################################
 
 variable "enable_secretsmanager_endpoint" {
@@ -37,6 +32,9 @@ variable "enable_secretsmanager_endpoint" {
   default     = false
 }
 
+################################################################################
+# Data Sources - Auto-discover network configuration from EC2 instance
+################################################################################
 
 # Get subnet details from the EC2 instance
 data "aws_subnet" "secretsmanager_subnet" {

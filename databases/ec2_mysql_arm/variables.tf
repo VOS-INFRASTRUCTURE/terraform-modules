@@ -188,18 +188,6 @@ variable "enable_automated_backups" {
   default     = false
 }
 
-variable "create_backup_bucket" {
-  description = "Create S3 bucket for backups (set to false if using existing bucket)"
-  type        = bool
-  default     = true
-}
-
-variable "backup_s3_bucket_name" {
-  description = "S3 bucket name for MySQL backups (required if enable_automated_backups = true and create_backup_bucket = false)"
-  type        = string
-  default     = ""
-}
-
 variable "backup_schedule" {
   description = "Cron expression for backup schedule (e.g., '0 * * * *' for hourly, '0 2 * * *' for 2 AM daily)"
   type        = string

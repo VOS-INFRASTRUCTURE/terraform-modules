@@ -17,8 +17,18 @@
 # S3 Bucket
 ################################################################################
 
+
+################################################################################
+# Local Variables
+################################################################################
+
+locals {
+  # Return created bucket name or provided bucket name
+  backup_bucket_name = var.enable_automated_backups ? "${var.env}-${var.project_id}-${var.base_name}-mysql-backups" : ""
+}
+
 resource "aws_s3_bucket" "mysql_backups" {
-  count = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count = var.enable_automated_backups ? 1 : 0
 
   bucket        = "${var.env}-${var.project_id}-${var.base_name}-mysql-backups"
   force_destroy = false  # Prevent accidental deletion with backups inside
@@ -41,7 +51,7 @@ resource "aws_s3_bucket" "mysql_backups" {
 ################################################################################
 
 resource "aws_s3_bucket_public_access_block" "mysql_backups" {
-  count  = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count  = var.enable_automated_backups ? 1 : 0
   bucket = aws_s3_bucket.mysql_backups[0].id
 
   block_public_acls       = true
@@ -55,7 +65,7 @@ resource "aws_s3_bucket_public_access_block" "mysql_backups" {
 ################################################################################
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "mysql_backups" {
-  count  = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count  = var.enable_automated_backups ? 1 : 0
   bucket = aws_s3_bucket.mysql_backups[0].id
 
   rule {
@@ -77,7 +87,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "mysql_backups" {
 ################################################################################
 
 resource "aws_s3_bucket_versioning" "mysql_backups" {
-  count  = var.enable_automated_backups && var.create_backup_bucket && var.enable_backup_versioning ? 1 : 0
+  count  = var.enable_automated_backups && var.enable_backup_versioning ? 1 : 0
   bucket = aws_s3_bucket.mysql_backups[0].id
 
   versioning_configuration {
@@ -94,7 +104,7 @@ resource "aws_s3_bucket_versioning" "mysql_backups" {
 ################################################################################
 
 resource "aws_s3_bucket_lifecycle_configuration" "mysql_backups" {
-  count  = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count  = var.enable_automated_backups ? 1 : 0
   bucket = aws_s3_bucket.mysql_backups[0].id
 
   # Rule 1: Delete old backup files after retention period
@@ -153,7 +163,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "mysql_backups" {
 
 # Uncomment if you need additional bucket policies
 # resource "aws_s3_bucket_policy" "mysql_backups" {
-#   count  = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+#   count  = var.enable_automated_backups ? 1 : 0
 #   bucket = aws_s3_bucket.mysql_backups[0].id
 #
 #   policy = jsonencode({

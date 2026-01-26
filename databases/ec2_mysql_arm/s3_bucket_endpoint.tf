@@ -22,25 +22,34 @@
 ################################################################################
 
 ################################################################################
+# Variable - Toggle for S3 Endpoint Creation
+################################################################################
+
+variable "enable_s3_endpoint" {
+  description = "Enable S3 Gateway VPC Endpoint for private S3 access without NAT Gateway (completely FREE, saves NAT costs)"
+  type        = bool
+  default     = false
+}
+
+################################################################################
 # Data Sources - Auto-discover network configuration from EC2 instance
 ################################################################################
 
-
 # Get subnet details from the EC2 instance
 data "aws_subnet" "mysql_subnet" {
-  count = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count = var.enable_s3_endpoint ? 1 : 0
   id    = var.subnet_id
 }
 
 # Get VPC details to find main route table
 data "aws_vpc" "mysql_vpc" {
-  count = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count = var.enable_s3_endpoint ? 1 : 0
   id    = data.aws_subnet.mysql_subnet[0].vpc_id
 }
 
 # Get all route tables in the VPC
 data "aws_route_tables" "vpc_route_tables" {
-  count  = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  count  = var.enable_s3_endpoint ? 1 : 0
   vpc_id = data.aws_subnet.mysql_subnet[0].vpc_id
 
   # Filter for route tables associated with our subnet
@@ -58,9 +67,11 @@ locals {
   # S3 service name for the current region
   s3_service_name = "com.amazonaws.${data.aws_region.current.name}.s3"
 
-  # Determine if we should create the S3 endpoint
-  # Only create if automated backups are enabled AND bucket is created by this module
-  should_create_endpoint = var.enable_automated_backups && var.create_backup_bucket
+  # Determine if we should create the S3 endpoint (controlled by variable)
+  should_create_endpoint = var.enable_s3_endpoint
+
+  # Check if backup bucket exists (to restrict policy)
+  has_backup_bucket = var.enable_automated_backups
 
   # VPC ID from subnet
   vpc_id = local.should_create_endpoint ? data.aws_subnet.mysql_subnet[0].vpc_id : ""
@@ -73,9 +84,8 @@ locals {
       : [data.aws_vpc.mysql_vpc[0].main_route_table_id]
   ) : []
 
-  # Endpoint policy: Restrict to backup bucket only (if bucket exists)
-  # If bucket doesn't exist, allow all S3 access (permissive policy)
-  s3_endpoint_policy = local.should_create_endpoint ? jsonencode({
+  # Endpoint policy: Restrict to backup bucket if it exists, else allow all S3
+  s3_endpoint_policy = local.has_backup_bucket ? jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
