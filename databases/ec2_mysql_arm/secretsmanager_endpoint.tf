@@ -63,6 +63,17 @@ locals {
 #
 # Note: Uses the same security groups as the EC2 instance
 # Requirement: EC2 security group must allow outbound HTTPS (443)
+#
+# Key Difference from S3 Gateway Endpoint:
+# ========================================
+# Interface Endpoints do NOT support endpoint policies (no 'policy' parameter).
+# Access control is handled through:
+# 1. IAM policies on the EC2 instance role (already configured in ec2_iam_role.tf)
+# 2. Security groups (network-level control)
+# 3. Private DNS (automatic routing to the endpoint)
+#
+# Gateway Endpoints (S3, DynamoDB) DO support endpoint policies to restrict
+# which resources can be accessed via the endpoint (see s3_bucket_endpoint.tf).
 ################################################################################
 
 resource "aws_vpc_endpoint" "secretsmanager" {
