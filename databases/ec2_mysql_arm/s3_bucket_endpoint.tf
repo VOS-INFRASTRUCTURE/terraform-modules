@@ -73,8 +73,9 @@ locals {
       : [data.aws_vpc.mysql_vpc[0].main_route_table_id]
   ) : []
 
-  # Endpoint policy: Restrict to backup bucket only
-  s3_endpoint_policy = jsonencode({
+  # Endpoint policy: Restrict to backup bucket only (if bucket exists)
+  # If bucket doesn't exist, allow all S3 access (permissive policy)
+  s3_endpoint_policy = local.should_create_endpoint ? jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
@@ -90,6 +91,17 @@ locals {
           aws_s3_bucket.mysql_backups[0].arn,
           "${aws_s3_bucket.mysql_backups[0].arn}/*"
         ]
+      }
+    ]
+  }) : jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowAllS3"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "*"
+        Resource  = "*"
       }
     ]
   })
