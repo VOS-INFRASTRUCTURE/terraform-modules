@@ -1,0 +1,118 @@
+################################################################################
+# Secrets Manager VPC Interface Endpoint for Private Access
+#
+# Purpose: Allows EC2 instances in private subnets to access AWS Secrets Manager
+#          directly without NAT Gateway or internet access.
+#
+# Use case: EC2 retrieves MySQL passwords from Secrets Manager during startup
+#
+# How it works:
+# - Interface Endpoint: Creates ENI in subnet with private DNS
+# - Traffic stays within AWS network (no internet gateway/NAT)
+# - EC2 uses private endpoint to call secretsmanager:GetSecretValue
+# - Reduces NAT Gateway costs
+# - Improves security (no public IP/internet exposure)
+#
+# Cost comparison (per month):
+# - NAT Gateway: ~$32.40 + data transfer
+# - Secrets Manager Interface Endpoint: ~$7.20 + minimal data transfer
+# - Savings: ~$25/month (if used with S3 Gateway Endpoint for backups)
+#
+# Note: This file is self-contained and discovers VPC/subnet information
+#       from the EC2 instance created in main.tf
+################################################################################
+
+################################################################################
+# Data Sources - Auto-discover network configuration from EC2 instance
+################################################################################
+
+# Get subnet details from the EC2 instance
+data "aws_subnet" "secretsmanager_subnet" {
+  count = var.enable_automated_backups && var.create_backup_bucket ? 1 : 0
+  id    = var.subnet_id
+}
+
+
+
+################################################################################
+# Locals
+################################################################################
+
+locals {
+  # Secrets Manager service name for the current region
+  secretsmanager_service_name = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
+
+  # Determine if we should create the endpoint
+  # Only create if automated backups are enabled AND bucket is created by this module
+  should_create_secretsmanager_endpoint = var.enable_automated_backups && var.create_backup_bucket
+
+  # VPC ID from subnet
+  secretsmanager_vpc_id = local.should_create_secretsmanager_endpoint ? data.aws_subnet.secretsmanager_subnet[0].vpc_id : ""
+
+  # Subnet ID where endpoint ENI will be created (same as EC2)
+  secretsmanager_subnet_ids = local.should_create_secretsmanager_endpoint ? [var.subnet_id] : []
+
+  # Security group IDs - Use same as EC2 instance
+  # Note: The EC2 security group must allow outbound HTTPS (443)
+  # This is typically already allowed with standard "allow all outbound" rules
+  secretsmanager_sg_ids = var.security_group_ids
+}
+
+################################################################################
+# Secrets Manager VPC Interface Endpoint
+#
+# Note: Uses the same security groups as the EC2 instance
+# Requirement: EC2 security group must allow outbound HTTPS (443)
+################################################################################
+
+resource "aws_vpc_endpoint" "secretsmanager" {
+  count               = local.should_create_secretsmanager_endpoint ? 1 : 0
+  vpc_id              = local.secretsmanager_vpc_id
+  service_name        = local.secretsmanager_service_name
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = local.secretsmanager_subnet_ids
+  security_group_ids  = local.secretsmanager_sg_ids
+
+  # Enable private DNS so EC2 can use standard AWS Secrets Manager endpoints
+  # Without this, you'd need to use endpoint-specific DNS names
+  private_dns_enabled = true
+
+  tags = {
+    Name        = "${var.env}-${var.project_id}-${var.base_name}-secretsmanager-endpoint"
+    Environment = var.env
+    Project     = var.project_id
+    ManagedBy   = "Terraform"
+    Purpose     = "SecretsManager-VPC-Endpoint"
+  }
+}
+
+################################################################################
+# Output
+################################################################################
+
+output "secretsmanager_endpoint" {
+  description = "Secrets Manager VPC Interface Endpoint configuration and identifiers"
+  value = {
+    # Toggle status
+    enabled = local.should_create_secretsmanager_endpoint
+
+    # Endpoint details (present only when enabled)
+    endpoint_id   = local.should_create_secretsmanager_endpoint ? aws_vpc_endpoint.secretsmanager[0].id : null
+    endpoint_arn  = local.should_create_secretsmanager_endpoint ? aws_vpc_endpoint.secretsmanager[0].arn : null
+    service_name  = local.secretsmanager_service_name
+    endpoint_type = "Interface"
+
+    # Network configuration
+    vpc_id                = local.secretsmanager_vpc_id
+    subnet_ids            = local.secretsmanager_subnet_ids
+    security_group_ids    = local.secretsmanager_sg_ids
+    private_dns_enabled   = true
+
+    # DNS names (private DNS automatically resolves secretsmanager.REGION.amazonaws.com)
+    dns_entries = local.should_create_secretsmanager_endpoint ? aws_vpc_endpoint.secretsmanager[0].dns_entry : []
+
+    # Cost estimate
+    monthly_cost_estimate = "~$7.20 USD (Interface endpoint fee) + minimal data transfer"
+  }
+}
+
