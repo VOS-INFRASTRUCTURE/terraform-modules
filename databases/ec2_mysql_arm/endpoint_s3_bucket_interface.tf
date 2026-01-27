@@ -4,17 +4,26 @@
 # Purpose: Allows EC2 instances in private subnets to access S3 directly
 #          without NAT Gateway or internet access.
 #
-# Why Interface (not Gateway):
-# - Provides private DNS (s3.region.amazonaws.com resolves to private IP)
-# - Works with AWS CLI/SDK without any configuration changes
-# - No dependency on NAT Gateway or internet access
-# - Works even when security groups block internet access
+# ⚠️ IMPORTANT AWS LIMITATION:
+# AWS requires a Gateway endpoint to exist in the VPC before you can enable
+# private DNS on an Interface endpoint. This module does NOT enable private DNS
+# by default to avoid this dependency.
 #
-# How it works:
-# - Creates ENI (network interface) in your subnet with private IP
-# - Private DNS enabled: S3 DNS names resolve to endpoint's private IP
-# - Traffic stays within AWS network (no internet gateway/NAT)
-# - Reduces NAT Gateway costs (~$25/month net savings)
+# Without private DNS enabled:
+# - Standard S3 DNS (s3.region.amazonaws.com) will NOT resolve to this endpoint
+# - You must use endpoint-specific DNS names (see output dns_entries)
+# - Example: bucket.vpce-xxxxx.s3.region.vpce.amazonaws.com
+#
+# To enable private DNS (optional):
+# 1. Create a Gateway endpoint for S3 in your VPC first
+# 2. Then set private_dns_enabled = true in the resource below
+# 3. After that, s3.region.amazonaws.com will resolve to the Interface endpoint
+#
+# Why Interface (not Gateway):
+# - Works even when security groups block internet access
+# - No dependency on NAT Gateway or route tables
+# - Provides ENI with private IP in your subnet
+# - Better for fully isolated architectures
 #
 # Cost:
 # - Interface endpoint: ~$7.20/month per AZ
@@ -25,7 +34,6 @@
 # - EC2 in private subnet WITHOUT NAT Gateway
 # - EC2 in private subnet with NAT BUT internet access is blocked
 # - Want fully isolated private architecture (zero internet exposure)
-# - Need `aws s3 ls/cp` to work without special configuration
 #
 # Note: This file is self-contained and discovers VPC/subnet information
 #       from the EC2 instance created in main.tf
@@ -86,9 +94,16 @@ resource "aws_vpc_endpoint" "s3" {
   subnet_ids          = local.subnet_ids
   security_group_ids  = local.s3_sg_ids
 
-  # CRITICAL: Private DNS must be enabled for normal CLI/SDK access
-  # This makes s3.region.amazonaws.com resolve to the endpoint's private IP
-  private_dns_enabled = true
+  # NOTE: private_dns_enabled is NOT set here (defaults to false)
+  # AWS requires a Gateway endpoint to exist before enabling private DNS on Interface endpoints
+  # Without private DNS:
+  # - You can still access S3 using the endpoint-specific DNS names
+  # - Endpoint DNS format: bucket.vpce-xxxxx.s3.region.vpce.amazonaws.com
+  # - Or create a Gateway endpoint first, then set private_dns_enabled = true
+  #
+  # To use standard S3 DNS (s3.region.amazonaws.com), you have two options:
+  # 1. Create a Gateway endpoint first, then enable private DNS here
+  # 2. Use the endpoint-specific DNS names provided in the output
 
   tags = {
     Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-endpoint"
@@ -119,10 +134,13 @@ output "s3_endpoint" {
     vpc_id                = local.vpc_id
     subnet_ids            = local.subnet_ids
     security_group_ids    = local.s3_sg_ids
-    private_dns_enabled   = true
+    private_dns_enabled   = false  # AWS requires Gateway endpoint first to enable private DNS
 
-    # DNS entries (private DNS automatically resolves s3.region.amazonaws.com)
+    # DNS entries (use these endpoint-specific DNS names to access S3)
     dns_entries = local.should_create_endpoint ? aws_vpc_endpoint.s3[0].dns_entry : []
+
+    # Usage note
+    usage_note = "Without private DNS, use endpoint-specific DNS names from dns_entries above, or create a Gateway endpoint first to enable private DNS"
 
     # Cost estimate
     monthly_cost_estimate = local.should_create_endpoint ? "~$7.20 USD (Interface endpoint fee) + FREE data transfer (same region)" : "$0 (endpoint disabled, requires NAT Gateway or public internet for S3 access)"
