@@ -86,7 +86,7 @@ locals {
 # - Creates ENI in subnet (not route table modification)
 ################################################################################
 
-resource "aws_vpc_endpoint" "s3" {
+resource "aws_vpc_endpoint" "s3_interface" {
   count               = local.should_create_endpoint ? 1 : 0
   vpc_id              = local.vpc_id
   service_name        = local.s3_service_name
@@ -105,6 +105,8 @@ resource "aws_vpc_endpoint" "s3" {
   # 1. Create a Gateway endpoint first, then enable private DNS here
   # 2. Use the endpoint-specific DNS names provided in the output
 
+  depends_on = [aws_vpc_endpoint.s3_gateway]
+
   tags = {
     Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-endpoint"
     Environment = var.env
@@ -118,15 +120,15 @@ resource "aws_vpc_endpoint" "s3" {
 # Output
 ################################################################################
 
-output "s3_endpoint" {
+output "s3_interface_endpoint" {
   description = "S3 Interface VPC Endpoint configuration and identifiers"
   value = {
     # Toggle status
     enabled = local.should_create_endpoint
 
     # Endpoint details (present only when enabled)
-    endpoint_id   = local.should_create_endpoint ? aws_vpc_endpoint.s3[0].id : null
-    endpoint_arn  = local.should_create_endpoint ? aws_vpc_endpoint.s3[0].arn : null
+    endpoint_id   = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].id : null
+    endpoint_arn  = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].arn : null
     service_name  = local.s3_service_name
     endpoint_type = "Interface"
 
@@ -137,7 +139,7 @@ output "s3_endpoint" {
     private_dns_enabled   = false  # AWS requires Gateway endpoint first to enable private DNS
 
     # DNS entries (use these endpoint-specific DNS names to access S3)
-    dns_entries = local.should_create_endpoint ? aws_vpc_endpoint.s3[0].dns_entry : []
+    dns_entries = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].dns_entry : []
 
     # Usage note
     usage_note = "Without private DNS, use endpoint-specific DNS names from dns_entries above, or create a Gateway endpoint first to enable private DNS"
