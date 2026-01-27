@@ -109,6 +109,10 @@ resource "aws_vpc_endpoint" "s3_interface" {
   # This makes s3.region.amazonaws.com resolve to the endpoint's private IP
   private_dns_enabled = true
 
+  dns_options {
+    private_dns_only_for_inbound_resolver_endpoint = false
+  }
+
   depends_on = [aws_vpc_endpoint.s3_gateway]
 
   tags = {
