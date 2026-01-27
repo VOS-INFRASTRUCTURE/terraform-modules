@@ -216,7 +216,7 @@ mysqldump \
   --events \
   | gzip > $BACKUP_FILE
 
-aws s3 cp $BACKUP_FILE s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/$TODAY/$TIME-all-databases.sql.gz
+aws s3 cp $BACKUP_FILE s3://${local.backup_bucket_name}/$TODAY/$TIME-all-databases.sql.gz
 rm -f $BACKUP_FILE
 echo "Backup completed at $(date)"
 BACKUPSCRIPT
