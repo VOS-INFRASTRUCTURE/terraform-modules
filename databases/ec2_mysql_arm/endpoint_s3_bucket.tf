@@ -53,7 +53,7 @@ locals {
   should_create_endpoint = var.enable_s3_endpoint
 
   # VPC ID from subnet
-  vpc_id = local.should_create_endpoint ? data.aws_subnet.mysql_subnet[0].vpc_id : ""
+  vpc_id = local.should_create_endpoint ? data.aws_subnet.mysql_subnet.vpc_id : ""
 
   # Subnet IDs where endpoint ENI will be created (same as EC2)
   subnet_ids = local.should_create_endpoint ? [var.subnet_id] : []

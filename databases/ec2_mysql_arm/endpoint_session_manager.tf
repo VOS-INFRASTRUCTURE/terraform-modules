@@ -88,7 +88,7 @@ locals {
   ec2messages_service_name = "com.amazonaws.${data.aws_region.current.name}.ec2messages"
 
   # VPC ID from subnet
-  ssm_vpc_id = var.enable_session_manager_endpoints ? data.aws_subnet.mysql_subnet[0].vpc_id : ""
+  ssm_vpc_id = var.enable_session_manager_endpoints ? data.aws_subnet.mysql_subnet.vpc_id : ""
 
   # Subnet ID where endpoint ENI will be created (same as EC2)
   ssm_subnet_ids = var.enable_session_manager_endpoints ? [var.subnet_id] : []
@@ -99,7 +99,7 @@ locals {
   ssm_sg_ids =  [aws_security_group.ssm_endpoints_sg[0].id]  # use the new SG
 
   # VPC CIDR block for egress rule in SSM endpoints SG
-  vpc_cidr_block = data.aws_vpc.mysql_vpc[0].cidr_block
+  vpc_cidr_block = data.aws_vpc.mysql_vpc.cidr_block
 
 }
 

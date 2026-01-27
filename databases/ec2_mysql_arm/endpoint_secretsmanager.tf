@@ -42,7 +42,7 @@ locals {
   secretsmanager_service_name = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
 
   # VPC ID from subnet
-  secretsmanager_vpc_id = var.enable_secretsmanager_endpoint ? data.aws_subnet.mysql_subnet[0].vpc_id : ""
+  secretsmanager_vpc_id = var.enable_secretsmanager_endpoint ? data.aws_subnet.mysql_subnet.vpc_id : ""
 
   # Subnet ID where endpoint ENI will be created (same as EC2)
   secretsmanager_subnet_ids = var.enable_secretsmanager_endpoint ? [var.subnet_id] : []
