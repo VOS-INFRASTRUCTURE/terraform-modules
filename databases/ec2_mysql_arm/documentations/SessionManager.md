@@ -574,3 +574,14 @@ aws ec2 describe-instances --instance-ids i-xxx --query 'Reservations[].Instance
 
 **Last Updated:** January 2026
 
+
+
+-- Endpoint required if no 0.0.0.0/0 rule in security group
+Your EC2
+|
+| HTTPS 443
+|
+[ssm endpoint] -------- registration
+[ec2messages endpoint] - control
+[ssmmessages endpoint] - shell data
+
