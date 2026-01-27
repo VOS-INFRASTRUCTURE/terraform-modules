@@ -7,7 +7,7 @@
 ################################################################################
 
 resource "aws_security_group" "endpoints_sg" {
-  name        = "${var.env}-${var.project_id}-endpoints-sg"
+  name        = "${var.env}-${var.project_id}-pg-endpoints-sg"
   description = "Security group for Internal Private endpoints"
   vpc_id      = data.aws_subnet.pgsql_subnet.vpc_id
 
