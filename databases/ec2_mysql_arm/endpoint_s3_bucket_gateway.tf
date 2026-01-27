@@ -88,7 +88,7 @@ resource "aws_vpc_endpoint" "s3_gateway" {
   private_dns_enabled   = false
 
   tags = {
-    Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-endpoint"
+    Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-gateway-endpoint"
     Environment = var.env
     Project     = var.project_id
     ManagedBy   = "Terraform"

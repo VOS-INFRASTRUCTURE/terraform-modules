@@ -108,7 +108,7 @@ resource "aws_vpc_endpoint" "s3_interface" {
   depends_on = [aws_vpc_endpoint.s3_gateway]
 
   tags = {
-    Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-endpoint"
+    Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-interface-endpoint"
     Environment = var.env
     Project     = var.project_id
     ManagedBy   = "Terraform"
