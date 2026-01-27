@@ -60,7 +60,7 @@ locals {
   # Security group IDs - Use same as EC2 instance
   # Note: The EC2 security group must allow outbound HTTPS (443)
   # This is typically already allowed with standard "allow all outbound" rules
-  secretsmanager_sg_ids = var.security_group_ids
+  secretsmanager_sg_ids = [aws_security_group.ssm_endpoints_sg[0].id]
 }
 
 ################################################################################
@@ -81,6 +81,8 @@ locals {
 # which resources can be accessed via the endpoint (see s3_bucket_endpoint.tf).
 ################################################################################
 resource "aws_security_group" "secretsmanager_sg" {
+  count       = var.enable_secretsmanager_endpoint ? 1 : 0
+
   name        = "${var.env}-${var.project_id}-secretsmanager-sg"
   description = "SG for Secrets Manager VPC endpoint"
   vpc_id      = local.ssm_vpc_id
