@@ -5,14 +5,12 @@
 
 # Get subnet details from the EC2 instance
 data "aws_subnet" "mysql_subnet" {
-  count = var.enable_s3_endpoint ? 1 : 0
   id    = var.subnet_id
 }
 
 # Get VPC details to find main route table
 data "aws_vpc" "mysql_vpc" {
-  count = var.enable_s3_endpoint ? 1 : 0
-  id    = data.aws_subnet.mysql_subnet[0].vpc_id
+  id    = data.aws_subnet.mysql_subnet.vpc_id
 }
 #
 # # Get all route tables in the VPC
