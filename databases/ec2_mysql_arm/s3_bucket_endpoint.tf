@@ -130,7 +130,7 @@ resource "aws_vpc_endpoint" "s3" {
   route_table_ids     = local.route_table_ids
   policy              = local.s3_endpoint_policy
 
-  private_dns_enabled   = true
+  private_dns_enabled   = false
 
   tags = {
     Name        = "${var.env}-${var.project_id}-${var.base_name}-s3-endpoint"
