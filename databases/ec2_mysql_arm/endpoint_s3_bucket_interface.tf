@@ -105,6 +105,10 @@ resource "aws_vpc_endpoint" "s3_interface" {
   # 1. Create a Gateway endpoint first, then enable private DNS here
   # 2. Use the endpoint-specific DNS names provided in the output
 
+  # CRITICAL: Private DNS must be enabled for normal CLI/SDK access
+  # This makes s3.region.amazonaws.com resolve to the endpoint's private IP
+  private_dns_enabled = true
+
   depends_on = [aws_vpc_endpoint.s3_gateway]
 
   tags = {
@@ -136,7 +140,7 @@ output "s3_interface_endpoint" {
     vpc_id                = local.vpc_id
     subnet_ids            = local.subnet_ids
     security_group_ids    = local.s3_sg_ids
-    private_dns_enabled   = false  # AWS requires Gateway endpoint first to enable private DNS
+    private_dns_enabled   = true  # AWS requires Gateway endpoint first to enable private DNS
 
     # DNS entries (use these endpoint-specific DNS names to access S3)
     dns_entries = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].dns_entry : []
