@@ -47,6 +47,49 @@ data "aws_subnet" "ssm_subnet" {
   id    = var.subnet_id
 }
 
+
+
+
+################################################################################
+# Security Group for SSM VPC Interface Endpoints
+# - Separate from EC2 SG
+# - Inbound: allow HTTPS (443) from EC2 instances
+# - Egress: restricted (VPC CIDR) for security
+################################################################################
+
+resource "aws_security_group" "ssm_endpoints_sg" {
+  count       = var.enable_session_manager_endpoints ? 1 : 0
+
+  name        = "${var.env}-${var.project_id}-ssm-endpoints-sg"
+  description = "Security group for Session Manager VPC endpoints"
+  vpc_id      = local.ssm_vpc_id
+
+  # Allow inbound HTTPS from EC2 SG (all EC2 instances that need Session Manager)
+  ingress {
+    description                = "Allow HTTPS from EC2 instances for SSM"
+    from_port                  = 443
+    to_port                    = 443
+    protocol                   = "tcp"
+    security_groups            = var.security_group_ids # EC2 SGs
+  }
+
+  # Egress: restrict to VPC CIDR (stateful SG allows return traffic)
+  egress {
+    description = "Allow return traffic within VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [local.vpc_cidr_block] # only allow within VPC
+  }
+
+  tags = {
+    Name        = "${var.env}-${var.project_id}-ssm-endpoints-sg"
+    Environment = var.env
+    Project     = var.project_id
+  }
+}
+
+
 ################################################################################
 # Locals
 ################################################################################
@@ -66,7 +109,11 @@ locals {
   # Security group IDs - Use same as EC2 instance
   # Note: The EC2 security group must allow outbound HTTPS (443)
   # This is typically already allowed with standard "allow all outbound" rules
-  ssm_sg_ids = var.security_group_ids
+  ssm_sg_ids =  [aws_security_group.ssm_endpoints_sg[0].id]  # use the new SG
+
+  # VPC CIDR block for egress rule in SSM endpoints SG
+  vpc_cidr_block = data.aws_vpc.mysql_vpc[0].cidr_block
+
 }
 
 ################################################################################
