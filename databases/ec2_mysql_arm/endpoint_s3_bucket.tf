@@ -42,17 +42,6 @@ variable "enable_s3_endpoint" {
 }
 
 ################################################################################
-# Data Sources - Auto-discover network configuration from EC2 instance
-################################################################################
-
-# Get subnet details from the EC2 instance
-data "aws_subnet" "mysql_subnet" {
-  count = var.enable_s3_endpoint ? 1 : 0
-  id    = var.subnet_id
-}
-
-
-################################################################################
 # Locals
 ################################################################################
 

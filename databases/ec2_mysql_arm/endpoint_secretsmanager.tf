@@ -32,16 +32,6 @@ variable "enable_secretsmanager_endpoint" {
   default     = false
 }
 
-################################################################################
-# Data Sources - Auto-discover network configuration from EC2 instance
-################################################################################
-
-# Get subnet details from the EC2 instance
-data "aws_subnet" "secretsmanager_subnet" {
-  count = var.enable_secretsmanager_endpoint ? 1 : 0
-  id    = var.subnet_id
-}
-
 
 ################################################################################
 # Locals
@@ -52,7 +42,7 @@ locals {
   secretsmanager_service_name = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
 
   # VPC ID from subnet
-  secretsmanager_vpc_id = var.enable_secretsmanager_endpoint ? data.aws_subnet.secretsmanager_subnet[0].vpc_id : ""
+  secretsmanager_vpc_id = var.enable_secretsmanager_endpoint ? data.aws_subnet.mysql_subnet[0].vpc_id : ""
 
   # Subnet ID where endpoint ENI will be created (same as EC2)
   secretsmanager_subnet_ids = var.enable_secretsmanager_endpoint ? [var.subnet_id] : []

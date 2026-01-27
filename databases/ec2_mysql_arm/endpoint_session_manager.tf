@@ -38,19 +38,6 @@ variable "enable_session_manager_endpoints" {
 }
 
 ################################################################################
-# Data Sources - Auto-discover network configuration from EC2 instance
-################################################################################
-
-# Get subnet details from the EC2 instance
-data "aws_subnet" "ssm_subnet" {
-  count = var.enable_session_manager_endpoints ? 1 : 0
-  id    = var.subnet_id
-}
-
-
-
-
-################################################################################
 # Security Group for SSM VPC Interface Endpoints
 # - Separate from EC2 SG
 # - Inbound: allow HTTPS (443) from EC2 instances
@@ -101,7 +88,7 @@ locals {
   ec2messages_service_name = "com.amazonaws.${data.aws_region.current.name}.ec2messages"
 
   # VPC ID from subnet
-  ssm_vpc_id = var.enable_session_manager_endpoints ? data.aws_subnet.ssm_subnet[0].vpc_id : ""
+  ssm_vpc_id = var.enable_session_manager_endpoints ? data.aws_subnet.mysql_subnet[0].vpc_id : ""
 
   # Subnet ID where endpoint ENI will be created (same as EC2)
   ssm_subnet_ids = var.enable_session_manager_endpoints ? [var.subnet_id] : []
