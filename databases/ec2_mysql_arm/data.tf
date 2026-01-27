@@ -15,8 +15,7 @@ data "aws_vpc" "mysql_vpc" {
 
 # Get all route tables in the VPC
 data "aws_route_tables" "vpc_route_tables" {
-  count  = var.enable_s3_endpoint ? 1 : 0
-  vpc_id = data.aws_subnet.mysql_subnet[0].vpc_id
+  vpc_id = data.aws_subnet.mysql_subnet.vpc_id
 
   # Filter for route tables associated with our subnet
   filter {

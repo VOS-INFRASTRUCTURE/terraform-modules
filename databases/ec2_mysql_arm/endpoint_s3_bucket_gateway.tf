@@ -34,9 +34,9 @@ locals {
   # Route table IDs to associate with the endpoint
   # Use discovered route tables, or fall back to main route table if subnet has no explicit association
   route_table_ids = local.should_create_endpoint ? (
-    length(data.aws_route_tables.vpc_route_tables[0].ids) > 0
-      ? data.aws_route_tables.vpc_route_tables[0].ids
-      : [data.aws_vpc.mysql_vpc[0].main_route_table_id]
+    length(data.aws_route_tables.vpc_route_tables.ids) > 0
+      ? data.aws_route_tables.vpc_route_tables.ids
+      : [data.aws_vpc.mysql_vpc.main_route_table_id]
   ) : []
 
   # Endpoint policy: Restrict to backup bucket if it exists, else allow all S3
