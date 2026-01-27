@@ -44,6 +44,9 @@ variable "security_group_ids" {
   type        = list(string)
 }
 
+################################################################################
+# Access Configuration
+################################################################################
 variable "key_name" {
   description = "SSH key pair name (optional, Session Manager recommended)"
   type        = string
@@ -54,6 +57,12 @@ variable "enable_ssh_key_access" {
   description = "Enable SSH key access (false = Session Manager only, recommended for security)"
   type        = bool
   default     = false
+}
+
+variable "enable_ssm_access" {
+  description = "Enable Systems Manager Session Manager for SSH-less access"
+  type        = bool
+  default     = true
 }
 
 ################################################################################
@@ -82,11 +91,11 @@ variable "enable_ebs_encryption" {
 # PostgreSQL Configuration
 ################################################################################
 
-variable "pgsql_version" {
-  description = "PostgreSQL version to install"
-  type        = string
-  default     = "15"
-}
+# variable "pgsql_version" {
+#   description = "PostgreSQL version to install"
+#   type        = string
+#   default     = "15"
+# }
 
 variable "pgsql_database" {
   description = "Name of the default PostgreSQL database to create"
@@ -248,19 +257,19 @@ variable "enable_termination_protection" {
   default     = false
 }
 
-################################################################################
-# Network Configuration
-################################################################################
-
-variable "network_config" {
-  description = "Network configuration including region and VPC details"
-  type = object({
-    region = string
-  })
-  default = {
-    region = "us-east-1"
-  }
-}
+# ################################################################################
+# # Network Configuration
+# ################################################################################
+#
+# variable "network_config" {
+#   description = "Network configuration including region and VPC details"
+#   type = object({
+#     region = string
+#   })
+#   default = {
+#     region = "us-east-1"
+#   }
+# }
 
 ################################################################################
 # Tags

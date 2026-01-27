@@ -52,6 +52,13 @@ resource "aws_iam_instance_profile" "pgsql_ec2" {
   )
 }
 
+# Attach Systems Manager policy for SSH-less access
+resource "aws_iam_role_policy_attachment" "ssm_policy" {
+  count      = var.enable_ssm_access ? 1 : 0
+  role       = aws_iam_role.pgsql_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 ################################################################################
 # Policy: Secrets Manager Access
 ################################################################################
@@ -94,9 +101,9 @@ resource "aws_iam_role_policy" "pgsql_s3_backup" {
         Effect = "Allow"
         Action = [
           "s3:PutObject",
-          "s3:PutObjectAcl",
           "s3:GetObject",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          # "s3:PutObjectAcl",
         ]
         Resource = [
           var.create_backup_bucket ? aws_s3_bucket.backup[0].arn : "arn:aws:s3:::${var.backup_s3_bucket_name}",

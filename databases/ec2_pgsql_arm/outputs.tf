@@ -33,17 +33,6 @@ output "pgsql" {
       django_dsn   = "postgres://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
     }
 
-    # Secrets Manager references
-    secrets = {
-      postgres_password_secret_arn = aws_secretsmanager_secret.pgsql_postgres_password.arn
-      postgres_password_secret_id  = aws_secretsmanager_secret.pgsql_postgres_password.id
-      user_password_secret_arn     = aws_secretsmanager_secret.pgsql_user_password.arn
-      user_password_secret_id      = aws_secretsmanager_secret.pgsql_user_password.id
-
-      # Command to retrieve passwords
-      get_postgres_password_cmd = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.id} --query SecretString --output text"
-      get_user_password_cmd     = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.id} --query SecretString --output text"
-    }
 
     # Backup configuration
     backups = var.enable_automated_backups ? {
@@ -83,13 +72,33 @@ output "connect_via_session_manager" {
   value       = "aws ssm start-session --target ${aws_instance.pgsql_ec2.id}"
 }
 
-output "postgres_password_retrieval" {
-  description = "Command to retrieve postgres password from Secrets Manager"
-  value       = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.id} --query SecretString --output text"
-}
+# Separate sensitive output for passwords (requires explicit query)
+output "pgsql_passwords" {
+  description = <<-EOT
+    Security Note: Passwords are stored in AWS Secrets Manager.
+    Retrieve them programmatically using the AWS CLI or SDK.
+  EOT
+  value = {
+    pgsql_postgres = local.generate_passwords ? random_password.pgsql_postgres[0].result : var.pgsql_postgres_password
+    pgsql_user = local.generate_passwords ? random_password.pgsql_user[0].result : var.pgsql_password
 
-output "user_password_retrieval" {
-  description = "Command to retrieve user password from Secrets Manager"
-  value       = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.id} --query SecretString --output text"
+    # Alternative: Retrieve from Secrets Manager (recommended)
+    retrieve_pgsql_postgres = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} --query SecretString --output text"
+    retrieve_pgsql_user = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.name} --query SecretString --output text"
+
+    # Secrets Manager references
+    secrets = {
+      postgres_password_secret_arn = aws_secretsmanager_secret.pgsql_postgres_password.arn
+      postgres_password_secret_id  = aws_secretsmanager_secret.pgsql_postgres_password.id
+      user_password_secret_arn     = aws_secretsmanager_secret.pgsql_user_password.arn
+      user_password_secret_id      = aws_secretsmanager_secret.pgsql_user_password.id
+
+      # Command to retrieve passwords
+      get_postgres_password_cmd = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.id} --query SecretString --output text"
+      get_user_password_cmd     = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.id} --query SecretString --output text"
+    }
+
+  }
+  sensitive = true
 }
 
