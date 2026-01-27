@@ -50,7 +50,7 @@ locals {
   # Security group IDs - Use same as EC2 instance
   # Note: The EC2 security group must allow outbound HTTPS (443)
   # This is typically already allowed with standard "allow all outbound" rules
-  secretsmanager_sg_ids = [aws_security_group.ssm_endpoints_sg[0].id]
+  secretsmanager_sg_ids = [aws_security_group.endpoints_sg.id]
 }
 
 ################################################################################
@@ -70,31 +70,6 @@ locals {
 # Gateway Endpoints (S3, DynamoDB) DO support endpoint policies to restrict
 # which resources can be accessed via the endpoint (see s3_bucket_endpoint.tf).
 ################################################################################
-resource "aws_security_group" "secretsmanager_sg" {
-  count       = var.enable_secretsmanager_endpoint ? 1 : 0
-
-  name        = "${var.env}-${var.project_id}-secretsmanager-sg"
-  description = "SG for Secrets Manager VPC endpoint"
-  vpc_id      = local.ssm_vpc_id
-
-  # Inbound HTTPS from EC2
-  ingress {
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups            = var.security_group_ids # EC2 SGs
-    description     = "Allow EC2 instances to access Secrets Manager"
-  }
-
-  # Egress: within VPC (stateful return traffic)
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [local.vpc_cidr_block] # only allow within VPC
-  }
-}
-
 
 resource "aws_vpc_endpoint" "secretsmanager" {
   count               = var.enable_secretsmanager_endpoint ? 1 : 0

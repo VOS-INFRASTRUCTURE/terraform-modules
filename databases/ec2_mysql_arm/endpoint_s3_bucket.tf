@@ -61,7 +61,7 @@ locals {
   # Security group IDs - Use same as EC2 instance
   # Note: The EC2 security group must allow outbound HTTPS (443)
   # This is typically already allowed with standard "allow all outbound" rules
-  s3_sg_ids = [aws_security_group.ssm_endpoints_sg[0].id]
+  s3_sg_ids = [aws_security_group.endpoints_sg.id]
 }
 
 
