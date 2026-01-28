@@ -8,10 +8,10 @@ data "aws_subnet" "pgsql_subnet" {
   id    = var.subnet_id
 }
 
-# Get VPC details to find main route table
-data "aws_vpc" "pgsql_vpc" {
-  id    = data.aws_subnet.pgsql_subnet.vpc_id
-}
+# # Get VPC details to find main route table
+# data "aws_vpc" "pgsql_vpc" {
+#   id    = data.aws_subnet.pgsql_subnet.vpc_id
+# }
 
 # # Get all route tables in the VPC
 # data "aws_route_tables" "vpc_route_tables" {

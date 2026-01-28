@@ -38,6 +38,7 @@ output "pgsql" {
     backups = var.enable_automated_backups ? {
       enabled         = true
       s3_bucket       = local.backup_bucket_name
+      s3_bucket_arn       = local.backup_bucket_arn
       schedule        = var.backup_schedule
       retention_days  = var.backup_retention_days
       backup_path     = "s3://${local.backup_bucket_name}/pgsql-backups/${var.env}/${var.project_id}/"
