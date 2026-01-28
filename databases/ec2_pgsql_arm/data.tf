@@ -13,13 +13,13 @@ data "aws_vpc" "pgsql_vpc" {
   id    = data.aws_subnet.pgsql_subnet.vpc_id
 }
 
-# Get all route tables in the VPC
-data "aws_route_tables" "vpc_route_tables" {
-  vpc_id = data.aws_subnet.pgsql_subnet.vpc_id
-
-  # Filter for route tables associated with our subnet
-  filter {
-    name   = "association.subnet-id"
-    values = [var.subnet_id]
-  }
-}
+# # Get all route tables in the VPC
+# data "aws_route_tables" "vpc_route_tables" {
+#   vpc_id = data.aws_subnet.pgsql_subnet.vpc_id
+#
+#   # Filter for route tables associated with our subnet
+#   filter {
+#     name   = "association.subnet-id"
+#     values = [var.subnet_id]
+#   }
+# }

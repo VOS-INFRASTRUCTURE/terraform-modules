@@ -25,6 +25,7 @@
 locals {
   # Return created bucket name or provided bucket name
   backup_bucket_name = var.enable_automated_backups ? "${var.env}-${var.project_id}-${var.base_name}-mysql-backups" : ""
+  backup_bucket_arn = var.enable_automated_backups ? aws_s3_bucket.mysql_backups[0].arn : ""
 }
 
 resource "aws_s3_bucket" "mysql_backups" {
