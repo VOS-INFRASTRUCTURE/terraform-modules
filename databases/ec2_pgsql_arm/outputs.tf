@@ -46,7 +46,15 @@ output "pgsql" {
       cross_region_dr = var.enable_cross_region_snapshot_copy
       dr_region       = var.enable_cross_region_snapshot_copy ? var.snapshot_dr_region : null
     } : {
-      enabled = false
+      enabled = false,
+      s3_bucket = null,
+        s3_bucket_arn = null,
+        schedule = null,
+        retention_days = null,
+        backup_path = null,
+        ebs_snapshots = null,
+        cross_region_dr = null,
+        dr_region = null
     }
 
     # CloudWatch monitoring
