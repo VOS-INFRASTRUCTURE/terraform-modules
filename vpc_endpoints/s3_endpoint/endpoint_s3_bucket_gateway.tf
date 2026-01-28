@@ -1,127 +1,124 @@
 ################################################################################
-# S3 Gateway VPC Endpoint for Private S3 Access (No NAT Gateway Required)
+# S3 GATEWAY VPC ENDPOINT
 #
-# Purpose: Allows EC2 instances in private subnets to access S3 directly
-#          without NAT Gateway or internet access.
+# Purpose: Allows resources in private subnets to access S3 directly
+#          without NAT Gateway or internet access - COMPLETELY FREE!
 #
-# How it works:
-# - VPC Gateway Endpoint adds a route to S3 in the specified route tables
-# - Traffic to S3 stays within AWS network (no internet gateway/NAT)
-# - Reduces NAT Gateway costs (~$32/month savings)
-# - Improves security (no public IP/internet exposure)
+# How Gateway Endpoint Works:
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ 1. Adds S3 prefix list route to your route tables                       │
+# │ 2. Traffic destined for S3 is routed through the Gateway endpoint       │
+# │ 3. Traffic stays within AWS network (never touches internet)            │
+# │ 4. No hourly charges, no data transfer fees                             │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
-# When to enable:
-# - EC2 in private subnet needs S3 access (backups, logs, etc.)
-# - Want to avoid NAT Gateway costs
-# - Don't need other internet access (or have NAT for that separately)
+# Gateway vs Interface Endpoint:
+# ┌──────────────────┬─────────────────┬────────────────────────┐
+# │ Feature          │ Gateway         │ Interface              │
+# ├──────────────────┼─────────────────┼────────────────────────┤
+# │ Cost             │ FREE            │ ~$7.20/month per AZ   │
+# │ Works via        │ Route tables    │ ENI in subnet          │
+# │ Endpoint policy  │ ✅ Yes          │ ❌ No                  │
+# │ Private DNS      │ ❌ No           │ ✅ Yes                 │
+# │ Security groups  │ ❌ No           │ ✅ Yes                 │
+# │ Recommended      │ ✅ Default      │ Special cases only     │
+# └──────────────────┴─────────────────┴────────────────────────┘
 #
-# Policy: Restricts endpoint to only access the MySQL backup bucket (if created)
+# When to Use Gateway Endpoint:
+# ✅ Default choice for most use cases
+# ✅ EC2 instances in private subnets
+# ✅ Lambda functions (with VPC)
+# ✅ ECS tasks
+# ✅ Want FREE S3 access without NAT
+# ✅ Need endpoint policies for security
 #
-# Note: This file is self-contained and discovers VPC/subnet information
-#       from the EC2 instance created in main.tf
+# Cost Savings:
+# - Gateway endpoint: FREE (no charges)
+# - NAT Gateway avoided: ~$32.40/month + data transfer fees
+# - Total savings: ~$32.40+/month
+#
+# Security:
+# - Endpoint policy restricts access to specific S3 buckets
+# - Traffic never leaves AWS network
+# - No public IP exposure
+# - Full CloudTrail audit trail
 ################################################################################
-
-
 ################################################################################
-# Locals
+# S3 GATEWAY VPC ENDPOINT
+#
+# Type: Gateway (NOT Interface)
+# - Adds route to S3 in route tables
+# - Completely FREE (no hourly charges)
+# - Supports endpoint policies
+# - Recommended for most use cases
 ################################################################################
-
-locals {
-
-  # Check if backup bucket exists (to restrict policy)
-  has_backup_bucket = true
-
-  # Route table IDs to associate with the endpoint
-  # Use discovered route tables, or fall back to main route table if subnet has no explicit association
-  route_table_ids = local.should_create_endpoint ? (
-    length(data.aws_route_tables.vpc_route_tables.ids) > 0
-      ? data.aws_route_tables.vpc_route_tables.ids
-      : [data.aws_vpc.target_vpc.main_route_table_id]
-  ) : []
-
-  # Endpoint policy: Restrict to backup bucket if it exists, else allow all S3
-  s3_endpoint_policy = local.has_backup_bucket ? jsonencode({
-    Version = "2012-10-17"
-    // loop through all backup buckets and create policy statements
-    Statement = [
-      {
-        Sid       = "S3AccessToBackupBucket"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:ListBucket"
-        ]
-        Resource  = [
-          aws_s3_bucket.mysql_backups[0].arn,
-          "${aws_s3_bucket.mysql_backups[0].arn}/*"
-        ]
-      }
-    ]
-  }) : jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowAllS3"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "*"
-        Resource  = "*"
-      }
-    ]
-  })
-}
-
-
-################################################################################
-# S3 Gateway VPC Endpoint
-################################################################################
-
 resource "aws_vpc_endpoint" "s3_gateway" {
-  count               = local.should_create_endpoint ? 1 : 0
-  vpc_id              = local.vpc_id
-  service_name        = local.s3_service_name
-  vpc_endpoint_type   = "Gateway"
-  route_table_ids     = local.route_table_ids
-  policy              = local.s3_endpoint_policy
-
-  private_dns_enabled   = false
-
+  count = local.create_gateway_endpoint || local.create_interface_endpoint ? 1 : 0
+  vpc_id            = data.aws_vpc.target_vpc.id
+  service_name      = local.s3_service_name
+  vpc_endpoint_type = "Gateway"
+  # Route table IDs to associate with this endpoint
+  # Traffic from these route tables to S3 will use this endpoint
+  route_table_ids = local.route_table_ids
+  # Endpoint policy: Restrict access to specific S3 buckets
+  # This prevents resources from accessing unauthorized buckets
+  # If no buckets specified, allows access to all S3 buckets
+  policy = local.s3_endpoint_policy
+  # NOTE: private_dns_enabled is not supported for Gateway endpoints
+  # Gateway endpoints work via route table modifications, not DNS
   tags = {
     Name        = "${var.env}-${var.project_id}-${data.aws_vpc.target_vpc.id}-s3-gateway-endpoint"
     Environment = var.env
     Project     = var.project_id
     ManagedBy   = "Terraform"
-    Purpose     = "S3-GatewayEndpoint-MySQL-Backups"
+    Purpose     = "S3-GatewayEndpoint"
+    Type        = "Gateway"
+    Cost        = "FREE"
   }
 }
-
 ################################################################################
-# Output
+# OUTPUT - Gateway Endpoint Information
 ################################################################################
-
 output "s3_gateway_endpoint" {
   description = "S3 Gateway VPC Endpoint configuration and identifiers"
   value = {
-    # Toggle status
-    enabled = local.should_create_endpoint
-
-    # Endpoint details (present only when enabled)
-    endpoint_id   = local.should_create_endpoint ? aws_vpc_endpoint.s3_gateway[0].id : null
-    endpoint_arn  = local.should_create_endpoint ? aws_vpc_endpoint.s3_gateway[0].arn : null
-    service_name  = local.s3_service_name
-    endpoint_type = "Gateway"
-
+    # Feature toggle status
+    enabled = local.create_gateway_endpoint
+    # Endpoint details
+    endpoint = {
+      endpoint_id   = local.create_gateway_endpoint ? aws_vpc_endpoint.s3_gateway[0].id : null
+      endpoint_arn  = local.create_gateway_endpoint ? aws_vpc_endpoint.s3_gateway[0].arn : null
+      service_name  = local.s3_service_name
+      endpoint_type = "Gateway"
+      state         = local.create_gateway_endpoint ? aws_vpc_endpoint.s3_gateway[0].state : null
+    }
     # Network configuration
-    vpc_id                  = local.vpc_id
-    associated_route_tables = local.route_table_ids
-
+    network = {
+      vpc_id                  = data.aws_vpc.target_vpc.id
+      associated_route_tables = local.route_table_ids
+    }
     # Policy configuration
-    policy_scope      = "RestrictedToBackupBucket"
-    backup_bucket_arn = local.should_create_endpoint ? aws_s3_bucket.mysql_backups[0].arn : null
-
-    # Cost estimate
-    monthly_cost_estimate = "FREE (Gateway endpoint has no hourly charge, and data transfer between EC2 and S3 in same region is FREE)"
+    policy = {
+      restricted_buckets = var.s3_bucket_arns
+      policy_type        = length(var.s3_bucket_arns) > 0 ? "Restricted to specific buckets" : "Allow all S3 buckets"
+    }
+    # Cost information
+    cost = {
+      monthly_estimate  = "FREE (Gateway endpoint has no hourly charge)"
+      data_transfer     = "FREE (S3 data transfer in same region is FREE)"
+      nat_gateway_saved = "~$32.40/month + $0.045/GB data transfer"
+      total_savings     = "~$32.40+/month"
+    }
+    # Usage instructions
+    usage = {
+      aws_cli_example    = "aws s3 ls s3://your-bucket/ --region ${data.aws_region.current.name}"
+      python_example     = "boto3.client('s3').list_objects_v2(Bucket='your-bucket')"
+      terraform_example  = "aws_s3_bucket.example.id"
+      requirements       = [
+        "Resource must be in VPC with route table associated to this endpoint",
+        "IAM role/user must have s3:* permissions for target buckets",
+        "Bucket must be in same region or policy allows cross-region access"
+      ]
+    }
   }
 }

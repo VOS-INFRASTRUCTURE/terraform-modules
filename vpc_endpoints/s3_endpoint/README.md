@@ -1,49 +1,84 @@
-# AWS Session Manager VPC Endpoints Module
-
-Production-ready Terraform module for creating AWS Systems Manager Session Manager VPC Interface Endpoints. Enables SSH-less access to EC2 instances in private subnets **without requiring NAT Gateway or Internet Gateway**.
-
+# AWS S3 VPC Endpoints Module
+Production-ready Terraform module for creating AWS S3 VPC Endpoints. Provides two endpoint types (Gateway and Interface) for private S3 access from EC2, Lambda, and ECS in private subnets **without requiring NAT Gateway or Internet Gateway**.
 ## 🎯 Overview
-
-This module creates the three mandatory VPC Interface Endpoints required for AWS Session Manager to work in private subnets:
-
-1. **com.amazonaws.{region}.ssm** - Systems Manager API
-2. **com.amazonaws.{region}.ssmmessages** - Session Manager messaging
-3. **com.amazonaws.{region}.ec2messages** - EC2 instance communication
-
-### Why Use This Module?
-
-| Feature | Benefit |
-|---------|---------|
-| ✅ **No SSH Keys** | Eliminates SSH key management and rotation |
-| ✅ **No NAT Gateway** | Saves ~$10/month compared to NAT Gateway |
-| ✅ **No Public IPs** | EC2 instances stay fully private |
-| ✅ **No Open Ports** | No need for port 22 (SSH) in security groups |
-| ✅ **Audit Trail** | All access logged in CloudTrail |
-| ✅ **IAM-Based Access** | Fine-grained access control via IAM policies |
-| ✅ **No Internet Access** | All traffic stays within AWS network |
-
+This module creates S3 VPC endpoints allowing your applications to access S3 buckets privately without internet access.
+### Two Endpoint Types
+| Feature | Gateway Endpoint | Interface Endpoint |
+|---------|------------------|---------------------|
+| **Cost** | **FREE** | ~$7.20/month per AZ |
+| **Works via** | Route table modifications | ENI in subnet |
+| **Private DNS** | ❌ No | ✅ Yes |
+| **Security Groups** | ❌ No | ✅ Yes |
+| **Endpoint Policy** | ✅ Yes | ❌ No |
+| **Recommended** | ✅ Default choice | Special cases only |
+### Which Should You Use?
+**Use Gateway Endpoint (FREE):**
+- ✅ Default choice for 99% of use cases
+- ✅ EC2, Lambda, ECS in private subnets
+- ✅ Want FREE S3 access without NAT
+- ✅ Need endpoint policies for security
+**Use Interface Endpoint ($7.20/month):**
+- Only when Gateway doesn't work
+- Need private DNS (s3.region.amazonaws.com)
+- Security requires ENI with security groups
+- Fully isolated subnet (zero internet)
 ## 💰 Cost Comparison
-
 ### Monthly Cost Breakdown
-
 | Solution | Base Cost | Data Transfer | Total Est. |
 |----------|-----------|---------------|------------|
 | **NAT Gateway** | $32.40 | $0.045/GB | ~$35-50/month |
-| **Session Manager Endpoints** (this module) | $21.60 | $0.01/GB | ~$22-25/month |
-| **Savings** | -$10.80 | ~70% cheaper | **~$10-25/month** |
-
-> **Note:** Costs are for single AZ deployment. Multi-AZ deployments multiply endpoint costs by number of AZs.
-
+| **Gateway Endpoint** (this module) | **FREE** | **FREE (same region)** | **$0** |
+| **Interface Endpoint** (1 AZ) | $7.20 | FREE (same region) | ~$8/month |
+| **Savings (Gateway)** | -$32.40 | -100% | **~$32-50/month** |
+| **Savings (Interface)** | -$25.20 | ~78% cheaper | **~$25-40/month** |
 ### Cost Formula
 ```
-Interface Endpoint Cost = $0.01/hour × 24 hours × 30 days = $7.20/month per endpoint
-Total Cost = 3 endpoints × $7.20 = $21.60/month (single AZ)
+Gateway Endpoint = FREE (no hourly charge, no data transfer fees)
+Interface Endpoint = $0.01/hour × 24 hours × 30 days = $7.20/month per AZ
+S3 data transfer (same region) = FREE for both endpoint types
 ```
-
 ## 🏗️ Architecture
-
-### Network Topology
-
+### Gateway Endpoint (FREE)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         AWS Region (eu-west-2)                       │
+│                                                                       │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                    VPC (10.0.0.0/16)                          │  │
+│  │                                                                │  │
+│  │  ┌────────────────────────────────────────────────────────┐  │  │
+│  │  │         Private Subnet (10.0.1.0/24)                    │  │  │
+│  │  │                                                          │  │  │
+│  │  │  ┌──────────────┐                                       │  │  │
+│  │  │  │ EC2 Instance │────┐                                  │  │  │
+│  │  │  │              │    │ aws s3 cp file.txt s3://bucket   │  │  │
+│  │  │  └──────────────┘    │                                  │  │  │
+│  │  │                      │                                  │  │  │
+│  │  └──────────────────────┼──────────────────────────────────┘  │  │
+│  │                         │                                     │  │
+│  │  ┌──────────────────────▼─────────────────────────────────┐  │  │
+│  │  │ Route Table                                             │  │  │
+│  │  │ • 10.0.0.0/16 → local                                  │  │  │
+│  │  │ • S3 prefix list → vpce-xxxxx (Gateway Endpoint)       │  │  │
+│  │  └────────────────────┬───────────────────────────────────┘  │  │
+│  │                       │                                       │  │
+│  └───────────────────────┼───────────────────────────────────────┘  │
+│                          │                                           │
+│                          ▼                                           │
+│               ┌────────────────────────┐                             │
+│               │ S3 Gateway Endpoint    │                             │
+│               │ (FREE - Route based)   │                             │
+│               └────────┬───────────────┘                             │
+│                        │                                             │
+└────────────────────────┼─────────────────────────────────────────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │ Amazon S3 Service   │
+              │  (Managed by AWS)   │
+              └─────────────────────┘
+```
+### Interface Endpoint ($7.20/month)
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         AWS Region (eu-west-2)                       │
@@ -56,465 +91,358 @@ Total Cost = 3 endpoints × $7.20 = $21.60/month (single AZ)
 │  │  │                                                          │  │  │
 │  │  │  ┌──────────────┐         ┌──────────────────────────┐ │  │  │
 │  │  │  │ EC2 Instance │────────▶│ VPC Endpoint ENI         │ │  │  │
-│  │  │  │ (Private IP) │  HTTPS  │ (Private IP: 10.0.1.100) │ │  │  │
+│  │  │  │              │  HTTPS  │ (Private IP: 10.0.1.100) │ │  │  │
 │  │  │  │              │   443   │                          │ │  │  │
-│  │  │  │ • SSM Agent  │         │ • ssm endpoint           │ │  │  │
-│  │  │  │ • IAM Role   │         │ • ssmmessages endpoint   │ │  │  │
-│  │  │  └──────────────┘         │ • ec2messages endpoint   │ │  │  │
-│  │  │                           └──────────────────────────┘ │  │  │
+│  │  │  │ Uploads to:  │         │ S3 Interface Endpoint    │ │  │  │
+│  │  │  │ • s3://bucket│         │ ($7.20/month)            │ │  │  │
+│  │  │  └──────────────┘         └──────────────────────────┘ │  │  │
 │  │  │                                      │                  │  │  │
 │  │  └──────────────────────────────────────┼──────────────────┘  │  │
 │  │                                         │                     │  │
 │  └─────────────────────────────────────────┼─────────────────────┘  │
 │                                            │                         │
-│                                            │                         │
-│                    ┌───────────────────────┼────────────────────┐   │
-│                    │   AWS PrivateLink Network (Internal AWS)   │   │
-│                    └───────────────────────┼────────────────────┘   │
-│                                            │                         │
 └────────────────────────────────────────────┼─────────────────────────┘
                                              │
                                              ▼
                               ┌────────────────────────────┐
-                              │ AWS Systems Manager Service │
-                              │    (Managed by AWS)         │
+                              │ Amazon S3 Service          │
+                              │    (Managed by AWS)        │
                               └────────────────────────────┘
-                                             ▲
-                                             │
-                                    ┌────────┴─────────┐
-                                    │                  │
-                              ┌─────▼─────┐      ┌────▼─────┐
-                              │ AWS CLI   │      │  AWS     │
-                              │ (User PC) │      │ Console  │
-                              └───────────┘      └──────────┘
 ```
-
-### Traffic Flow
-
-1. **User initiates connection** via AWS Console or CLI:
-   ```bash
-   aws ssm start-session --target i-0123456789abcdef0
-   ```
-
-2. **Request flows**:
-   - User → AWS API (over internet) → Session Manager Service
-   - Session Manager Service → VPC Endpoint (ssm) → EC2 Instance
-
-3. **Session established**:
-   - EC2 Instance ↔ ssmmessages endpoint (bidirectional messaging)
-   - EC2 Instance → ec2messages endpoint (status updates)
-
-4. **All traffic stays private** - no NAT, no IGW, no public IPs needed!
-
 ## 📋 Prerequisites
-
-### EC2 Instance Requirements
-
+### For Gateway Endpoint (FREE)
 | Requirement | Details |
 |-------------|---------|
-| **SSM Agent** | Pre-installed on Amazon Linux 2, Ubuntu 20.04+, Windows Server 2016+ |
-| **IAM Role** | Must have `AmazonSSMManagedInstanceCore` policy attached |
-| **Security Group** | Must allow outbound HTTPS (443) to VPC CIDR or endpoint security group |
-| **Network** | Can be in private subnet (no public IP needed) |
-
-### IAM Role for EC2 Instance
-
-```hcl
-# Attach this managed policy to your EC2 instance role
-data "aws_iam_policy" "ssm_managed_instance_core" {
-  arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_ssm" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = data.aws_iam_policy.ssm_managed_instance_core.arn
-}
-```
-
-### EC2 Security Group
-
-```hcl
-# Your EC2 security group must allow outbound HTTPS
-resource "aws_security_group" "ec2" {
-  # ... other configuration ...
-
-  egress {
-    description = "Allow outbound HTTPS for Session Manager"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"] # Your VPC CIDR
-  }
+| **IAM Permissions** | Resource needs `s3:*` permissions for target buckets |
+| **Route Tables** | VPC must have route tables (auto-detected) |
+| **Network** | Resources in subnets associated with route tables |
+### For Interface Endpoint ($7.20/month)
+| Requirement | Details |
+|-------------|---------|
+| **IAM Permissions** | Resource needs `s3:*` permissions for target buckets |
+| **Security Group** | Must allow outbound HTTPS (443) to VPC CIDR |
+| **Gateway Endpoint** | Must exist for private DNS to work |
+| **Network** | Resources in same VPC as endpoint |
+### IAM Policy Example
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::my-bucket",
+        "arn:aws:s3:::my-bucket/*"
+      ]
+    }
+  ]
 }
 ```
-
 ## 🚀 Usage
-
-### Minimal Example
-
+### Minimal Example (Gateway Endpoint - FREE)
 ```hcl
-module "session_manager_endpoints" {
-  source = "../../vpc_endpoints/session_manager_endpoint"
-
+module "s3_endpoint" {
+  source = "../../vpc_endpoints/s3_endpoint"
   # Required variables
   env        = "production"
   project_id = "myapp"
-
   # Network configuration
-  subnet_ids = ["subnet-abc123", "subnet-def456"] # Private subnets
-
-  # Security groups of EC2 instances that need Session Manager access
-  resources_security_group_ids = ["sg-ec2instance123"]
-
-  # Enable endpoints (default: false to avoid costs)
-  enable_session_manager_endpoints = true
+  subnet_ids = ["subnet-abc123", "subnet-def456"]
+  # Security groups (needed for Interface endpoint)
+  resources_security_group_ids = ["sg-ec2-instances"]
+  # S3 buckets to allow access
+  s3_bucket_arns = [
+    "arn:aws:s3:::my-backups-bucket",
+    "arn:aws:s3:::my-logs-bucket"
+  ]
+  # Enable Gateway endpoint (FREE)
+  enable_s3_gateway_endpoint = true
+  # Disable Interface endpoint (costs money)
+  enable_s3_interface_endpoint = false
 }
+# Cost: $0/month (Gateway is FREE)
 ```
-
-### Multi-Subnet High Availability
-
+### Gateway + Interface (for maximum compatibility)
 ```hcl
-module "session_manager_endpoints" {
-  source = "../../vpc_endpoints/session_manager_endpoint"
-
+module "s3_endpoint" {
+  source = "../../vpc_endpoints/s3_endpoint"
   env        = "production"
   project_id = "backend-api"
-
-  # Multiple subnets for HA (different AZs)
+  # Multiple subnets for HA
   subnet_ids = [
     "subnet-private-a", # eu-west-2a
     "subnet-private-b", # eu-west-2b
   ]
-
-  # Multiple EC2 security groups
   resources_security_group_ids = [
-    "sg-web-servers",
-    "sg-app-servers",
-    "sg-database-instances",
+    "sg-ec2-app-servers",
+    "sg-lambda-functions"
   ]
-
-  enable_session_manager_endpoints = true
+  s3_bucket_arns = [
+    "arn:aws:s3:::prod-data-bucket",
+    "arn:aws:s3:::prod-backups-bucket"
+  ]
+  # Enable both endpoints
+  enable_s3_gateway_endpoint   = true  # FREE
+  enable_s3_interface_endpoint = true  # ~$14.40/month (2 AZs)
 }
+# Cost: ~$14.40/month (Interface endpoint for 2 AZs)
+# Note: Gateway is FREE, costs come from Interface endpoint only
 ```
-
-### Cost-Optimized (Single Subnet)
-
+### Gateway Only (Recommended)
 ```hcl
-module "session_manager_endpoints" {
-  source = "../../vpc_endpoints/session_manager_endpoint"
-
+module "s3_endpoint" {
+  source = "../../vpc_endpoints/s3_endpoint"
   env        = "staging"
   project_id = "myapp"
-
-  # Single subnet for cost optimization
-  subnet_ids = ["subnet-private-a"]
-
-  resources_security_group_ids = ["sg-staging-instances"]
-
-  enable_session_manager_endpoints = true
-}
-
-# Cost: ~$21.60/month (single AZ)
-# vs Multi-AZ: ~$43.20/month (2 AZs)
-```
-
-### Disable Endpoints (Use NAT Gateway Instead)
-
-```hcl
-module "session_manager_endpoints" {
-  source = "../../vpc_endpoints/session_manager_endpoint"
-
-  env        = "dev"
-  project_id = "myapp"
-
   subnet_ids                   = ["subnet-private-a"]
-  resources_security_group_ids = ["sg-dev-instances"]
-
-  # Disabled - EC2 instances will use NAT Gateway or public internet
-  enable_session_manager_endpoints = false
+  resources_security_group_ids = ["sg-staging-instances"]
+  s3_bucket_arns = [
+    "arn:aws:s3:::staging-backups"
+  ]
+  # Gateway only (FREE)
+  enable_s3_gateway_endpoint   = true
+  enable_s3_interface_endpoint = false
 }
-
-# Cost: $0 (endpoints not created)
-# Note: Requires NAT Gateway (~$32.40/month) or IGW for Session Manager
+# Cost: $0/month (completely FREE)
+# Saves: ~$32.40/month vs NAT Gateway
 ```
-
 ## 📊 Module Inputs
-
 ### Required Variables
-
 | Variable | Type | Description |
 |----------|------|-------------|
-| `env` | `string` | Environment name (e.g., 'production', 'staging', 'dev') |
+| `env` | `string` | Environment name (e.g., 'production', 'staging') |
 | `project_id` | `string` | Project identifier for resource tagging |
-| `subnet_ids` | `list(string)` | List of subnet IDs where endpoints will be created |
-| `resources_security_group_ids` | `list(string)` | Security group IDs of EC2 instances needing access |
-
+| `subnet_ids` | `list(string)` | Subnet IDs (for Interface endpoint) |
+| `resources_security_group_ids` | `list(string)` | Security group IDs (for Interface endpoint) |
+| `s3_bucket_arns` | `list(string)` | S3 bucket ARNs to allow access |
 ### Optional Variables
-
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `enable_session_manager_endpoints` | `bool` | `false` | Enable/disable endpoint creation |
-
+| `enable_s3_gateway_endpoint` | `bool` | `true` | Enable Gateway endpoint (FREE) |
+| `enable_s3_interface_endpoint` | `bool` | `false` | Enable Interface endpoint ($7.20/month per AZ) |
 ## 📤 Module Outputs
-
-### Output Structure
-
+### Gateway Endpoint Output
 ```hcl
-output "session_manager_endpoints" {
+output "s3_gateway_endpoint" {
   value = {
     enabled = true
-
-    # Individual endpoint details
-    ssm = {
-      endpoint_id         = "vpce-0123456789abcdef0"
-      endpoint_arn        = "arn:aws:ec2:eu-west-2:..."
-      service_name        = "com.amazonaws.eu-west-2.ssm"
-      private_dns_enabled = true
-      dns_entries         = []
+    endpoint = {
+      endpoint_id   = "vpce-0123456789abcdef0"
+      endpoint_arn  = "arn:aws:ec2:eu-west-2:..."
+      service_name  = "com.amazonaws.eu-west-2.s3"
+      endpoint_type = "Gateway"
+      state         = "available"
     }
-
-    ssmmessages = {  }
-    ec2messages = {  }
-
-    # Network configuration
     network = {
-      vpc_id             = "vpc-abc123"
-      subnet_ids         = ["subnet-abc123"]
-      security_group_ids = ["sg-endpoints123"]
-      vpc_cidr_block     = "10.0.0.0/16"
+      vpc_id                  = "vpc-abc123"
+      associated_route_tables = ["rtb-xxx", "rtb-yyy"]
     }
-
-    # Cost information
     cost = {
-      monthly_estimate = "~$21.60 USD"
-      comparison       = "NAT Gateway: ~$32.40/month"
-      savings          = "~$10.80/month"
-    }
-
-    # Usage instructions
-    usage = {
-      connect_command = "aws ssm start-session --target <instance-id>"
-      requirements    = [...]
+      monthly_estimate  = "FREE"
+      nat_gateway_saved = "~$32.40/month"
     }
   }
 }
 ```
-
-### Accessing Outputs
-
+### Interface Endpoint Output
 ```hcl
-# Get endpoint IDs
-output "ssm_endpoint_id" {
-  value = module.session_manager_endpoints.session_manager_endpoints.ssm.endpoint_id
-}
-
-# Get cost estimate
-output "monthly_cost" {
-  value = module.session_manager_endpoints.session_manager_endpoints.cost.monthly_estimate
+output "s3_interface_endpoint" {
+  value = {
+    enabled = true
+    endpoint = {
+      endpoint_id         = "vpce-9876543210fedcba"
+      endpoint_arn        = "arn:aws:ec2:eu-west-2:..."
+      service_name        = "com.amazonaws.eu-west-2.s3"
+      endpoint_type       = "Interface"
+      private_dns_enabled = true
+      dns_entries         = [...]
+    }
+    network = {
+      vpc_id             = "vpc-abc123"
+      subnet_ids         = ["subnet-abc123"]
+      security_group_ids = ["sg-endpoint123"]
+    }
+    cost = {
+      monthly_estimate = "~$7.20 USD per AZ"
+      net_savings      = "~$25.20/month"
+    }
+  }
 }
 ```
-
-## 🔧 How to Connect
-
-### Method 1: AWS Console
-
-1. Go to **EC2 Console** → **Instances**
-2. Select your instance
-3. Click **Connect** → **Session Manager** tab
-4. Click **Connect**
-
-### Method 2: AWS CLI
-
+## 🔧 How to Use S3 with VPC Endpoints
+### AWS CLI
 ```bash
-# Start interactive session
-aws ssm start-session --target i-0123456789abcdef0
-
-# Run command without interactive session
-aws ssm send-command \
-  --instance-ids "i-0123456789abcdef0" \
-  --document-name "AWS-RunShellScript" \
-  --parameters 'commands=["uptime"]'
-
-# Port forwarding (access private RDS from local machine)
-aws ssm start-session \
-  --target i-0123456789abcdef0 \
-  --document-name AWS-StartPortForwardingSession \
-  --parameters '{"portNumber":["3306"],"localPortNumber":["3306"]}'
+# Upload file to S3 (works with both endpoint types)
+aws s3 cp myfile.txt s3://my-bucket/
+# List bucket contents
+aws s3 ls s3://my-bucket/
+# Sync directory
+aws s3 sync ./local-dir s3://my-bucket/backup/
+# Download file
+aws s3 cp s3://my-bucket/file.txt ./
 ```
-
-### Method 3: AWS Systems Manager Fleet Manager
-
-1. Go to **Systems Manager** → **Fleet Manager**
-2. Select your instance
-3. Click **Node actions** → **Start terminal session**
-
+### Python (Boto3)
+```python
+import boto3
+# Initialize S3 client (works automatically with VPC endpoints)
+s3 = boto3.client('s3')
+# Upload file
+s3.upload_file('local-file.txt', 'my-bucket', 'remote-file.txt')
+# Download file
+s3.download_file('my-bucket', 'remote-file.txt', 'local-file.txt')
+# List objects
+response = s3.list_objects_v2(Bucket='my-bucket')
+for obj in response['Contents']:
+    print(obj['Key'])
+```
+### Node.js
+```javascript
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
+// Upload file
+const params = {
+  Bucket: 'my-bucket',
+  Key: 'file.txt',
+  Body: fs.readFileSync('local-file.txt')
+};
+s3.upload(params, (err, data) => {
+  if (err) console.error(err);
+  else console.log('Upload successful:', data.Location);
+});
+// Download file
+s3.getObject({ Bucket: 'my-bucket', Key: 'file.txt' }, (err, data) => {
+  if (err) console.error(err);
+  else fs.writeFileSync('local-file.txt', data.Body);
+});
+```
 ## 🔍 Verification
-
-### Check Endpoint Status
-
+### Check Gateway Endpoint
 ```bash
-# Verify endpoints are created
+# Verify Gateway endpoint is created
 aws ec2 describe-vpc-endpoints \
   --filters "Name=vpc-id,Values=vpc-abc123" \
-  --query 'VpcEndpoints[?ServiceName==`com.amazonaws.eu-west-2.ssm`]'
+  --query 'VpcEndpoints[?ServiceName==`com.amazonaws.eu-west-2.s3` && VpcEndpointType==`Gateway`]'
+# Check route tables
+aws ec2 describe-route-tables \
+  --route-table-ids rtb-xxx \
+  --query 'RouteTables[].Routes'
 ```
-
-### Test from EC2 Instance
-
+### Check Interface Endpoint
 ```bash
-# Connect via Session Manager
-aws ssm start-session --target i-0123456789abcdef0
-
-# Once connected, verify private DNS resolution
-nslookup ssm.eu-west-2.amazonaws.com
-# Should resolve to private IP (10.x.x.x)
-
-# Check SSM Agent status
-sudo systemctl status amazon-ssm-agent
-
-# Verify connectivity
-curl -I https://ssm.eu-west-2.amazonaws.com
+# Verify Interface endpoint is created
+aws ec2 describe-vpc-endpoints \
+  --filters "Name=vpc-id,Values=vpc-abc123" \
+  --query 'VpcEndpoints[?ServiceName==`com.amazonaws.eu-west-2.s3` && VpcEndpointType==`Interface`]'
+# Test DNS resolution (should resolve to private IP)
+nslookup s3.eu-west-2.amazonaws.com
 ```
-
+### Test from EC2 Instance
+```bash
+# Connect to EC2 in private subnet
+aws ssm start-session --target i-0123456789abcdef0
+# Test S3 access
+aws s3 ls s3://my-bucket/
+# Verify traffic is using endpoint (check VPC flow logs)
+```
 ## 🐛 Troubleshooting
-
-### Issue: "Instance not available for Session Manager"
-
+### Issue: "Unable to connect to S3"
 **Possible causes:**
-
-1. **Missing IAM role** - EC2 must have `AmazonSSMManagedInstanceCore` policy
+1. **Gateway Endpoint - Route table issue**
    ```bash
-   # Check instance IAM role
-   aws ec2 describe-instances --instance-ids i-xxx --query 'Reservations[0].Instances[0].IamInstanceProfile'
+   # Check if route table has S3 prefix list route
+   aws ec2 describe-route-tables --route-table-ids rtb-xxx
    ```
-
-2. **SSM Agent not running**
+   **Fix:** Verify endpoint is associated with correct route tables
+2. **Interface Endpoint - Security group blocks traffic**
    ```bash
-   # Connect via AWS Console (EC2 Instance Connect or SSH if available)
-   sudo systemctl status amazon-ssm-agent
-   sudo systemctl start amazon-ssm-agent
+   # Check endpoint security group
+   aws ec2 describe-security-groups --group-ids sg-endpoint-xxx
    ```
-
-3. **Security group blocks outbound 443**
+   **Fix:** Ensure inbound 443 from resource security group
+3. **Interface Endpoint - Private DNS not working**
    ```bash
-   # Check security group rules
-   aws ec2 describe-security-groups --group-ids sg-xxx
+   # Check if Gateway endpoint exists (required for private DNS)
+   aws ec2 describe-vpc-endpoints \
+     --filters "Name=vpc-endpoint-type,Values=Gateway"
    ```
-
-4. **Endpoints not created or unhealthy**
-   ```bash
-   # Check endpoint status
-   aws ec2 describe-vpc-endpoints --vpc-endpoint-ids vpce-xxx
-   ```
-
-### Issue: "Connection timeout"
-
+   **Fix:** Create Gateway endpoint first, then Interface endpoint
+### Issue: "Access denied to S3 bucket"
 **Possible causes:**
-
-1. **Private DNS not enabled** - Must be `true` on all three endpoints
-2. **Endpoint security group blocks inbound 443** - Check `security_groups.tf`
-3. **Subnet route table incorrect** - Should NOT route to NAT/IGW for endpoint traffic
-
-### Issue: "Access denied"
-
-**Possible causes:**
-
-1. **IAM user lacks permissions**
+1. **IAM permissions missing**
    ```json
    {
      "Effect": "Allow",
-     "Action": [
-       "ssm:StartSession",
-       "ssm:TerminateSession",
-       "ssm:ResumeSession",
-       "ssm:DescribeSessions",
-       "ssm:GetConnectionStatus"
-     ],
-     "Resource": "*"
+     "Action": ["s3:*"],
+     "Resource": ["arn:aws:s3:::my-bucket/*"]
    }
    ```
-
-2. **Session Manager preferences restrict access** - Check Systems Manager → Session Manager → Preferences
-
+2. **Endpoint policy blocks bucket**
+   - Gateway endpoint: Check endpoint policy in AWS Console
+   - Interface endpoint: Use IAM policies instead (no endpoint policies)
 ### Issue: "High costs"
-
-**Solution:** Use single-subnet deployment for non-production environments
-
+**Solution:** Use Gateway endpoint only (FREE)
 ```hcl
-# Production: Multi-AZ for HA (~$43/month)
-subnet_ids = ["subnet-a", "subnet-b"]
-
-# Staging/Dev: Single AZ for cost savings (~$21/month)
-subnet_ids = ["subnet-a"]
+# Production: Gateway only (FREE)
+enable_s3_gateway_endpoint   = true
+enable_s3_interface_endpoint = false
+# Only use Interface if Gateway doesn't work
 ```
-
 ## ⚠️ Important Notes
-
 ### Critical Requirements
-
-1. **ALL THREE endpoints are mandatory** - Missing even one breaks Session Manager
-2. **Private DNS must be enabled** - Set to `true` on all endpoints
-3. **EC2 IAM role required** - Must have `AmazonSSMManagedInstanceCore` policy
-4. **Security groups must allow HTTPS (443)** - Both EC2 and endpoint security groups
-
+1. **Gateway endpoint is FREE** - Use it as default choice
+2. **Interface endpoint costs $7.20/month per AZ** - Only use when needed
+3. **Interface requires Gateway for private DNS** - Create Gateway first
+4. **Endpoint policies only work with Gateway** - Use IAM for Interface
+5. **S3 data transfer in same region is FREE** - No data transfer charges
 ### Security Best Practices
-
-- ✅ Use separate security group for endpoints (this module does this automatically)
-- ✅ Restrict endpoint egress to VPC CIDR only (not 0.0.0.0/0)
-- ✅ Use IAM policies to restrict which users can access which instances
-- ✅ Enable Session Manager logging to S3 or CloudWatch for audit trail
-- ✅ Use session document for command restrictions (prevent sudo, shell access, etc.)
-
+- ✅ Use Gateway endpoint for cost-effective security
+- ✅ Restrict bucket access via endpoint policies (Gateway only)
+- ✅ Use IAM policies to restrict S3 access
+- ✅ Enable CloudTrail logging for audit trail
+- ✅ Review bucket list periodically
+- ✅ Follow principle of least privilege
 ### Cost Optimization
-
-- Use single subnet for dev/staging environments
-- Use multi-subnet for production (HA)
-- Consider NAT Gateway if you need internet access anyway (no cost benefit from endpoints)
-- Monitor data transfer costs (usually negligible for Session Manager)
-
+- Use Gateway endpoint only (FREE) for most cases
+- Only use Interface endpoint when Gateway doesn't work
+- Single subnet deployment for dev/staging to reduce Interface endpoint costs
+- Monitor S3 access patterns and adjust endpoint configuration
 ## 📚 Additional Resources
-
-- [AWS Session Manager Documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html)
+- [AWS S3 VPC Endpoints Documentation](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html)
 - [VPC Endpoints Pricing](https://aws.amazon.com/privatelink/pricing/)
-- [Session Manager IAM Policies](https://docs.aws.amazon.com/systems-manager/latest/userguide/getting-started-create-iam-instance-profile.html)
-- [Troubleshooting Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-troubleshooting.html)
-
+- [S3 Best Practices](https://docs.aws.amazon.com/AmazonS3/latest/userguide/best-practices.html)
 ## 🔐 Security Considerations
-
 ### Network Isolation
-
 - All traffic stays within AWS network (never touches internet)
 - No NAT Gateway or Internet Gateway required
-- EC2 instances can remain in fully isolated private subnets
-
+- Resources can remain in fully isolated private subnets
 ### Access Control
-
-- IAM-based authentication (no SSH keys to manage)
-- Fine-grained permissions per user/role
-- Integration with AWS Organizations for cross-account access
-- MFA can be enforced via IAM policies
-
+**Gateway Endpoint:**
+- Endpoint policies restrict bucket access at route level
+- IAM policies control user/role permissions
+- Bucket policies provide additional layer
+**Interface Endpoint:**
+- No endpoint policies (use IAM instead)
+- Security groups control network access
+- IAM policies control user/role permissions
 ### Audit & Compliance
-
-- All sessions logged to CloudTrail
-- Optional session logging to S3 or CloudWatch
-- Session recording for compliance
+- All S3 API calls logged to CloudTrail
+- VPC flow logs show endpoint usage
+- S3 access logs track bucket access
 - Integration with AWS Config for compliance checks
-
 ## 📝 License
-
 This module is part of the internal Terraform modules library.
-
 ## 🤝 Support
-
 For issues or questions:
 1. Check the troubleshooting section above
-2. Review AWS Session Manager documentation
+2. Review AWS S3 VPC Endpoints documentation
 3. Contact DevOps team
-
 ---
-
 **Last Updated:** January 28, 2026  
 **Module Version:** 1.0.0  
 **Tested with:** Terraform 1.5+, AWS Provider 5.0+
-

@@ -1,159 +1,161 @@
 ################################################################################
-# S3 Interface VPC Endpoint for Private S3 Access (No NAT Gateway Required)
+# S3 INTERFACE VPC ENDPOINT
 #
-# Purpose: Allows EC2 instances in private subnets to access S3 directly
-#          without NAT Gateway or internet access.
+# Purpose: Provides ENI-based private S3 access for fully isolated architectures
 #
-# ⚠️ IMPORTANT AWS LIMITATION:
-# AWS requires a Gateway endpoint to exist in the VPC before you can enable
-# private DNS on an Interface endpoint. This module does NOT enable private DNS
-# by default to avoid this dependency.
+# Why Use Interface Endpoint (vs Gateway):
+# - Gateway endpoint can't be used (route table constraints)
+# - Need private DNS (s3.region.amazonaws.com)
+# - Security requires ENI with security groups
+# - Fully isolated subnet (zero internet, even for internal routes)
+#
+# Cost vs Gateway:
+# - Interface: ~$7.20/month per AZ + FREE data transfer
+# - Gateway: FREE
+# - Use Interface only when Gateway doesn't work
+#
+# How Interface Endpoint Works:
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ 1. Creates ENI (network interface) in your subnet                       │
+# │ 2. Provides private IP for S3 service                                   │
+# │ 3. Private DNS makes s3.region.amazonaws.com resolve to private IP     │
+# │ 4. Security group controls access                                       │
+# │ 5. Traffic never leaves AWS network                                     │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ⚠️ AWS LIMITATION - Private DNS Requirement:
+# AWS requires a Gateway endpoint to exist before enabling private DNS
+# on Interface endpoints. This module handles this automatically by:
+# 1. Creating Gateway endpoint (if enabled)
+# 2. Creating Interface endpoint with private DNS
+# 3. Making Interface endpoint depend on Gateway endpoint
 #
 # Without private DNS enabled:
-# - Standard S3 DNS (s3.region.amazonaws.com) will NOT resolve to this endpoint
-# - You must use endpoint-specific DNS names (see output dns_entries)
-# - Example: bucket.vpce-xxxxx.s3.region.vpce.amazonaws.com
+# - Standard S3 URLs (s3.region.amazonaws.com) won't work
+# - Must use endpoint-specific DNS (see output dns_entries)
 #
-# To enable private DNS (optional):
-# 1. Create a Gateway endpoint for S3 in your VPC first
-# 2. Then set private_dns_enabled = true in the resource below
-# 3. After that, s3.region.amazonaws.com will resolve to the Interface endpoint
+# Security Model:
+# - Dedicated security group for endpoint
+# - Allows HTTPS (443) from resource security groups
+# - Egress restricted to VPC CIDR only
+################################################################################
+################################################################################
+# S3 INTERFACE VPC ENDPOINT
 #
-# Why Interface (not Gateway):
-# - Works even when security groups block internet access
-# - No dependency on NAT Gateway or route tables
-# - Provides ENI with private IP in your subnet
-# - Better for fully isolated architectures
-#
-# Cost:
-# - Interface endpoint: ~$7.20/month per AZ
-# - NAT Gateway avoided: ~$32.40/month
-# - Net savings: ~$25/month + better security
-#
-# When to enable:
-# - EC2 in private subnet WITHOUT NAT Gateway
-# - EC2 in private subnet with NAT BUT internet access is blocked
-# - Want fully isolated private architecture (zero internet exposure)
-#
-# Note: This file is self-contained and discovers VPC/subnet information
-#       from the EC2 instance created in main.tf
+# Type: Interface (NOT Gateway)
+# - Creates ENI in your subnets
+# - Costs ~$7.20/month per AZ
+# - Provides private DNS
+# - Use when Gateway endpoint doesn't meet needs
 ################################################################################
-
-################################################################################
-# Variable - Toggle for S3 Endpoint Creation
-################################################################################
-
-variable "enable_s3_endpoint" {
-  description = "Enable S3 Interface VPC Endpoint for private S3 access without NAT Gateway (~$7.20/month but saves ~$25/month vs NAT, enables fully private architecture)"
-  type        = bool
-  default     = false
-}
-
-################################################################################
-# Locals
-################################################################################
-
-locals {
-  // Same service name just different endpoint type
-  # S3 service name for the current region
-  s3_service_name = "com.amazonaws.${data.aws_region.current.name}.s3"
-
-  # Determine if we should create the S3 endpoint (controlled by variable)
-  should_create_endpoint = var.enable_s3_endpoint
-
-  # VPC ID from subnet
-  vpc_id = local.should_create_endpoint ? data.aws_subnet.any_subnet.vpc_id : ""
-
-  # Subnet IDs where endpoint ENI will be created (same as EC2)
-  subnet_ids = local.should_create_endpoint ? local.subnet_ids : []
-
-  # Security group IDs - Use same as EC2 instance
-  # Note: The EC2 security group must allow outbound HTTPS (443)
-  # This is typically already allowed with standard "allow all outbound" rules
-  s3_sg_ids = [aws_security_group.endpoints_sg.id]
-}
-
-
-################################################################################
-# S3 Interface VPC Endpoint
-#
-# Note: Uses the same security groups as the EC2 instance
-# Requirement: EC2 security group must allow outbound HTTPS (443)
-#
-# Key Difference from Gateway Endpoint:
-# - Interface endpoints do NOT support endpoint policies
-# - Access control is handled through IAM policies on the EC2 instance role
-# - Provides private DNS (s3.region.amazonaws.com resolves to private IP)
-# - Creates ENI in subnet (not route table modification)
-################################################################################
-
 resource "aws_vpc_endpoint" "s3_interface" {
-  count               = local.should_create_endpoint ? 1 : 0
-  vpc_id              = local.vpc_id
+  count = local.create_interface_endpoint ? 1 : 0
+  vpc_id              = data.aws_vpc.target_vpc.id
   service_name        = local.s3_service_name
   vpc_endpoint_type   = "Interface"
-  subnet_ids          = local.subnet_ids
-  security_group_ids  = local.s3_sg_ids
-
-  # NOTE: private_dns_enabled is NOT set here (defaults to false)
-  # AWS requires a Gateway endpoint to exist before enabling private DNS on Interface endpoints
-  # Without private DNS:
-  # - You can still access S3 using the endpoint-specific DNS names
-  # - Endpoint DNS format: bucket.vpce-xxxxx.s3.region.vpce.amazonaws.com
-  # - Or create a Gateway endpoint first, then set private_dns_enabled = true
-  #
-  # To use standard S3 DNS (s3.region.amazonaws.com), you have two options:
-  # 1. Create a Gateway endpoint first, then enable private DNS here
-  # 2. Use the endpoint-specific DNS names provided in the output
-
-  # CRITICAL: Private DNS must be enabled for normal CLI/SDK access
-  # This makes s3.region.amazonaws.com resolve to the endpoint's private IP
+  subnet_ids          = var.subnet_ids
+  security_group_ids  = [aws_security_group.s3_endpoint_sg[0].id]
+  # CRITICAL: Private DNS requires Gateway endpoint to exist first
+  # This resolves s3.region.amazonaws.com to endpoint's private IP
+  # Without this, must use endpoint-specific DNS names
   private_dns_enabled = true
-
+  # DNS options for private DNS configuration
   dns_options {
+    # Only use private DNS for resolver endpoints in VPC
+    # This prevents DNS leakage to public resolvers
     private_dns_only_for_inbound_resolver_endpoint = false
   }
-
+  # Dependency: Gateway endpoint must exist before Interface endpoint
+  # AWS requirement for enabling private DNS
   depends_on = [aws_vpc_endpoint.s3_gateway]
-
   tags = {
     Name        = "${var.env}-${var.project_id}-${data.aws_vpc.target_vpc.id}-s3-interface-endpoint"
     Environment = var.env
     Project     = var.project_id
     ManagedBy   = "Terraform"
-    Purpose     = "S3-InterfaceEndpoint-MySQL-Backups"
+    Purpose     = "S3-InterfaceEndpoint"
+    Type        = "Interface"
+    Cost        = "~$7.20/month per AZ"
   }
 }
-
 ################################################################################
-# Output
+# SECURITY GROUP FOR S3 INTERFACE ENDPOINT
+#
+# Purpose: Controls access to S3 Interface endpoint
+# Only created when Interface endpoint is enabled
 ################################################################################
-
+resource "aws_security_group" "s3_endpoint_sg" {
+  count = local.create_interface_endpoint ? 1 : 0
+  name        = "${var.env}-${var.project_id}-s3-interface-endpoint-sg"
+  description = "Security group for S3 Interface VPC Endpoint - allows HTTPS from resources"
+  vpc_id      = data.aws_vpc.target_vpc.id
+  # Inbound: Allow HTTPS (443) from resources that need S3 access
+  ingress {
+    description     = "Allow HTTPS from resources for S3 API calls"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = var.resources_security_group_ids
+  }
+  # Outbound: Allow return traffic within VPC only
+  egress {
+    description = "Allow return traffic to resources within VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [local.vpc_cidr_block]
+  }
+  tags = {
+    Name        = "${var.env}-${var.project_id}-s3-interface-endpoint-sg"
+    Environment = var.env
+    Project     = var.project_id
+    ManagedBy   = "Terraform"
+    Purpose     = "S3-InterfaceEndpoint-SecurityGroup"
+  }
+}
+################################################################################
+# OUTPUT - Interface Endpoint Information
+################################################################################
 output "s3_interface_endpoint" {
   description = "S3 Interface VPC Endpoint configuration and identifiers"
   value = {
-    # Toggle status
-    enabled = local.should_create_endpoint
-
-    # Endpoint details (present only when enabled)
-    endpoint_id   = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].id : null
-    endpoint_arn  = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].arn : null
-    service_name  = local.s3_service_name
-    endpoint_type = "Interface"
-
+    # Feature toggle status
+    enabled = local.create_interface_endpoint
+    # Endpoint details
+    endpoint = {
+      endpoint_id         = local.create_interface_endpoint ? aws_vpc_endpoint.s3_interface[0].id : null
+      endpoint_arn        = local.create_interface_endpoint ? aws_vpc_endpoint.s3_interface[0].arn : null
+      service_name        = local.s3_service_name
+      endpoint_type       = "Interface"
+      private_dns_enabled = true
+      state               = local.create_interface_endpoint ? aws_vpc_endpoint.s3_interface[0].state : null
+      dns_entries         = local.create_interface_endpoint ? aws_vpc_endpoint.s3_interface[0].dns_entry : []
+    }
     # Network configuration
-    vpc_id                = local.vpc_id
-    subnet_ids            = local.subnet_ids
-    security_group_ids    = local.s3_sg_ids
-    private_dns_enabled   = true  # AWS requires Gateway endpoint first to enable private DNS
-
-    # DNS entries (use these endpoint-specific DNS names to access S3)
-    dns_entries = local.should_create_endpoint ? aws_vpc_endpoint.s3_interface[0].dns_entry : []
-
-    # Usage note
-    usage_note = "Without private DNS, use endpoint-specific DNS names from dns_entries above, or create a Gateway endpoint first to enable private DNS"
-
-    # Cost estimate
-    monthly_cost_estimate = local.should_create_endpoint ? "~$7.20 USD (Interface endpoint fee) + FREE data transfer (same region)" : "$0 (endpoint disabled, requires NAT Gateway or public internet for S3 access)"
+    network = {
+      vpc_id             = data.aws_vpc.target_vpc.id
+      subnet_ids         = var.subnet_ids
+      security_group_ids = local.create_interface_endpoint ? [aws_security_group.s3_endpoint_sg[0].id] : []
+      vpc_cidr_block     = local.vpc_cidr_block
+    }
+    # Cost information
+    cost = {
+      monthly_estimate  = local.create_interface_endpoint ? "~$7.20 USD per AZ (Interface endpoint fee)" : "$0 (endpoint disabled)"
+      data_transfer     = "FREE (S3 data transfer in same region is FREE)"
+      nat_gateway_saved = "~$32.40/month + $0.045/GB data transfer"
+      net_savings       = "~$25.20+/month"
+    }
+    # Usage instructions
+    usage = {
+      aws_cli_example   = "aws s3 ls s3://your-bucket/ --region ${data.aws_region.current.name}"
+      python_example    = "boto3.client('s3').list_objects_v2(Bucket='your-bucket')"
+      dns_note          = "Private DNS enabled - s3.${data.aws_region.current.name}.amazonaws.com resolves to endpoint private IP"
+      requirements      = [
+        "Resource must be in VPC with subnets connected to this endpoint",
+        "Resource security group must allow outbound HTTPS (443)",
+        "IAM role/user must have s3:* permissions for target buckets",
+        "Gateway endpoint must exist for private DNS to work"
+      ]
+    }
   }
 }
