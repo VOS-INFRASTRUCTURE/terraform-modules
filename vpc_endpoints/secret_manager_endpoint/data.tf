@@ -2,7 +2,7 @@
 # DATA SOURCES - Auto-discover network configuration
 #
 # Purpose: Automatically discover VPC and network details from the provided
-#          subnet IDs to configure Session Manager endpoints properly.
+#          subnet IDs to configure Secrets Manager VPC endpoint properly.
 #
 # This eliminates the need to manually specify:
 # - VPC ID
@@ -11,8 +11,8 @@
 ################################################################################
 
 # Get current AWS region
-# Used to construct Session Manager endpoint service names
-# Example: com.amazonaws.eu-west-2.ssm
+# Used to construct Secrets Manager endpoint service name
+# Example: com.amazonaws.eu-west-2.secretsmanager
 data "aws_region" "current" {}
 
 # Get subnet details from the first provided subnet

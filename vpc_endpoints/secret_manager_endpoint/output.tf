@@ -1,64 +1,49 @@
 ################################################################################
 # OUTPUTS - Endpoint Information and Configuration
 ################################################################################
-output "session_manager_endpoints" {
-  description = "Session Manager VPC Interface Endpoints configuration and identifiers"
+output "secretsmanager_endpoint" {
+  description = "Secrets Manager VPC Interface Endpoint configuration and identifiers"
   value = {
     # Feature toggle status
-    enabled = var.enable_session_manager_endpoints
-    # Endpoint 1: SSM (Systems Manager API)
-    ssm = {
-      endpoint_id         = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ssm[0].id : null
-      endpoint_arn        = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ssm[0].arn : null
-      service_name        = local.ssm_service_name
+    enabled = var.enable_secretsmanager_endpoint
+    # Secrets Manager Endpoint details
+    endpoint = {
+      endpoint_id         = var.enable_secretsmanager_endpoint ? aws_vpc_endpoint.secretsmanager[0].id : null
+      endpoint_arn        = var.enable_secretsmanager_endpoint ? aws_vpc_endpoint.secretsmanager[0].arn : null
+      service_name        = local.secretsmanager_service_name
       private_dns_enabled = true
-      dns_entries         = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ssm[0].dns_entry : []
-    }
-    # Endpoint 2: SSM Messages (Session Manager messaging)
-    ssmmessages = {
-      endpoint_id         = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ssmmessages[0].id : null
-      endpoint_arn        = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ssmmessages[0].arn : null
-      service_name        = local.ssmmessages_service_name
-      private_dns_enabled = true
-      dns_entries         = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ssmmessages[0].dns_entry : []
-    }
-    # Endpoint 3: EC2 Messages (EC2 communication)
-    ec2messages = {
-      endpoint_id         = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ec2messages[0].id : null
-      endpoint_arn        = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ec2messages[0].arn : null
-      service_name        = local.ec2messages_service_name
-      private_dns_enabled = true
-      dns_entries         = var.enable_session_manager_endpoints ? aws_vpc_endpoint.ec2messages[0].dns_entry : []
+      dns_entries         = var.enable_secretsmanager_endpoint ? aws_vpc_endpoint.secretsmanager[0].dns_entry : []
     }
     # Network configuration
     network = {
-      vpc_id             = local.ssm_vpc_id
-      subnet_ids         = local.ssm_subnet_ids
-      security_group_ids = local.ssm_sg_ids
+      vpc_id             = local.secretsmanager_vpc_id
+      subnet_ids         = local.secretsmanager_subnet_ids
+      security_group_ids = local.secretsmanager_sg_ids
       vpc_cidr_block     = local.vpc_cidr_block
     }
     # Cost information
     cost = {
-      monthly_estimate = var.enable_session_manager_endpoints ? "~$21.60 USD (3 Interface endpoints × $7.20/month each) + minimal data transfer (~$0.01/GB)" : "$0 (endpoints disabled)"
+      monthly_estimate = var.enable_secretsmanager_endpoint ? "~$7.20 USD (1 Interface endpoint × $7.20/month) + minimal data transfer (~$0.01/GB)" : "$0 (endpoint disabled)"
       comparison       = "NAT Gateway alternative: ~$32.40/month + $0.045/GB data transfer"
-      savings          = var.enable_session_manager_endpoints ? "~$10.80/month + reduced data transfer costs" : "N/A"
+      savings          = var.enable_secretsmanager_endpoint ? "~$25.20/month + reduced data transfer costs" : "N/A"
     }
     # Usage instructions
     usage = {
-      connect_command = "aws ssm start-session --target <instance-id>"
+      aws_cli_example = "aws secretsmanager get-secret-value --secret-id my-database-password"
+      python_example  = "boto3.client('secretsmanager').get_secret_value(SecretId='my-secret')"
+      nodejs_example  = "new AWS.SecretsManager().getSecretValue({SecretId: 'my-secret'})"
       requirements = [
-        "EC2 instance must have SSM Agent installed (pre-installed on Amazon Linux 2, Ubuntu 20.04+)",
-        "EC2 instance must have IAM role with AmazonSSMManagedInstanceCore policy",
-        "EC2 security group must allow outbound HTTPS (443) to VPC CIDR",
-        "User must have IAM permissions: ssm:StartSession, ssm:TerminateSession"
+        "Resource must be in same VPC as endpoint",
+        "Resource security group must allow outbound HTTPS (443) to VPC CIDR",
+        "IAM role/user must have secretsmanager:GetSecretValue permission",
+        "Private DNS enabled on endpoint (automatically resolves secretsmanager.{region}.amazonaws.com)"
       ]
     }
-    # Validation reminder
+    # Validation notes
     validation = {
-      all_three_required = "⚠️ ALL THREE endpoints (ssm, ssmmessages, ec2messages) are MANDATORY"
-      missing_any        = "Missing even ONE endpoint will break Session Manager completely!"
-      private_dns        = "private_dns_enabled MUST be true on all endpoints"
-      security_groups    = "EC2 must allow outbound 443, Endpoint must allow inbound 443 from EC2"
+      private_dns_required = "private_dns_enabled MUST be true for standard AWS SDK calls to work"
+      security_groups      = "Resources must allow outbound 443, Endpoint must allow inbound 443 from resources"
+      no_internet_needed   = "All Secrets Manager API calls route through private VPC endpoint (no NAT/IGW required)"
     }
   }
 }
