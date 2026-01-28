@@ -35,8 +35,8 @@ output "pgsql" {
 
 
     # Backup configuration
-    backups = var.enable_automated_backups ? {
-      enabled         = true
+    backups = {
+      enabled         = var.enable_automated_backups
       s3_bucket       = local.backup_bucket_name
       s3_bucket_arn       = local.backup_bucket_arn
       schedule        = var.backup_schedule
@@ -45,16 +45,6 @@ output "pgsql" {
       ebs_snapshots   = var.enable_ebs_snapshots
       cross_region_dr = var.enable_cross_region_snapshot_copy
       dr_region       = var.enable_cross_region_snapshot_copy ? var.snapshot_dr_region : null
-    } : {
-      enabled = false,
-      s3_bucket = null,
-        s3_bucket_arn = null,
-        schedule = null,
-        retention_days = null,
-        backup_path = null,
-        ebs_snapshots = null,
-        cross_region_dr = null,
-        dr_region = null
     }
 
     # CloudWatch monitoring
