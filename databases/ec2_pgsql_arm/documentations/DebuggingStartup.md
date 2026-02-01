@@ -12,4 +12,6 @@ sudo -u postgres psql -c "SELECT 1;"
 sudo cp /var/lib/cloud/instance/scripts/part-001 /root/startup_script.sh
 sudo chmod +x /root/startup_script.sh
 sudo /root/startup_script.sh
+
+sudo aws s3 ls s3://<bucket_name>
 ```
