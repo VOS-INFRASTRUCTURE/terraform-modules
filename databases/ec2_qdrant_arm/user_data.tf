@@ -164,8 +164,15 @@ QDRANTCONFIG
 chown qdrant:qdrant /etc/qdrant/config.yaml
 chmod 600 /etc/qdrant/config.yaml
 
-# Create systemd service with API key as environment variable
-cat > /etc/systemd/system/qdrant.service <<SYSTEMDSERVICE
+# Create environment file for systemd (safer than inline Environment=)
+# systemd does NOT expand shell variables in Environment= directives
+# Using EnvironmentFile= ensures proper substitution
+echo "QDRANT__SERVICE__API_KEY=$QDRANT_API_KEY" > /etc/qdrant/qdrant.env
+chmod 600 /etc/qdrant/qdrant.env
+chown qdrant:qdrant /etc/qdrant/qdrant.env
+
+# Create systemd service
+cat > /etc/systemd/system/qdrant.service <<'SYSTEMDSERVICE'
 [Unit]
 Description=Qdrant Vector Database
 After=network.target
@@ -174,7 +181,7 @@ After=network.target
 Type=simple
 User=qdrant
 Group=qdrant
-Environment="QDRANT__SERVICE__API_KEY=$QDRANT_API_KEY"
+EnvironmentFile=/etc/qdrant/qdrant.env
 ExecStart=/usr/local/bin/qdrant --config-path /etc/qdrant/config.yaml
 Restart=always
 RestartSec=10
@@ -218,6 +225,7 @@ TODAY=$(date +"%Y-%m-%d")
 TIME=$(date +"%H%M%S")
 SNAPSHOT_NAME="$TIME-full-snapshot"
 BACKUP_DIR="/tmp/qdrant-backup-$TIME"
+SNAPSHOT_DIR="/var/lib/qdrant/snapshots"
 
 # Get API key from Secrets Manager
 QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
@@ -236,7 +244,7 @@ curl -X POST "http://localhost:${var.qdrant_http_port}/snapshots" \
 sleep 5
 
 # Find latest snapshot
-LATEST_SNAPSHOT=$(ls -t /var/lib/qdrant/snapshots/*.snapshot 2>/dev/null | head -1)
+LATEST_SNAPSHOT=$(ls -t $SNAPSHOT_DIR/*.snapshot 2>/dev/null | head -1)
 
 if [ -z "$LATEST_SNAPSHOT" ]; then
   echo "ERROR: No snapshot found"
@@ -249,8 +257,18 @@ cp $LATEST_SNAPSHOT $BACKUP_DIR/
 tar -czf /tmp/$TIME-qdrant-snapshot.tar.gz -C $BACKUP_DIR .
 aws s3 cp /tmp/$TIME-qdrant-snapshot.tar.gz s3://${local.backup_bucket_name}/$TODAY/
 
-# Cleanup
+# Cleanup temporary files
 rm -rf $BACKUP_DIR /tmp/$TIME-qdrant-snapshot.tar.gz
+
+# Cleanup old local snapshots (keep only last 3 snapshots to prevent disk space issues)
+# Snapshots can grow large over time, so we only keep recent ones locally
+# All backups are safely stored in S3 with lifecycle policies
+echo "Cleaning up old local snapshots (keeping last 3)..."
+SNAPSHOT_COUNT=$(ls -1 $SNAPSHOT_DIR/*.snapshot 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt 3 ]; then
+  ls -t $SNAPSHOT_DIR/*.snapshot | tail -n +4 | xargs rm -f
+  echo "Removed $((SNAPSHOT_COUNT - 3)) old snapshot(s)"
+fi
 
 echo "Backup completed at $(date)"
 BACKUPSCRIPT
