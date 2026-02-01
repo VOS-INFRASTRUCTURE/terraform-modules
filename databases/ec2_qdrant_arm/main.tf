@@ -1,25 +1,25 @@
 ################################################################################
-# EC2 PostgreSQL ARM Module - Native Installation (No Docker)
+# EC2 Qdrant ARM Module - Native Installation (No Docker)
 #
-# Purpose: Deploy PostgreSQL 15 natively on EC2 ARM (Graviton) instances
+# Purpose: Deploy Qdrant vector database natively on EC2 ARM (Graviton) instances
 #          for maximum performance and cost efficiency
 #
 # Benefits over Docker version:
 # - 5-10% better performance (no Docker overhead)
 # - 200-500MB less memory usage (no Docker daemon)
-# - Simpler architecture (direct PostgreSQL installation)
+# - Simpler architecture (direct Qdrant installation)
 # - 20-25% cost savings (ARM Graviton vs x86)
 #
-# Default: m7g.large (2 vCPU, 8GB RAM, ~$67/month)
+# Default: t4g.large (2 vCPU, 8GB RAM, ~$49/month)
 #
 # Security Features:
-# - Passwords stored in AWS Secrets Manager (not plain text)
+# - API keys stored in AWS Secrets Manager (not plain text)
 # - Encrypted EBS volumes
 # - IAM role with minimal permissions
 # - CloudWatch monitoring and logging
-# - Automated backups to S3
+# - Automated snapshots to S3
 # - Systems Manager Session Manager (no SSH keys needed)
-# - PostgreSQL configured with security best practices
+# - Qdrant configured with security best practices
 ################################################################################
 
 ################################################################################
@@ -75,11 +75,11 @@ data "aws_ami" "ubuntu_arm64" {
 ################################################################################
 
 locals {
-  instance_name = "${var.project_id}-${var.env}-${var.base_name}-pgsql"
+  instance_name = "${var.project_id}-${var.env}-${var.base_name}-qdrant"
 
   # Return created bucket name or provided bucket name
   backup_bucket_name = var.enable_automated_backups ? (
-    var.create_backup_bucket ? "${var.env}-${var.project_id}-${var.base_name}-pgsql-backups" : var.backup_s3_bucket_name
+    var.create_backup_bucket ? "${var.env}-${var.project_id}-${var.base_name}-qdrant-backups" : var.backup_s3_bucket_name
   ) : ""
   backup_bucket_arn = var.enable_automated_backups ? aws_s3_bucket.backup[0].arn : ""
 }
@@ -88,13 +88,13 @@ locals {
 # EC2 Instance
 ################################################################################
 
-resource "aws_instance" "pgsql_ec2" {
+resource "aws_instance" "qdrant_ec2" {
   ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu_arm64.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = var.security_group_ids
   key_name               = var.enable_ssh_key_access ? var.key_name : null
-  iam_instance_profile   = aws_iam_instance_profile.pgsql_ec2.name
+  iam_instance_profile   = aws_iam_instance_profile.qdrant_ec2.name
 
   monitoring = var.enable_detailed_monitoring
 
@@ -140,7 +140,7 @@ resource "aws_instance" "pgsql_ec2" {
       Environment = var.env
       Project     = var.project_id
       ManagedBy   = "Terraform"
-      Purpose     = "PostgreSQL-Database"
+      Purpose     = "Qdrant-Vector-Database"
       Backup      = var.enable_automated_backups ? "Required" : "None"
     }
   )

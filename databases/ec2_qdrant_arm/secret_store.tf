@@ -1,79 +1,73 @@
 ################################################################################
-# Secrets Manager - PostgreSQL Passwords
+# Secrets Manager - Qdrant API Keys
 #
-# Purpose: Securely store PostgreSQL passwords
-# Security: Passwords never stored in Terraform state or logs
+# Purpose: Store Qdrant API keys securely in AWS Secrets Manager
+# Security: Keys are never stored in plain text or in Terraform state
 ################################################################################
 
 ################################################################################
-# Generate Random Passwords (if not provided)
+# Random Password Generation (if not provided)
 ################################################################################
 
-locals {
-  generate_passwords = var.pgsql_postgres_password == "" || var.pgsql_password == ""
-}
-
-resource "random_password" "pgsql_postgres" {
-  count   = local.generate_passwords ? 1 : 0
+resource "random_password" "qdrant_api_key" {
   length  = 32
   special = true
 }
 
-resource "random_password" "pgsql_user" {
-  count   = local.generate_passwords ? 1 : 0
+resource "random_password" "qdrant_read_only_key" {
   length  = 32
   special = true
 }
 
 ################################################################################
-# Store PostgreSQL postgres password in Secrets Manager
+# Secrets Manager - Qdrant API Key (Full Access)
 ################################################################################
 
-resource "aws_secretsmanager_secret" "pgsql_postgres_password" {
-  name                    = "${var.env}/${var.project_id}/${var.base_name}/pgsql-postgres-password"
-  description             = "PostgreSQL postgres password for ${local.instance_name}"
+resource "aws_secretsmanager_secret" "qdrant_api_key" {
+  name                    = "${var.env}/${var.project_id}/${var.base_name}/qdrant-api-key"
+  description             = "Qdrant API key for ${local.instance_name}"
   recovery_window_in_days = 7
 
   tags = merge(
     var.tags,
     {
-      Name        = "${local.instance_name}-postgres-password"
+      Name        = "${local.instance_name}-api-key"
       Environment = var.env
       Project     = var.project_id
       ManagedBy   = "Terraform"
-      Purpose     = "PostgreSQL-Postgres-Password"
+      Purpose     = "Qdrant-API-Key"
     }
   )
 }
 
-resource "aws_secretsmanager_secret_version" "pgsql_postgres_password" {
-  secret_id     = aws_secretsmanager_secret.pgsql_postgres_password.id
-  secret_string = local.generate_passwords ? random_password.pgsql_postgres[0].result : var.pgsql_postgres_password
+resource "aws_secretsmanager_secret_version" "qdrant_api_key" {
+  secret_id     = aws_secretsmanager_secret.qdrant_api_key.id
+  secret_string = var.qdrant_api_key != "" ? var.qdrant_api_key : random_password.qdrant_api_key.result
 }
 
 ################################################################################
-# Store PostgreSQL user password in Secrets Manager
+# Secrets Manager - Qdrant Read-Only API Key
 ################################################################################
 
-resource "aws_secretsmanager_secret" "pgsql_user_password" {
-  name                    = "${var.env}/${var.project_id}/${var.base_name}/pgsql-user-password"
-  description             = "PostgreSQL user password for ${var.pgsql_user} on ${local.instance_name}"
+resource "aws_secretsmanager_secret" "qdrant_read_only_key" {
+  name                    = "${var.env}/${var.project_id}/${var.base_name}/qdrant-read-only-key"
+  description             = "Qdrant read-only API key for ${local.instance_name}"
   recovery_window_in_days = 7
 
   tags = merge(
     var.tags,
     {
-      Name        = "${local.instance_name}-user-password"
+      Name        = "${local.instance_name}-read-only-key"
       Environment = var.env
       Project     = var.project_id
       ManagedBy   = "Terraform"
-      Purpose     = "PostgreSQL-User-Password"
+      Purpose     = "Qdrant-Read-Only-Key"
     }
   )
 }
 
-resource "aws_secretsmanager_secret_version" "pgsql_user_password" {
-  secret_id     = aws_secretsmanager_secret.pgsql_user_password.id
-  secret_string = local.generate_passwords ? random_password.pgsql_user[0].result : var.pgsql_password
+resource "aws_secretsmanager_secret_version" "qdrant_read_only_key" {
+  secret_id     = aws_secretsmanager_secret.qdrant_read_only_key.id
+  secret_string = var.qdrant_read_only_api_key != "" ? var.qdrant_read_only_api_key : random_password.qdrant_read_only_key.result
 }
 

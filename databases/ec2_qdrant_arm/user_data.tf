@@ -1,143 +1,296 @@
 ################################################################################
-# User Data Script - Native PostgreSQL 16 Installation (No Docker)
+# User Data Script - Native Qdrant Installation (No Docker)
 #
-# Purpose: Install PostgreSQL 16 natively on Ubuntu 24.04 ARM64
-# Strategy: Minimal bootstrap script to stay under 16KB limit
+# Purpose: Install Qdrant vector database natively on Ubuntu 24.04 ARM64
+# Benefits over Docker:
+#   - 5-10% better performance (no Docker overhead)
+#   - 200-500MB less memory usage (no Docker daemon)
+#   - Simpler architecture (one less layer)
+#   - Direct access to logs and configuration
+#   - Full ARM optimization
 ################################################################################
 
 locals {
-  # PostgreSQL configuration content (minified version without comments for size reduction)
-  pgsql_config = templatefile("${path.module}/postgresql.min.conf", {
-    shared_buffers       = var.shared_buffers
-    effective_cache_size = var.effective_cache_size
-    max_connections      = var.max_connections
-  })
-
-  # pg_hba.conf content
-  pg_hba_config = file("${path.module}/pg_hba.conf")
-
-  # Minimal user_data script - stays well under 16KB
   user_data = <<-EOF
 #!/bin/bash
 set -e
-exec > >(tee /var/log/pgsql-setup.log) 2>&1
 
-echo "=== PostgreSQL ARM Setup Started: $(date) ==="
+# Log everything to a file
+exec > >(tee /var/log/qdrant-setup.log)
+exec 2>&1
 
-# Install essentials
-apt-get update -y && apt-get install -y curl unzip jq postgresql postgresql-contrib
+echo "=== Starting Native Qdrant EC2 setup at $(date) ==="
+echo "Architecture: $(uname -m)"
 
-# Install AWS CLI
-curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/aws.zip"
-unzip -q /tmp/aws.zip -d /tmp && /tmp/aws/install && rm -rf /tmp/aws*
+# Update system
+apt-get update -y
+apt-get upgrade -y
 
-# Get PostgreSQL postgres password
-POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} --region ${data.aws_region.current.name} --query SecretString --output text)
+# Install required packages
+apt-get install -y \
+  apt-transport-https \
+  ca-certificates \
+  curl \
+  software-properties-common \
+  gnupg-agent \
+  jq \
+  unzip
 
-# Stop PostgreSQL
-systemctl stop postgresql
+# Install AWS CLI v2 (for backups and Secrets Manager) - ARM64
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
 
-# Configure PostgreSQL
-if ! grep -q "### CUSTOM_PG_CONF ###" /etc/postgresql/16/main/postgresql.conf; then
-  cat >> /etc/postgresql/16/main/postgresql.conf << 'PGSQLCONF'
-### CUSTOM_PG_CONF ###
-${local.pgsql_config}
-### END CUSTOM_PG_CONF ###
-PGSQLCONF
+# Install CloudWatch agent (conditional based on variable)
+if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
+  wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+  dpkg -i amazon-cloudwatch-agent.deb
+
+  # Configure CloudWatch agent
+  cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'CWCONFIG'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/qdrant-setup.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.qdrant_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/setup.log",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/qdrant/qdrant.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.qdrant_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/qdrant",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/syslog",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.qdrant_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/syslog",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/cloud-init-output.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.qdrant_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/cloud-init-output",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/qdrant-backup.log",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.qdrant_logs[0].name : ""}",
+            "log_stream_name": "{instance_id}/backup.log",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "Qdrant/EC2",
+    "metrics_collected": {
+      "cpu": {
+        "measurement": [{"name": "cpu_usage_idle", "rename": "CPU_IDLE", "unit": "Percent"}],
+        "totalcpu": false
+      },
+      "disk": {
+        "measurement": [{"name": "used_percent", "rename": "DISK_USED", "unit": "Percent"}],
+        "resources": ["*"]
+      },
+      "mem": {
+        "measurement": [{"name": "mem_used_percent", "rename": "MEM_USED", "unit": "Percent"}]
+      }
+    }
+  }
+}
+CWCONFIG
+
+  # Start CloudWatch agent
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config \
+    -m ec2 \
+    -s \
+    -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
 fi
 
-cat > /etc/postgresql/16/main/pg_hba.conf << 'PGHBACONF'
-${local.pg_hba_config}
-PGHBACONF
+# Retrieve API keys from Secrets Manager
+echo "Retrieving Qdrant API keys from Secrets Manager..."
+QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id ${aws_secretsmanager_secret.qdrant_api_key.name} \
+  --region ${data.aws_region.current.name} \
+  --query SecretString \
+  --output text)
 
-# Set ownership
-chown postgres:postgres /etc/postgresql/16/main/postgresql.conf
-chown postgres:postgres /etc/postgresql/16/main/pg_hba.conf
-chmod 640 /etc/postgresql/16/main/postgresql.conf
-chmod 640 /etc/postgresql/16/main/pg_hba.conf
+QDRANT_READ_ONLY_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id ${aws_secretsmanager_secret.qdrant_read_only_key.name} \
+  --region ${data.aws_region.current.name} \
+  --query SecretString \
+  --output text)
 
-# Create log directory
-mkdir -p /var/log/postgresql
-chown postgres:postgres /var/log/postgresql
+# Install Qdrant natively (latest stable release for ARM64)
+echo "Installing Qdrant..."
+QDRANT_VERSION="v1.7.4"  # Latest stable as of Jan 2026
+wget https://github.com/qdrant/qdrant/releases/download/$QDRANT_VERSION/qdrant-aarch64-unknown-linux-gnu.tar.gz
+tar -xzf qdrant-aarch64-unknown-linux-gnu.tar.gz
+mv qdrant /usr/local/bin/
+chmod +x /usr/local/bin/qdrant
+rm qdrant-aarch64-unknown-linux-gnu.tar.gz
 
-# Start PostgreSQL
-systemctl start postgresql && systemctl enable postgresql
-sleep 5
+# Create qdrant user and directories
+useradd -r -s /bin/false qdrant || true
+mkdir -p /var/lib/qdrant/storage
+mkdir -p /var/lib/qdrant/snapshots
+mkdir -p /etc/qdrant
+mkdir -p /var/log/qdrant
+chown -R qdrant:qdrant /var/lib/qdrant /var/log/qdrant
 
-# Set postgres user password
-sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$POSTGRES_PASSWORD';"
+# Create Qdrant configuration
+cat > /etc/qdrant/config.yaml <<'QDRANTCONFIG'
+service:
+  http_port: ${var.qdrant_http_port}
+  grpc_port: ${var.qdrant_grpc_port}
 
-# Create application database
-sudo -u postgres psql -c "CREATE DATABASE ${var.pgsql_database};"
+storage:
+  storage_path: /var/lib/qdrant/storage
+  snapshots_path: /var/lib/qdrant/snapshots
+  on_disk_payload: true
 
-# Create application user
-PGSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.name} --region ${data.aws_region.current.name} --query SecretString --output text)
-sudo -u postgres psql -c "CREATE USER ${var.pgsql_user} WITH PASSWORD '$PGSQL_USER_PASSWORD';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${var.pgsql_database} TO ${var.pgsql_user};"
-sudo -u postgres psql -d ${var.pgsql_database} -c "GRANT ALL ON SCHEMA public TO ${var.pgsql_user};"
+log_level: ${var.qdrant_log_level}
 
-%{~ if var.enable_cloudwatch_monitoring ~}
-# Install CloudWatch agent
-if [ ! -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent ]; then
-  CW_DEB=/tmp/amazon-cloudwatch-agent.deb
-  wget -q -O "$CW_DEB" \
-    https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
-  dpkg -i "$CW_DEB"
+# Performance settings for ARM Graviton
+cluster:
+  enabled: false
+
+# Security settings
+service:
+  api_key: "$QDRANT_API_KEY"
+  read_only_api_key: "$QDRANT_READ_ONLY_KEY"
+QDRANTCONFIG
+
+chown qdrant:qdrant /etc/qdrant/config.yaml
+chmod 600 /etc/qdrant/config.yaml
+
+# Create systemd service
+cat > /etc/systemd/system/qdrant.service <<'SYSTEMDSERVICE'
+[Unit]
+Description=Qdrant Vector Database
+After=network.target
+
+[Service]
+Type=simple
+User=qdrant
+Group=qdrant
+ExecStart=/usr/local/bin/qdrant --config-path /etc/qdrant/config.yaml
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/qdrant/qdrant.log
+StandardError=append:/var/log/qdrant/qdrant.log
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/qdrant /var/log/qdrant
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMDSERVICE
+
+# Start and enable Qdrant
+systemctl daemon-reload
+systemctl enable qdrant
+systemctl start qdrant
+
+echo "Waiting for Qdrant to start..."
+sleep 10
+
+# Verify Qdrant is running
+if systemctl is-active --quiet qdrant; then
+  echo "Qdrant started successfully"
+  curl -s http://localhost:${var.qdrant_http_port}/
+else
+  echo "ERROR: Qdrant failed to start"
+  systemctl status qdrant --no-pager
 fi
-cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << 'CWCFG'
-{"logs":{"logs_collected":{"files":{"collect_list":[{"file_path":"/var/log/postgresql/postgresql-*.log","log_group_name":"${try(aws_cloudwatch_log_group.pgsql_logs[0].name, "")}","log_stream_name":"{instance_id}/postgres"},{"file_path":"/var/log/pgsql-setup.log","log_group_name":"${try(aws_cloudwatch_log_group.pgsql_logs[0].name, "")}","log_stream_name":"{instance_id}/setup"}]}}},"metrics":{"namespace":"PostgreSQL/EC2","metrics_collected":{"cpu":{"measurement":[{"name":"cpu_usage_idle"}]},"disk":{"measurement":[{"name":"used_percent"}],"resources":["*"]},"mem":{"measurement":[{"name":"mem_used_percent"}]}}}}
-CWCFG
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
-%{~ endif ~}
 
-
-%{~ if var.enable_automated_backups && local.backup_bucket_name != "" ~}
-
-# Backup script
-cat > /usr/local/bin/backup_pgsql.sh << 'BACKUP'
+# Create Qdrant backup script (conditional based on variable)
+if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
+  cat > /usr/local/bin/backup_qdrant.sh <<'BACKUPSCRIPT'
 #!/bin/bash
-
+set -e
 TODAY=$(date +"%Y-%m-%d")
 TIME=$(date +"%H%M%S")
+SNAPSHOT_NAME="$TIME-full-snapshot"
+BACKUP_DIR="/tmp/qdrant-backup-$TIME"
 
-# Get Postgres password from AWS Secrets Manager
-POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value \
-    --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} \
-    --region ${data.aws_region.current.name} \
-    --query SecretString --output text)
+# Get API key from Secrets Manager
+QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id ${aws_secretsmanager_secret.qdrant_api_key.name} \
+  --region ${data.aws_region.current.name} \
+  --query SecretString \
+  --output text)
 
-export PGPASSWORD="$POSTGRES_PASSWORD"
+# Create snapshot via Qdrant API
+echo "Creating Qdrant snapshot..."
+curl -X POST "http://localhost:${var.qdrant_http_port}/snapshots" \
+  -H "api-key: $QDRANT_API_KEY" \
+  -H "Content-Type: application/json"
 
-# Database connection info
-DB_HOST=0.0.0.0
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_DATABASE=${var.pgsql_database}
+# Wait for snapshot to complete
+sleep 5
 
-# Backup and compress in one step
-pg_dump --no-owner --no-privileges \
-  -h "$DB_HOST" \
-  -p "$DB_PORT" \
-  -U "$DB_USERNAME" \
-  -d "$DB_DATABASE" \
-  | gzip > /tmp/$${TIME}-$${DB_DATABASE}.sql.gz
+# Find latest snapshot
+LATEST_SNAPSHOT=$(ls -t /var/lib/qdrant/snapshots/*.snapshot 2>/dev/null | head -1)
 
-# Upload to S3
-aws s3 cp /tmp/$${TIME}-$${DB_DATABASE}.sql.gz s3://${local.backup_bucket_name}/$${TODAY}/
+if [ -z "$LATEST_SNAPSHOT" ]; then
+  echo "ERROR: No snapshot found"
+  exit 1
+fi
 
-# Remove local dump
-rm /tmp/$${TIME}-$${DB_DATABASE}.sql.gz
+# Compress and upload to S3
+mkdir -p $BACKUP_DIR
+cp $LATEST_SNAPSHOT $BACKUP_DIR/
+tar -czf /tmp/$TIME-qdrant-snapshot.tar.gz -C $BACKUP_DIR .
+aws s3 cp /tmp/$TIME-qdrant-snapshot.tar.gz s3://${local.backup_bucket_name}/$TODAY/
 
-echo "Backup completed for $DB_DATABASE on $TODAY"
-BACKUP
+# Cleanup
+rm -rf $BACKUP_DIR /tmp/$TIME-qdrant-snapshot.tar.gz
 
+echo "Backup completed at $(date)"
+BACKUPSCRIPT
 
-chmod +x /usr/local/bin/backup_pgsql.sh
-echo "${var.backup_schedule} /usr/local/bin/backup_pgsql.sh >> /var/log/pgsql-backup.log 2>&1" | crontab -
-/usr/local/bin/backup_pgsql.sh  # Initial backup
-%{~ endif ~}
+  chmod +x /usr/local/bin/backup_qdrant.sh
+  echo "${var.backup_schedule} /usr/local/bin/backup_qdrant.sh >> /var/log/qdrant-backup.log 2>&1" | crontab -
+fi
 
-echo "=== PostgreSQL Setup Complete: $(date) ==="
+echo "=== Qdrant installation completed at $(date) ==="
+echo "Qdrant Status:"
+systemctl status qdrant --no-pager || true
+
+echo "Qdrant Version:"
+/usr/local/bin/qdrant --version || true
+
+# Run initial backup if enabled
+if [ "${var.enable_automated_backups}" = "true" ] && [ "${local.backup_bucket_name}" != "" ]; then
+  echo "Running initial backup..."
+  /usr/local/bin/backup_qdrant.sh || true
+fi
+
+# Disable and remove SSH (Session Manager only)
+systemctl stop ssh || true
+systemctl disable ssh || true
+apt-get remove -y openssh-server || true
+
+echo "=== Setup Complete ==="
 EOF
 }
+
+################################################################################
+# Attach User Data to Instance
+################################################################################
+
+# The user_data is used in main.tf via: user_data = local.user_data
 

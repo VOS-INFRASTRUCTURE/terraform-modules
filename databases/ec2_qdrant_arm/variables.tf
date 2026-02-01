@@ -1,5 +1,5 @@
 ################################################################################
-# Variables for EC2 PostgreSQL ARM Module
+# Variables for EC2 Qdrant ARM Module
 ################################################################################
 
 variable "env" {
@@ -13,9 +13,9 @@ variable "project_id" {
 }
 
 variable "base_name" {
-  description = "Base name for the PostgreSQL instance (e.g., 'db', 'pgsql')"
+  description = "Base name for the Qdrant instance (e.g., 'vector-db', 'qdrant')"
   type        = string
-  default     = "pgsql"
+  default     = "qdrant"
 }
 
 ################################################################################
@@ -31,7 +31,7 @@ variable "ami_id" {
 variable "instance_type" {
   description = "The type of instance to launch (ARM/Graviton recommended for better price/performance)"
   type        = string
-  default     = "m7g.large" # 2 vCPU, 8 GB RAM, ~$67/month
+  default     = "t4g.large" # 2 vCPU, 8 GB RAM, ~$49/month
 }
 
 variable "subnet_id" {
@@ -40,7 +40,7 @@ variable "subnet_id" {
 }
 
 variable "security_group_ids" {
-  description = "List of security group IDs to assign to the instance (must allow PostgreSQL port 5432)"
+  description = "List of security group IDs to assign to the instance (must allow Qdrant ports: 6333 REST API, 6334 gRPC)"
   type        = list(string)
 }
 
@@ -70,9 +70,9 @@ variable "enable_ssm_access" {
 ################################################################################
 
 variable "storage_size" {
-  description = "Size of the EBS volume in GB"
+  description = "Size of the EBS volume in GB (Qdrant stores vector data, size based on collection size)"
   type        = number
-  default     = 20
+  default     = 50
 }
 
 variable "storage_type" {
@@ -88,55 +88,39 @@ variable "enable_ebs_encryption" {
 }
 
 ################################################################################
-# PostgreSQL Configuration
+# Qdrant Configuration
 ################################################################################
 
-# variable "pgsql_version" {
-#   description = "PostgreSQL version to install"
-#   type        = string
-#   default     = "15"
-# }
-
-variable "pgsql_database" {
-  description = "Name of the default PostgreSQL database to create"
-  type        = string
-}
-
-variable "pgsql_user" {
-  description = "PostgreSQL username (non-postgres user for applications)"
-  type        = string
-}
-
-variable "pgsql_postgres_password" {
-  description = "Password for postgres superuser (leave empty to auto-generate)"
+variable "qdrant_api_key" {
+  description = "API key for Qdrant REST/gRPC API authentication (leave empty to auto-generate)"
   type        = string
   default     = ""
   sensitive   = true
 }
 
-variable "pgsql_password" {
-  description = "Password for application user (leave empty to auto-generate)"
+variable "qdrant_read_only_api_key" {
+  description = "Read-only API key for Qdrant (leave empty to auto-generate)"
   type        = string
   default     = ""
   sensitive   = true
 }
 
-variable "shared_buffers" {
-  description = "PostgreSQL shared_buffers setting (25% of RAM recommended)"
-  type        = string
-  default     = "2GB" # For m7g.large (8GB RAM), 25% = 2GB
-}
-
-variable "effective_cache_size" {
-  description = "PostgreSQL effective_cache_size setting (75% of RAM recommended)"
-  type        = string
-  default     = "6GB" # For m7g.large (8GB RAM), 75% = 6GB
-}
-
-variable "max_connections" {
-  description = "Maximum number of concurrent connections to PostgreSQL"
+variable "qdrant_http_port" {
+  description = "Qdrant REST API port"
   type        = number
-  default     = 200
+  default     = 6333
+}
+
+variable "qdrant_grpc_port" {
+  description = "Qdrant gRPC API port"
+  type        = number
+  default     = 6334
+}
+
+variable "qdrant_log_level" {
+  description = "Qdrant log level (DEBUG, INFO, WARN, ERROR)"
+  type        = string
+  default     = "INFO"
 }
 
 ################################################################################
@@ -144,15 +128,15 @@ variable "max_connections" {
 ################################################################################
 
 variable "enable_automated_backups" {
-  description = "Enable automated PostgreSQL backups to S3"
+  description = "Enable automated Qdrant snapshots to S3"
   type        = bool
   default     = true
 }
 
 variable "backup_schedule" {
-  description = "Cron schedule for backups (default: hourly at minute 0)"
+  description = "Cron schedule for backups (default: every 6 hours)"
   type        = string
-  default     = "0 * * * *"
+  default     = "0 */6 * * *"
 }
 
 variable "create_backup_bucket" {
@@ -256,20 +240,6 @@ variable "enable_termination_protection" {
   type        = bool
   default     = false
 }
-
-# ################################################################################
-# # Network Configuration
-# ################################################################################
-#
-# variable "network_config" {
-#   description = "Network configuration including region and VPC details"
-#   type = object({
-#     region = string
-#   })
-#   default = {
-#     region = "us-east-1"
-#   }
-# }
 
 ################################################################################
 # Tags

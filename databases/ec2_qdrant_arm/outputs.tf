@@ -1,47 +1,46 @@
 ################################################################################
-# Outputs for EC2 PostgreSQL Module
+# Outputs for EC2 Qdrant Module
 ################################################################################
 
-output "pgsql" {
-  description = "Complete EC2 PostgreSQL instance configuration and connection details"
+output "qdrant" {
+  description = "Complete EC2 Qdrant instance configuration and connection details"
   value = {
     # Instance details
     instance = {
-      id                = aws_instance.pgsql_ec2.id
-      arn               = aws_instance.pgsql_ec2.arn
-      private_ip        = aws_instance.pgsql_ec2.private_ip
-      public_ip         = aws_instance.pgsql_ec2.public_ip
-      availability_zone = aws_instance.pgsql_ec2.availability_zone
-      instance_type     = aws_instance.pgsql_ec2.instance_type
-      ami_id            = aws_instance.pgsql_ec2.ami
+      id                = aws_instance.qdrant_ec2.id
+      arn               = aws_instance.qdrant_ec2.arn
+      private_ip        = aws_instance.qdrant_ec2.private_ip
+      public_ip         = aws_instance.qdrant_ec2.public_ip
+      availability_zone = aws_instance.qdrant_ec2.availability_zone
+      instance_type     = aws_instance.qdrant_ec2.instance_type
+      ami_id            = aws_instance.qdrant_ec2.ami
       ami_name          = data.aws_ami.ubuntu_arm64.name
       ami_description   = data.aws_ami.ubuntu_arm64.description
     }
 
-    # PostgreSQL connection details
+    # Qdrant connection details
     connection = {
-      host     = aws_instance.pgsql_ec2.private_ip
-      port     = 5432
-      database = var.pgsql_database
-      user     = var.pgsql_user
+      private_ip = aws_instance.qdrant_ec2.private_ip
+      http_port  = var.qdrant_http_port
+      grpc_port  = var.qdrant_grpc_port
 
-      # Connection string examples (password must be retrieved separately)
-      psql_command = "psql -h ${aws_instance.pgsql_ec2.private_ip} -p 5432 -U ${var.pgsql_user} -d ${var.pgsql_database}"
-      jdbc_url     = "jdbc:postgresql://${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
-      node_url     = "postgresql://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
-      python_url   = "postgresql://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
-      django_dsn   = "postgres://${var.pgsql_user}:PASSWORD@${aws_instance.pgsql_ec2.private_ip}:5432/${var.pgsql_database}"
+      # API endpoint URLs
+      rest_api_url = "http://${aws_instance.qdrant_ec2.private_ip}:${var.qdrant_http_port}"
+      grpc_url     = "${aws_instance.qdrant_ec2.private_ip}:${var.qdrant_grpc_port}"
+
+      # Example curl commands
+      health_check_cmd = "curl http://${aws_instance.qdrant_ec2.private_ip}:${var.qdrant_http_port}/"
+      collections_cmd  = "curl http://${aws_instance.qdrant_ec2.private_ip}:${var.qdrant_http_port}/collections"
     }
-
 
     # Backup configuration
     backups = {
       enabled         = var.enable_automated_backups
       s3_bucket       = local.backup_bucket_name
-      s3_bucket_arn       = local.backup_bucket_arn
+      s3_bucket_arn   = local.backup_bucket_arn
       schedule        = var.backup_schedule
       retention_days  = var.backup_retention_days
-      backup_path     = "s3://${local.backup_bucket_name}/pgsql-backups/${var.env}/${var.project_id}/"
+      backup_path     = "s3://${local.backup_bucket_name}/qdrant-snapshots/${var.env}/${var.project_id}/"
       ebs_snapshots   = var.enable_ebs_snapshots
       cross_region_dr = var.enable_cross_region_snapshot_copy
       dr_region       = var.enable_cross_region_snapshot_copy ? var.snapshot_dr_region : null
@@ -49,54 +48,54 @@ output "pgsql" {
 
     # CloudWatch monitoring
     monitoring = var.enable_cloudwatch_monitoring ? {
-      enabled         = true
-      log_group       = aws_cloudwatch_log_group.pgsql_logs[0].name
-      log_group_arn   = aws_cloudwatch_log_group.pgsql_logs[0].arn
-      retention_days  = var.cloudwatch_retention_days
-      detailed_ec2    = var.enable_detailed_monitoring
+      enabled        = true
+      log_group      = aws_cloudwatch_log_group.qdrant_logs[0].name
+      log_group_arn  = aws_cloudwatch_log_group.qdrant_logs[0].arn
+      retention_days = var.cloudwatch_retention_days
+      detailed_ec2   = var.enable_detailed_monitoring
     } : {
       enabled = false
     }
 
     # IAM role
     iam_role = {
-      name = aws_iam_role.pgsql_ec2.name
-      arn  = aws_iam_role.pgsql_ec2.arn
+      name = aws_iam_role.qdrant_ec2.name
+      arn  = aws_iam_role.qdrant_ec2.arn
     }
   }
 }
 
 output "connect_via_session_manager" {
   description = "Command to connect to the instance via AWS Systems Manager Session Manager"
-  value       = "aws ssm start-session --target ${aws_instance.pgsql_ec2.id}"
+  value       = "aws ssm start-session --target ${aws_instance.qdrant_ec2.id}"
 }
 
-# Separate sensitive output for passwords (requires explicit query)
-output "pgsql_passwords" {
+# Separate sensitive output for API keys (requires explicit query)
+output "qdrant_api_keys" {
   description = <<-EOT
-    Security Note: Passwords are stored in AWS Secrets Manager.
+    Security Note: API keys are stored in AWS Secrets Manager.
     Retrieve them programmatically using the AWS CLI or SDK.
+
+    To view: terraform output -json qdrant_api_keys
   EOT
   value = {
-    pgsql_postgres = local.generate_passwords ? random_password.pgsql_postgres[0].result : var.pgsql_postgres_password
-    pgsql_user = local.generate_passwords ? random_password.pgsql_user[0].result : var.pgsql_password
-
-    # Alternative: Retrieve from Secrets Manager (recommended)
-    retrieve_pgsql_postgres = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} --query SecretString --output text"
-    retrieve_pgsql_user = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.name} --query SecretString --output text"
-
     # Secrets Manager references
     secrets = {
-      postgres_password_secret_arn = aws_secretsmanager_secret.pgsql_postgres_password.arn
-      postgres_password_secret_id  = aws_secretsmanager_secret.pgsql_postgres_password.id
-      user_password_secret_arn     = aws_secretsmanager_secret.pgsql_user_password.arn
-      user_password_secret_id      = aws_secretsmanager_secret.pgsql_user_password.id
+      api_key_secret_arn          = aws_secretsmanager_secret.qdrant_api_key.arn
+      api_key_secret_id           = aws_secretsmanager_secret.qdrant_api_key.id
+      read_only_key_secret_arn    = aws_secretsmanager_secret.qdrant_read_only_key.arn
+      read_only_key_secret_id     = aws_secretsmanager_secret.qdrant_read_only_key.id
 
-      # Command to retrieve passwords
-      get_postgres_password_cmd = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.id} --query SecretString --output text"
-      get_user_password_cmd     = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.id} --query SecretString --output text"
+      # Commands to retrieve API keys
+      get_api_key_cmd          = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.qdrant_api_key.id} --query SecretString --output text"
+      get_read_only_key_cmd    = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.qdrant_read_only_key.id} --query SecretString --output text"
     }
 
+    # Example usage with curl (retrieve key first)
+    usage_examples = {
+      get_collections     = "curl -H 'api-key: YOUR_API_KEY' http://${aws_instance.qdrant_ec2.private_ip}:${var.qdrant_http_port}/collections"
+      create_collection   = "curl -X PUT -H 'api-key: YOUR_API_KEY' -H 'Content-Type: application/json' http://${aws_instance.qdrant_ec2.private_ip}:${var.qdrant_http_port}/collections/my_collection -d '{\"vectors\":{\"size\":384,\"distance\":\"Cosine\"}}'"
+    }
   }
   sensitive = true
 }
