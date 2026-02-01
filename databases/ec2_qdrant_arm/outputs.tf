@@ -83,12 +83,9 @@ output "qdrant_api_keys" {
     secrets = {
       api_key_secret_arn          = aws_secretsmanager_secret.qdrant_api_key.arn
       api_key_secret_id           = aws_secretsmanager_secret.qdrant_api_key.id
-      read_only_key_secret_arn    = aws_secretsmanager_secret.qdrant_read_only_key.arn
-      read_only_key_secret_id     = aws_secretsmanager_secret.qdrant_read_only_key.id
 
       # Commands to retrieve API keys
       get_api_key_cmd          = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.qdrant_api_key.id} --query SecretString --output text"
-      get_read_only_key_cmd    = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.qdrant_read_only_key.id} --query SecretString --output text"
     }
 
     # Example usage with curl (retrieve key first)
