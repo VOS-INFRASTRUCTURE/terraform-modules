@@ -24,9 +24,8 @@ module "qdrant_production" {
   instance_type = "m7g.xlarge" # 4 vCPU, 16GB RAM, ~$134/month
   storage_size  = 200          # GB for large vector collections
 
-  # API Keys - Custom (or leave empty for auto-generation)
-  qdrant_api_key           = var.qdrant_api_key
-  qdrant_read_only_api_key = var.qdrant_read_only_api_key
+  # API Key - Custom (or leave empty for auto-generation)
+  qdrant_api_key = var.qdrant_api_key
 
   # Backups - Frequent with longer retention
   enable_automated_backups = true
@@ -67,15 +66,10 @@ module "qdrant_production" {
 ################################################################################
 
 variable "qdrant_api_key" {
-  description = "Qdrant API key (use strong 32+ char key)"
+  description = "Qdrant API key (use strong 32+ char key, or leave empty for auto-generation). Note: For read-only access, configure collection-level permissions via Qdrant API after deployment."
   type        = string
   sensitive   = true
-}
-
-variable "qdrant_read_only_api_key" {
-  description = "Qdrant read-only API key"
-  type        = string
-  sensitive   = true
+  default     = "" # Auto-generate if not provided
 }
 
 ################################################################################

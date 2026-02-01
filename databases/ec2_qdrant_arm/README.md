@@ -69,10 +69,9 @@ module "qdrant" {
   instance_type = "t4g.large"
   storage_size  = 50  # GB for vector data
 
-  # Auto-generated secure API keys
+  # Auto-generated secure API key
   # Leave empty to auto-generate
-  qdrant_api_key           = ""
-  qdrant_read_only_api_key = ""
+  qdrant_api_key = ""
 
   # Backups (every 6 hours by default)
   enable_automated_backups = true
@@ -106,6 +105,8 @@ curl -H "api-key: YOUR_API_KEY" http://PRIVATE_IP:6333/collections
 aws ssm start-session --target i-xxxxx
 ```
 
+**Note on Read-Only Access**: Qdrant doesn't support separate read-only API keys via environment variables. For read-only access, configure collection-level permissions using the [Qdrant API](https://qdrant.tech/documentation/guides/security/) after deployment.
+
 ### Instance Types
 
 | Instance     | vCPU | RAM   | Storage     | Cost/Month | Use Case             |
@@ -129,9 +130,9 @@ qdrant_grpc_port = 6334  # gRPC API
 # Logging
 qdrant_log_level = "INFO"  # DEBUG, INFO, WARN, ERROR
 
-# API keys (leave empty to auto-generate)
-qdrant_api_key           = ""  # Full access
-qdrant_read_only_api_key = ""  # Read-only access
+# API key (leave empty to auto-generate)
+qdrant_api_key = ""  # Full access
+# Note: For read-only access, use Qdrant's collection-level permissions API
 ```
 
 ### Backup Configuration

@@ -115,28 +115,24 @@ CWCONFIG
     -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
 fi
 
-# Retrieve API keys from Secrets Manager
-echo "Retrieving Qdrant API keys from Secrets Manager..."
+# Retrieve API key from Secrets Manager
+echo "Retrieving Qdrant API key from Secrets Manager..."
 QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.qdrant_api_key.name} \
   --region ${data.aws_region.current.name} \
   --query SecretString \
   --output text)
 
-QDRANT_READ_ONLY_KEY=$(aws secretsmanager get-secret-value \
-  --secret-id ${aws_secretsmanager_secret.qdrant_read_only_key.name} \
-  --region ${data.aws_region.current.name} \
-  --query SecretString \
-  --output text)
-
 # Install Qdrant natively (latest stable release for ARM64)
 echo "Installing Qdrant..."
-QDRANT_VERSION="v1.7.4"  # Latest stable as of Jan 2026
-wget https://github.com/qdrant/qdrant/releases/download/$QDRANT_VERSION/qdrant-aarch64-unknown-linux-gnu.tar.gz
-tar -xzf qdrant-aarch64-unknown-linux-gnu.tar.gz
+# Check for latest version at: https://github.com/qdrant/qdrant/releases
+# ARM64 asset: qdrant-aarch64-unknown-linux-musl.tar.gz
+QDRANT_VERSION="v1.12.5"  # Verified stable release (update as needed)
+wget https://github.com/qdrant/qdrant/releases/download/$QDRANT_VERSION/qdrant-aarch64-unknown-linux-musl.tar.gz
+tar -xzf qdrant-aarch64-unknown-linux-musl.tar.gz
 mv qdrant /usr/local/bin/
 chmod +x /usr/local/bin/qdrant
-rm qdrant-aarch64-unknown-linux-gnu.tar.gz
+rm qdrant-aarch64-unknown-linux-musl.tar.gz
 
 # Create qdrant user and directories
 useradd -r -s /bin/false qdrant || true
@@ -147,6 +143,7 @@ mkdir -p /var/log/qdrant
 chown -R qdrant:qdrant /var/lib/qdrant /var/log/qdrant
 
 # Create Qdrant configuration
+# Note: Qdrant API key is set via environment variable, not config file
 cat > /etc/qdrant/config.yaml <<'QDRANTCONFIG'
 service:
   http_port: ${var.qdrant_http_port}
@@ -162,18 +159,13 @@ log_level: ${var.qdrant_log_level}
 # Performance settings for ARM Graviton
 cluster:
   enabled: false
-
-# Security settings
-service:
-  api_key: "$QDRANT_API_KEY"
-  read_only_api_key: "$QDRANT_READ_ONLY_KEY"
 QDRANTCONFIG
 
 chown qdrant:qdrant /etc/qdrant/config.yaml
 chmod 600 /etc/qdrant/config.yaml
 
-# Create systemd service
-cat > /etc/systemd/system/qdrant.service <<'SYSTEMDSERVICE'
+# Create systemd service with API key as environment variable
+cat > /etc/systemd/system/qdrant.service <<SYSTEMDSERVICE
 [Unit]
 Description=Qdrant Vector Database
 After=network.target
@@ -182,6 +174,7 @@ After=network.target
 Type=simple
 User=qdrant
 Group=qdrant
+Environment="QDRANT__SERVICE__API_KEY=$QDRANT_API_KEY"
 ExecStart=/usr/local/bin/qdrant --config-path /etc/qdrant/config.yaml
 Restart=always
 RestartSec=10

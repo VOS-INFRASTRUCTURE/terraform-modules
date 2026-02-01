@@ -23,9 +23,8 @@ module "qdrant" {
   instance_type = "t4g.large" # 2 vCPU, 8GB RAM, ~$49/month
   storage_size  = 50          # GB for vector data
 
-  # API Keys (leave empty to auto-generate)
-  qdrant_api_key           = "" # Auto-generated 32-char key
-  qdrant_read_only_api_key = "" # Auto-generated read-only key
+  # API Key (leave empty to auto-generate)
+  qdrant_api_key = "" # Auto-generated 32-char key
 
   # Backups (every 6 hours)
   enable_automated_backups = true

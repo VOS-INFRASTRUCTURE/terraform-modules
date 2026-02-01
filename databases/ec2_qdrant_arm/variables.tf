@@ -92,14 +92,7 @@ variable "enable_ebs_encryption" {
 ################################################################################
 
 variable "qdrant_api_key" {
-  description = "API key for Qdrant REST/gRPC API authentication (leave empty to auto-generate)"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "qdrant_read_only_api_key" {
-  description = "Read-only API key for Qdrant (leave empty to auto-generate)"
+  description = "API key for Qdrant REST/gRPC API authentication (leave empty to auto-generate). Note: For read-only access, configure collection-level permissions via Qdrant API after deployment."
   type        = string
   default     = ""
   sensitive   = true
