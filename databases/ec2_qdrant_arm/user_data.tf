@@ -167,7 +167,8 @@ chmod 600 /etc/qdrant/config.yaml
 # Create environment file for systemd (safer than inline Environment=)
 # systemd does NOT expand shell variables in Environment= directives
 # Using EnvironmentFile= ensures proper substitution
-echo "QDRANT__SERVICE__API_KEY=$QDRANT_API_KEY" > /etc/qdrant/qdrant.env
+# Disable use of api-key in config file for security for now
+echo "# QDRANT__SERVICE__API_KEY=$QDRANT_API_KEY" > /etc/qdrant/qdrant.env
 chmod 600 /etc/qdrant/qdrant.env
 chown qdrant:qdrant /etc/qdrant/qdrant.env
 
