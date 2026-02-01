@@ -31,7 +31,7 @@ variable "ami_id" {
 variable "instance_type" {
   description = "The type of instance to launch (e.g., t3.micro, t3.small, t3.medium)"
   type        = string
-  default     = "t3.micro"
+  default     = "t3a.medium"
 }
 
 variable "subnet_id" {

@@ -10,8 +10,9 @@ Complete comparison of all EC2 instance types suitable for MySQL databases, comp
 2. [M-Series: General Purpose](#m-series-general-purpose)
 3. [R-Series: Memory Optimized](#r-series-memory-optimized)
 4. [C-Series: Compute Optimized](#c-series-compute-optimized)
-5. [Quick Selection Guide](#quick-selection-guide)
-6. [Cost Summary](#cost-summary)
+5. [AMD x86 Alternatives](#amd-x86-alternatives)
+6. [Quick Selection Guide](#quick-selection-guide)
+7. [Cost Summary](#cost-summary)
 
 ---
 
@@ -40,6 +41,21 @@ Complete comparison of all EC2 instance types suitable for MySQL databases, comp
 | **t3.large** | 2 | 8 GB | 30% | 100% | Up to 5 | Up to 2.780 | **$60.74** | +24% |
 | **t3.xlarge** | 4 | 16 GB | 40% | 100% | Up to 5 | Up to 2.780 | **$121.47** | +24% |
 | **t3.2xlarge** | 8 | 32 GB | 40% | 100% | Up to 5 | Up to 2.780 | **$242.93** | +24% |
+
+#### x86 (AMD) - t3a Family
+
+AMD EPYC-based burstable instances (t3a) generally offer ~10% lower pricing than t3 with similar performance characteristics.
+
+| Instance Type | vCPU | RAM | Baseline CPU | Burst CPU | Network (Gbps) | EBS (Gbps) | Typical Price vs t3 |
+|--------------|------|-----|--------------|-----------|----------------|------------|---------------------|
+| **t3a.micro** | 2 | 1 GB | 10% | 100% | Up to 5 | Up to 2.085 | ~10% lower than t3.micro |
+| **t3a.small** | 2 | 2 GB | 20% | 100% | Up to 5 | Up to 2.085 | ~10% lower than t3.small |
+| **t3a.medium** | 2 | 4 GB | 20% | 100% | Up to 5 | Up to 2.085 | ~10% lower than t3.medium |
+| **t3a.large** | 2 | 8 GB | 30% | 100% | Up to 5 | Up to 2.780 | ~10% lower than t3.large |
+| **t3a.xlarge** | 4 | 16 GB | 40% | 100% | Up to 5 | Up to 2.780 | ~10% lower than t3.xlarge |
+| **t3a.2xlarge** | 8 | 32 GB | 40% | 100% | Up to 5 | Up to 2.780 | ~10% lower than t3.2xlarge |
+
+*Tip:* Choose t3a over t3 where available to reduce cost on x86 without changing performance envelopes.
 
 **CPU Credits:**
 - t4g.micro: 12 credits/hour (10% baseline)
@@ -132,6 +148,31 @@ Complete comparison of all EC2 instance types suitable for MySQL databases, comp
 
 ---
 
+## AMD x86 Alternatives
+
+Dedicated overview of AMD-based x86 instances to complement ARM and Intel options. Prefer ARM for most MySQL workloads; use AMD when you want competitive pricing on x86 or specific AMD optimizations.
+
+### General Purpose (AMD)
+
+- Consider m6a/m7a families when available in your region for balanced CPU/RAM.
+- Typical pricing is ~20–25% higher than ARM for comparable sizes.
+
+### Compute Optimized (AMD)
+
+| Instance Type | vCPU | RAM | Network (Gbps) | EBS (Gbps) | Price ($/month)* | Best For |
+|--------------|------|-----|----------------|------------|------------------|----------|
+| **c6a.large** | 2 | 4 GB | Up to 12.5 | Up to 10 | **$68.04** | Compute-heavy queries on x86 |
+| **c6a.xlarge** | 4 | 8 GB | Up to 12.5 | Up to 10 | **$136.08** | Analytics on x86 |
+| **c6a.2xlarge** | 8 | 16 GB | Up to 12.5 | Up to 10 | **$272.16** | High-throughput CPU |
+| **c6a.4xlarge** | 16 | 32 GB | Up to 12.5 | Up to 10 | **$544.32** | Heavy analytics x86 |
+
+### Memory Optimized (AMD)
+
+- r6a/r7a families: good for larger buffer pools on x86.
+- Expect ~20–25% cost premium vs ARM with similar memory bandwidth targets.
+
+---
+
 ## Quick Selection Guide
 
 | Your Need | Recommended Instance | Monthly Cost | Why |
@@ -176,11 +217,11 @@ Complete comparison of all EC2 instance types suitable for MySQL databases, comp
 - **Buffer Pool Size: Recommended `innodb_buffer_pool_size` (75% of RAM)
 - ⭐ = Recommended sweet spot for that use case
 - Prices exclude EBS storage, data transfer, and backups
-- Reserved Instances and Savings Plans can reduce costs by 40-60%
+- Reserved Instances and Savings Plans can reduce costs by 40–60%
 
 ---
 
-**Recommendation:** Use ARM (Graviton) for 90% of MySQL workloads to get 14-25% cost savings with equal or better performance.
+**Recommendation:** Use ARM (Graviton) for 90% of MySQL workloads to get 14–25% cost savings with equal or better performance.
 
 **Last Updated:** January 2026
 
