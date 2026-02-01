@@ -22,11 +22,6 @@
 # - Qdrant configured with security best practices
 ################################################################################
 
-################################################################################
-# Data Sources
-################################################################################
-
-data "aws_region" "current" {}
 
 # Auto-detect latest Ubuntu ARM64 AMI for current region
 # Tries Ubuntu 24.04 (Noble) first, falls back to 22.04 (Jammy) if unavailable
