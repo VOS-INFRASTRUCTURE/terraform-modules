@@ -78,7 +78,6 @@ resource "aws_iam_role_policy" "qdrant_secrets_manager" {
         ]
         Resource = [
           aws_secretsmanager_secret.qdrant_api_key.arn,
-          aws_secretsmanager_secret.qdrant_read_only_key.arn
         ]
       }
     ]
