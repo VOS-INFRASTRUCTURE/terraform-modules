@@ -32,6 +32,8 @@ locals {
   backup_bucket_name = var.enable_automated_backups ? (
     var.create_backup_bucket ? "${var.env}-${var.project_id}-${var.base_name}-mysql-backups" : var.backup_s3_bucket_name
   ) : ""
+
+  backup_bucket_arn = var.enable_automated_backups ? aws_s3_bucket.mysql_backups[0].arn : ""
 }
 
 ################################################################################

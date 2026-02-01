@@ -66,6 +66,7 @@ output "mysql" {
       mysql_backups = {
         enabled            = var.enable_automated_backups
         s3_bucket_name     = local.backup_bucket_name
+        s3_bucket_arn     = local.backup_bucket_arn
         schedule           = var.backup_schedule
         retention_days     = var.backup_retention_days
         s3_path            = var.enable_automated_backups ? "s3://${local.backup_bucket_name}/mysql-backups/${var.env}/${var.project_id}/" : null
