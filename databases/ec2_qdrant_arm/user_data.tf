@@ -127,7 +127,7 @@ QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
 echo "Installing Qdrant..."
 # Check for latest version at: https://github.com/qdrant/qdrant/releases
 # ARM64 asset: qdrant-aarch64-unknown-linux-musl.tar.gz
-QDRANT_VERSION="v1.12.5"  # Verified stable release (update as needed)
+QDRANT_VERSION="v1.16.3"  # Verified stable release (update as needed)
 wget https://github.com/qdrant/qdrant/releases/download/$QDRANT_VERSION/qdrant-aarch64-unknown-linux-musl.tar.gz
 tar -xzf qdrant-aarch64-unknown-linux-musl.tar.gz
 mv qdrant /usr/local/bin/
