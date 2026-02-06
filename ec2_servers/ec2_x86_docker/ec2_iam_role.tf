@@ -36,40 +36,6 @@ resource "aws_iam_role_policy_attachment" "ssm_policy" {
   role       = aws_iam_role.ec2_x86_docker.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
-
-# Policy for Secrets Manager - READ-ONLY access
-# Security Note: EC2 instance can only READ passwords from Secrets Manager.
-# Terraform creates/updates/deletes secrets, not the EC2 instance.
-# This prevents compromised EC2 from modifying or deleting passwords.
-resource "aws_iam_role_policy" "secrets_read_only" {
-  name = "${local.instance_name}-secrets-read-only"
-  role = aws_iam_role.ec2_x86_docker.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ReadSecretsOnly"
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue",    # Read password value
-          "secretsmanager:DescribeSecret"     # Read secret metadata
-          # NOTE: The following permissions are NOT granted for security:
-          # - secretsmanager:CreateSecret
-          # - secretsmanager:UpdateSecret
-          # - secretsmanager:DeleteSecret
-          # - secretsmanager:PutSecretValue
-          # Only Terraform can manage secrets
-        ]
-        Resource = [
-          aws_secretsmanager_secret.mysql_root_password.arn,
-          aws_secretsmanager_secret.mysql_user_password.arn
-        ]
-      }
-    ]
-  })
-}
-
 # Policy for CloudWatch logs and metrics
 resource "aws_iam_role_policy" "cloudwatch_access" {
   count = var.enable_cloudwatch_monitoring ? 1 : 0
@@ -94,7 +60,6 @@ resource "aws_iam_role_policy" "cloudwatch_access" {
     ]
   })
 }
-
 
 # Instance profile is required to attach IAM role to EC2 instance
 # Only a profile can be attached to an EC2 instance
