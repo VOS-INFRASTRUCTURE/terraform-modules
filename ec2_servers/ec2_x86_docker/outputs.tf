@@ -2,7 +2,7 @@
 # Outputs for EC2  Module
 ################################################################################
 
-output "mysql" {
+output "server" {
   description = "Complete EC2  instance configuration and connection details"
   value = {
     # Instance details
@@ -13,18 +13,6 @@ output "mysql" {
       public_ip         = aws_instance.ec2_x86_docker.public_ip
       availability_zone = aws_instance.ec2_x86_docker.availability_zone
       instance_type     = aws_instance.ec2_x86_docker.instance_type
-    }
-
-    # Secrets Manager ARNs
-    secrets = {
-      root_password_secret_arn = aws_secretsmanager_secret.mysql_root_password.arn
-      root_password_secret_name = aws_secretsmanager_secret.mysql_root_password.name
-      user_password_secret_arn = aws_secretsmanager_secret.mysql_user_password.arn
-      user_password_secret_name = aws_secretsmanager_secret.mysql_user_password.name
-
-      # Commands to retrieve passwords
-      get_root_password_command = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} --query SecretString --output text"
-      get_user_password_command = "aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} --query SecretString --output text"
     }
 
     # Security configuration
