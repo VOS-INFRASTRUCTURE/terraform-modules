@@ -1,109 +1,89 @@
-# EC2 MySQL Module - Complete Usage Guide
+# EC2 Docker Server Module (x86_64/AMD64)
 
 ## Overview
 
-This module deploys a production-ready MySQL database on EC2 using Docker, with comprehensive security features including AWS Secrets Manager for password management, automated backups, and CloudWatch monitoring.
+This module deploys a production-ready EC2 instance with Docker pre-installed on x86_64/AMD64 architecture (Ubuntu 24.04). It includes comprehensive security features, CloudWatch monitoring, and automated EBS snapshots.
+
+## Architecture
+
+- **OS**: Ubuntu 24.04 LTS (x86_64/AMD64)
+- **Docker**: Latest stable version installed and configured
+- **Access**: AWS Systems Manager Session Manager (SSH-less) or SSH key
+- **Monitoring**: CloudWatch Logs and Metrics
+- **Backups**: Automated EBS snapshots via AWS Data Lifecycle Manager
 
 ## Features
 
-- ✅ **Secure Password Management**: Passwords stored in AWS Secrets Manager (not Terraform state)
-- ✅ **Automatic Password Generation**: 32-character random passwords generated automatically
-- ✅ **Encrypted Storage**: EBS volumes encrypted at rest
+- ✅ **Docker Pre-installed**: Latest Docker CE installed and ready to use
+- ✅ **Secure Access**: Systems Manager Session Manager (no SSH keys needed)
 - ✅ **IAM Roles**: Least-privilege IAM roles for secure AWS API access
+- ✅ **Encrypted Storage**: EBS volumes encrypted at rest
 - ✅ **CloudWatch Integration**: Comprehensive logging and metrics
-- ✅ **Automated Backups**: Daily backups to S3 with retention management
-- ✅ **SSH-less Access**: Systems Manager Session Manager (no SSH keys needed)
-- ✅ **MySQL Hardening**: Security best practices in MySQL configuration
-- ✅ **Docker Health Checks**: Automatic container health monitoring
+- ✅ **Automated Snapshots**: EBS volume snapshots for disaster recovery
+- ✅ **IMDSv2**: Instance Metadata Service v2 enforced for security
+- ✅ **Cost Optimized**: Support for t3, t3a instance families
 
 ## Quick Start
 
 ### Basic Example (Development)
 
 ```hcl
-module "mysql_dev" {
-  source = "../../databases/ec2_mysql"
+module "docker_server" {
+  source = "../../ec2_servers/ec2_x86_docker"
 
   env        = "development"
   project_id = "myapp"
+  base_name  = "api-server"
 
   # Instance configuration
-  ami_id     = "ami-0c55b159cbfafe1f0"  # Ubuntu 22.04
-  subnet_id  = "subnet-12345678"
-  security_group_ids = ["sg-mysql-servers"]
+  subnet_id          = "subnet-12345678"
+  security_group_ids = ["sg-app-servers"]
 
-  # MySQL configuration
-  mysql_database = "appdb"
-  mysql_user     = "appuser"
-  # Passwords auto-generated and stored in Secrets Manager
+  # Use defaults: t3a.medium, 20GB storage, CloudWatch enabled
 }
 ```
 
-### Production Example (with all features)
+### Production Example (All Features)
 
 ```hcl
-module "mysql_prod" {
-  source = "../../databases/ec2_mysql"
+module "docker_prod_server" {
+  source = "../../ec2_servers/ec2_x86_docker"
 
   env        = "production"
   project_id = "myapp"
-  base_name  = "primary-db"
+  base_name  = "api-server"
 
   # Instance configuration
-  ami_id        = "ami-0c55b159cbfafe1f0"
-  instance_type = "t3.small"  # 2 GB RAM for production
+  instance_type = "t3a.large"  # 2 vCPU, 8 GB RAM
   subnet_id     = "subnet-private-1a"
-  security_group_ids = ["sg-mysql-servers"]
+  security_group_ids = ["sg-app-servers"]
 
   # Storage
-  storage_size = 50  # 50 GB
-  storage_type = "gp3"
+  storage_size          = 50   # 50 GB
+  storage_type          = "gp3"
   enable_ebs_encryption = true
 
   # Access
-  enable_ssm_access      = true
-  enable_ssh_key_access  = false  # Use SSM only
-
-  # MySQL configuration
-  mysql_version      = "8.0"
-  mysql_database     = "production_db"
-  mysql_user         = "app_user"
-  # Passwords auto-generated and stored in Secrets Manager
-  
-  # Performance tuning
-  mysql_max_connections   = 200
-  innodb_buffer_pool_size = "512M"
+  enable_ssm_access     = true
+  enable_ssh_key_access = false  # Use SSM only
 
   # Monitoring
   enable_cloudwatch_monitoring = true
   log_retention_days          = 30
 
-  # Backups (S3 bucket created automatically by module)
-  enable_automated_backups = true
-  backup_schedule          = "0 * * * *"  # Hourly backups
-  backup_retention_days    = 14
-
-  # EBS snapshots for full instance backup
+  # Snapshots
   enable_ebs_snapshots        = true
   ebs_snapshot_interval_hours = 24
   ebs_snapshot_time           = "03:00"  # 3 AM UTC daily
-  ebs_snapshot_retention_count = 14  # Keep 2 weeks
+  ebs_snapshot_retention_count = 14
+
+  # Protection
+  enable_termination_protection = true
 
   tags = {
     Environment = "production"
     Critical    = "true"
-    Backup      = "Required"
   }
-}
-
-# Output connection details
-output "mysql_connection" {
-  value = module.mysql_prod.mysql.connection
-}
-
-# Access the auto-created backup bucket
-output "backup_bucket" {
-  value = module.mysql_prod.mysql.backup.s3_bucket_name
 }
 ```
 
@@ -113,538 +93,395 @@ output "backup_bucket" {
 
 | Name | Description | Type |
 |------|-------------|------|
-| `env` | Environment name | `string` |
+| `env` | Environment name (e.g., staging, production) | `string` |
 | `project_id` | Project identifier | `string` |
-| `ami_id` | Ubuntu 22.04 AMI ID | `string` |
-| `subnet_id` | Subnet ID (private recommended) | `string` |
+| `subnet_id` | Subnet ID (private subnet recommended) | `string` |
 | `security_group_ids` | List of security group IDs | `list(string)` |
-| `mysql_database` | Database name to create | `string` |
-| `mysql_user` | Non-root MySQL username | `string` |
 
 ### Optional Variables
 
 | Name | Description | Default |
 |------|-------------|---------|
 | `base_name` | Base name for resources | `"mysql"` |
-| `instance_type` | EC2 instance type | `"t3.micro"` |
-| `storage_size` | EBS volume size (GB) | `20` |
-| `storage_type` | EBS volume type | `"gp3"` |
+| `ami_id` | Ubuntu 24.04 AMI ID (auto-detected if not specified) | `"ami-05c172c7f0d3aed00"` |
+| `instance_type` | EC2 instance type (t3, t3a families supported) | `"t3a.medium"` |
+| `storage_size` | EBS volume size in GB | `20` |
+| `storage_type` | EBS volume type (gp3 recommended) | `"gp3"` |
 | `enable_ebs_encryption` | Encrypt EBS volumes | `true` |
-| `enable_detailed_monitoring` | Detailed CloudWatch monitoring | `false` |
-| `enable_termination_protection` | Prevent accidental deletion | `false` |
-| `key_name` | SSH key pair name | `""` |
+| `enable_detailed_monitoring` | Detailed CloudWatch monitoring (1-min intervals) | `false` |
+| `enable_termination_protection` | Prevent accidental instance termination | `false` |
+| `key_name` | SSH key pair name (optional) | `""` |
 | `enable_ssh_key_access` | Enable SSH key access | `false` |
 | `enable_ssm_access` | Enable SSM Session Manager | `true` |
-| `mysql_version` | MySQL Docker image version | `"8.0"` |
-| `mysql_root_password` | Root password (auto-generated if empty) | `""` |
-| `mysql_password` | User password (auto-generated if empty) | `""` |
-| `mysql_max_connections` | Max MySQL connections | `151` |
-| `innodb_buffer_pool_size` | InnoDB buffer pool size | `"128M"` |
-| `enable_cloudwatch_monitoring` | Enable CloudWatch | `true` |
-| `log_retention_days` | Log retention days | `7` |
-| `enable_automated_backups` | Enable S3 backups (creates S3 bucket) | `false` |
-| `backup_schedule` | Cron schedule for backups | `"0 * * * *"` (hourly) |
-| `backup_retention_days` | Backup retention days | `7` |
-| `enable_ebs_snapshots` | Enable EBS volume snapshots | `false` |
+| `enable_cloudwatch_monitoring` | Enable CloudWatch logs and metrics | `true` |
+| `log_retention_days` | CloudWatch log retention days | `7` |
+| `enable_ebs_snapshots` | Enable automated EBS snapshots | `false` |
 | `ebs_snapshot_interval_hours` | Hours between snapshots | `24` |
-| `ebs_snapshot_time` | Daily snapshot time (UTC) | `"03:00"` |
+| `ebs_snapshot_time` | Daily snapshot time in UTC (HH:MM) | `"03:00"` |
 | `ebs_snapshot_retention_count` | Number of snapshots to keep | `7` |
+| `tags` | Additional resource tags | `{}` |
 
 ## Outputs
 
-### Single Output Object
+The module provides a single comprehensive output object:
 
 ```hcl
-module.mysql.mysql
+module.docker_server.mysql  # Output object containing all server details
 ```
 
-Contains all connection details, security information, and configuration:
+### Output Structure
 
 ```json
 {
   "instance": {
     "id": "i-0123456789abcdef",
+    "arn": "arn:aws:ec2:...",
     "private_ip": "10.0.1.50",
-    "availability_zone": "us-east-1a"
+    "public_ip": null,
+    "availability_zone": "eu-west-2a",
+    "instance_type": "t3a.medium"
   },
-  "connection": {
-    "host": "10.0.1.50",
-    "port": 3306,
-    "database": "appdb",
-    "user": "appuser",
-    "mysql_cli_command": "mysql -h 10.0.1.50 -P 3306 -u appuser -p appdb"
+  "security": {
+    "ebs_encrypted": true,
+    "iam_role_arn": "arn:aws:iam::...",
+    "iam_instance_profile": "...",
+    "security_group_ids": ["sg-..."],
+    "ssm_access_enabled": true,
+    "ssh_key_access": false
   },
-  "secrets": {
-    "root_password_secret_arn": "arn:aws:secretsmanager:...",
-    "user_password_secret_arn": "arn:aws:secretsmanager:...",
-    "get_user_password_command": "aws secretsmanager get-secret-value ..."
+  "monitoring": {
+    "enabled": true,
+    "log_group_name": "/aws/ec2/...",
+    "log_group_arn": "arn:aws:logs:...",
+    "log_retention_days": 7
   },
-  "security": { ... },
-  "monitoring": { ... },
-  "backup": { ... },
-  "access": { ... },
-  "app_config_examples": { ... }
+  "backup": {
+    "ebs_snapshots": {
+      "enabled": true,
+      "interval_hours": 24,
+      "snapshot_time": "03:00",
+      "retention_count": 7,
+      "dlm_policy_id": "policy-...",
+      "dlm_policy_arn": "arn:aws:dlm:..."
+    }
+  },
+  "access": {
+    "ssm_session_command": "aws ssm start-session --target i-...",
+    "ssh_command": "SSH key access not configured"
+  }
 }
 ```
 
-## Security Features
+## Instance Type Options
 
-### 1. Password Management
+### AMD (t3a series) - Best Value
 
-Passwords are **never stored in Terraform state** in plain text. Instead:
+| Instance Type | vCPU | RAM | Cost/Month* | Use Case |
+|--------------|------|-----|-------------|----------|
+| `t3a.micro` | 2 | 1 GB | ~$6 | Very light workloads |
+| `t3a.small` | 2 | 2 GB | ~$12 | Light applications |
+| `t3a.medium` | 2 | 4 GB | ~$24 | **Default** - General purpose |
+| `t3a.large` | 2 | 8 GB | ~$48 | Memory-intensive apps |
+| `t3a.xlarge` | 4 | 16 GB | ~$96 | High-performance apps |
 
-- Automatically generated (32 characters, random)
-- Stored in AWS Secrets Manager (encrypted at rest)
-- Retrieved programmatically by EC2 instance
-- IAM controls who can read secrets
+### Intel (t3 series) - Slightly Higher Performance
 
-**Retrieve password:**
-```bash
-aws secretsmanager get-secret-value \
-  --secret-id production/myapp/mysql/mysql-user-password \
-  --query SecretString \
-  --output text
-```
+| Instance Type | vCPU | RAM | Cost/Month* | Use Case |
+|--------------|------|-----|-------------|----------|
+| `t3.micro` | 2 | 1 GB | ~$7 | Very light workloads |
+| `t3.small` | 2 | 2 GB | ~$14 | Light applications |
+| `t3.medium` | 2 | 4 GB | ~$28 | General purpose |
+| `t3.large` | 2 | 8 GB | ~$56 | Memory-intensive apps |
+| `t3.xlarge` | 4 | 16 GB | ~$112 | High-performance apps |
 
-### 2. IAM Roles (Least Privilege)
+*Approximate costs for eu-west-2 region (compute only, excludes storage)
 
-The EC2 instance has minimal IAM permissions:
-- ✅ Read specific Secrets Manager secrets only
-- ✅ Write to specific S3 backup bucket only
-- ✅ Write CloudWatch logs
-- ✅ SSM Session Manager access
-- ❌ Cannot create/modify AWS resources
-- ❌ Cannot access other secrets
+**CPU Credits System:**
 
-### 3. Encryption
+| Instance | Baseline Performance | Burst Performance | Credit Accrual Rate |
+|----------|---------------------|-------------------|---------------------|
+| t3a.micro | 10% | 100% | 12 credits/hour |
+| t3a.small | 20% | 100% | 24 credits/hour |
+| t3a.medium | 20% | 100% | 24 credits/hour |
+| t3a.large | 30% | 100% | 36 credits/hour |
 
-- **EBS Volumes**: Encrypted at rest (enabled by default)
-- **Secrets Manager**: Encrypted using AWS KMS
-- **S3 Backups**: Server-side encryption
-- **In Transit**: TLS for Secrets Manager and S3 API calls
+## Accessing the Server
 
-### 4. Access Control
+### 1. SSM Session Manager (Recommended)
 
-**Recommended: SSM Session Manager (no SSH keys)**
-```bash
-aws ssm start-session --target i-0123456789abcdef
-```
-
-**Benefits:**
-- No SSH keys to manage
-- IAM-based access control
-- All sessions logged in CloudTrail
-- No port 22 in security groups
-
-### 5. MySQL Security Hardening
-
-```ini
-# MySQL configuration applied automatically
-skip-name-resolve       # Prevents DNS attacks
-local-infile=0          # Prevents local file access
-slow_query_log=1        # Detect performance issues
-log-bin                 # Binary logging for recovery
-```
-
-## Application Integration
-
-### Node.js (with Secrets Manager)
-
-```javascript
-const AWS = require('aws-sdk');
-const mysql = require('mysql2/promise');
-
-const secretsManager = new AWS.SecretsManager();
-
-// Get password from Secrets Manager
-const secretValue = await secretsManager.getSecretValue({
-  SecretId: 'production/myapp/mysql/mysql-user-password'
-}).promise();
-
-// Connect to MySQL
-const connection = await mysql.createConnection({
-  host: process.env.MYSQL_HOST,
-  port: 3306,
-  user: process.env.MYSQL_USER,
-  password: secretValue.SecretString,
-  database: process.env.MYSQL_DATABASE
-});
-
-// Use connection
-const [rows] = await connection.execute('SELECT * FROM users');
-```
-
-### Python (with Secrets Manager)
-
-```python
-import boto3
-import pymysql
-import os
-
-# Get password from Secrets Manager
-secrets = boto3.client('secretsmanager')
-password = secrets.get_secret_value(
-    SecretId='production/myapp/mysql/mysql-user-password'
-)['SecretString']
-
-# Connect to MySQL
-connection = pymysql.connect(
-    host=os.environ['MYSQL_HOST'],
-    port=3306,
-    user=os.environ['MYSQL_USER'],
-    password=password,
-    database=os.environ['MYSQL_DATABASE']
-)
-
-# Use connection
-cursor = connection.cursor()
-cursor.execute('SELECT * FROM users')
-rows = cursor.fetchall()
-```
-
-### Environment Variables
-
-```bash
-# Set these in your application
-MYSQL_HOST=10.0.1.50
-MYSQL_PORT=3306
-MYSQL_DATABASE=appdb
-MYSQL_USER=appuser
-# Password retrieved from Secrets Manager programmatically
-```
-
-## Accessing the MySQL Server
-
-### 1. Connect to Instance (via SSM)
+No SSH keys required, IAM-based access control:
 
 ```bash
 # Get instance ID from Terraform output
-terraform output -json mysql | jq -r '.instance.id'
+INSTANCE_ID=$(terraform output -json docker_server | jq -r '.instance.id')
 
 # Start SSM session
-aws ssm start-session --target i-0123456789abcdef
+aws ssm start-session --target $INSTANCE_ID
+
+# Once connected, Docker is ready to use
+docker ps
+docker run hello-world
 ```
 
-### 2. Access MySQL Container
+### 2. SSH Access (Optional)
+
+If `enable_ssh_key_access = true`:
 
 ```bash
-# Once connected to instance:
+# Get private IP
+INSTANCE_IP=$(terraform output -json docker_server | jq -r '.instance.private_ip')
 
-# View MySQL container status
-docker ps | grep mysql-server
-
-# View MySQL logs
-docker logs mysql-server -f
-
-# Connect to MySQL CLI (as user)
-docker exec -it mysql-server mysql -u appuser -p appdb
-
-# Connect as root
-docker exec -it mysql-server mysql -u root -p
+# Connect via SSH
+ssh -i /path/to/key.pem ubuntu@$INSTANCE_IP
 ```
 
-### 3. Get Password from Secrets Manager
+## Using Docker
+
+Docker is pre-installed and ready to use:
 
 ```bash
-# On your local machine:
-aws secretsmanager get-secret-value \
-  --secret-id production/myapp/mysql/mysql-user-password \
-  --query SecretString \
-  --output text
-```
-
-## Backups
-
-This module provides **two types of backups** for comprehensive disaster recovery:
-
-### 1. MySQL Database Backups (to S3)
-
-**What**: Logical backups using `mysqldump` → compressed → stored in S3  
-**When**: Hourly by default (configurable)  
-**Restore**: Database-level restore, fast, cross-region compatible
-
-When `enable_automated_backups = true`:
-- **S3 Bucket**: Created automatically by the module (no need to create separately)
-- **Schedule**: Runs hourly by default (`0 * * * *` - configurable via `backup_schedule`)
-- **Naming**: Folder-based structure: `YYYY-MM-DD-database-name/HHMMSS.sql.gz`
-  - Example: `2026-01-19-production_db/143022.sql.gz`
-  - All hourly backups for the same day are grouped in one folder
-- **Process**: Creates mysqldump of all databases → compresses with gzip → uploads to S3
-- **Retention**: Managed automatically by S3 lifecycle rules based on `backup_retention_days`
-- **Logs**: Check `/var/log/mysql-backup.log` for backup execution logs
-- **Versioning**: Optional (disabled by default) - enable with `enable_backup_versioning = true`
-  - **Not required** because backups use unique timestamps (no overwrites)
-  - **Enable for**: Extra protection against accidental deletions or script bugs
-  - **Cost**: Higher storage costs (keeps version history)
-
-**S3 Bucket Structure:**
-```
-s3://env-project-mysql-backups/
-  mysql-backups/
-    production/
-      myapp/
-        2026-01-19-production_db/
-          010000.sql.gz  # 1 AM backup
-          020000.sql.gz  # 2 AM backup
-          030000.sql.gz  # 3 AM backup
-          ...
-          230000.sql.gz  # 11 PM backup
-        2026-01-18-production_db/
-          010000.sql.gz
-          ...
-```
-
-### 2. EBS Volume Snapshots (Full Disk)
-
-**What**: Complete EBS volume snapshot (OS + Docker + MySQL data + configs)  
-**When**: Daily at 3 AM UTC by default (configurable)  
-**Restore**: Full instance restore, launch new EC2 from snapshot
-
-When `enable_ebs_snapshots = true`:
-- **Technology**: AWS Data Lifecycle Manager (DLM)
-- **Schedule**: Daily at 3 AM UTC by default (configurable via `ebs_snapshot_time`)
-- **Retention**: Keeps last 7 snapshots by default (configurable via `ebs_snapshot_retention_count`)
-- **Cost**: ~$0.05/GB/month (incremental snapshots, only changed blocks stored)
-- **Automatic**: Fully managed by AWS, no maintenance required
-- **Tagged**: Snapshots tagged with environment, project, purpose for easy identification
-
-### Comparison
-
-| Feature | MySQL Backups (S3) | EBS Snapshots |
-|---------|-------------------|---------------|
-| **Frequency** | Hourly | Daily |
-| **Size** | Small (compressed SQL) | Larger (full disk) |
-| **Restore Speed** | Fast (minutes) | Medium (launch new EC2) |
-| **Restore Scope** | Database only | Entire system |
-| **Cross-Region** | Yes (S3 replication) | Yes (copy snapshots) |
-| **Cost** | Lower (S3 storage) | Medium (snapshot storage) |
-| **Use Case** | DB corruption, data recovery | Instance failure, DR |
-
-### Recommended Configuration
-
-**Development/Staging:**
-```hcl
-enable_automated_backups = true   # MySQL backups only
-backup_schedule          = "0 2 * * *"  # Daily at 2 AM
-backup_retention_days    = 7
-enable_ebs_snapshots     = false  # Optional
-```
-
-**Production:**
-```hcl
-# Both backup types for maximum protection
-enable_automated_backups = true
-backup_schedule          = "0 * * * *"  # Hourly
-backup_retention_days    = 14
-
-enable_ebs_snapshots        = true
-ebs_snapshot_interval_hours = 24
-ebs_snapshot_time           = "03:00"  # 3 AM UTC
-ebs_snapshot_retention_count = 14
-```
-
-### Manual MySQL Backup
-
-```bash
-# Connect to instance
+# Connect to instance via SSM
 aws ssm start-session --target i-0123456789abcdef
 
-# Run backup script manually
-sudo /usr/local/bin/backup_mysql.sh
+# Docker is ready (ubuntu user is in docker group)
+docker version
+docker info
 
-# Check backup logs
-tail -f /var/log/mysql-backup.log
-```
+# Run containers
+docker run -d -p 80:80 nginx
+docker run -d -p 3000:3000 node:18
 
-### Restore from MySQL Backup (S3)
-
-```bash
-# 1. List available backups
-aws s3 ls s3://production-myapp-mysql-backups/mysql-backups/production/myapp/ --recursive
-
-# 2. Download specific backup
-aws s3 cp s3://bucket/mysql-backups/production/myapp/2026-01-19-production_db/143022.sql.gz .
-
-# 3. Extract
-gunzip 143022.sql.gz
-
-# 4. Get root password
-MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
-  --secret-id production/myapp/mysql/mysql-root-password \
-  --query SecretString \
-  --output text)
-
-# 5. Connect to instance and restore
-aws ssm start-session --target i-0123456789abcdef
-
-# On instance:
-docker exec -i mysql-server mysql -u root -p"$MYSQL_ROOT_PASSWORD" < 143022.sql
-```
-
-### Restore from EBS Snapshot (Full Instance)
-
-**Scenario**: EC2 instance failed, need to launch new instance from snapshot
-
-```bash
-# 1. List available snapshots
-aws ec2 describe-snapshots \
-  --filters "Name=tag:Name,Values=*mysql*" \
-  --query 'Snapshots[*].[SnapshotId,StartTime,VolumeSize,Description]' \
-  --output table
-
-# 2. Create new volume from snapshot
-aws ec2 create-volume \
-  --snapshot-id snap-0123456789abcdef \
-  --availability-zone eu-west-2a \
-  --volume-type gp3
-
-# 3. Launch new EC2 instance
-# Option A: Use AWS Console → Launch Instance → Select snapshot as root volume
-# Option B: Update Terraform with new instance, import snapshot volume
-
-# 4. Test MySQL connectivity
-aws ssm start-session --target i-NEW-INSTANCE-ID
-docker ps | grep mysql-server
-docker exec mysql-server mysql -u root -p -e "SHOW DATABASES;"
-```
-
-**Alternative: Quick Launch from Snapshot**
-```bash
-# Create AMI from snapshot (easier to launch)
-aws ec2 create-image \
-  --instance-id i-ORIGINAL-INSTANCE-ID \
-  --name "mysql-backup-$(date +%Y%m%d)" \
-  --description "MySQL instance backup from snapshot"
-
-# Launch new instance from AMI
-# Update terraform ami_id variable with new AMI ID
+# Docker Compose is also available
+docker compose version
 ```
 
 ## Monitoring
 
 ### CloudWatch Logs
 
-View logs:
-```bash
-# Setup logs
-aws logs tail /aws/ec2/myapp-production-mysql-mysql/setup.log
+Available log streams (when `enable_cloudwatch_monitoring = true`):
 
-# MySQL error logs
-aws logs tail /aws/ec2/myapp-production-mysql-mysql/mysql-error.log --follow
+```bash
+# View setup logs
+aws logs tail /aws/ec2/{project}-{env}-{base_name}/setup.log
+
+# View system logs
+aws logs tail /aws/ec2/{project}-{env}-{base_name}/syslog --follow
+
+# View auth logs
+aws logs tail /aws/ec2/{project}-{env}-{base_name}/auth.log
+
+# View cloud-init logs
+aws logs tail /aws/ec2/{project}-{env}-{base_name}/cloud-init.log
 ```
 
 ### CloudWatch Metrics
 
-- Memory usage percentage
-- Disk usage percentage
-- CPU utilization (if detailed monitoring enabled)
+Automatically collected:
+- **Memory Usage**: Percentage of memory used
+- **Disk Usage**: Percentage of disk space used
+- **CPU Utilization**: Available with detailed monitoring
 
 ### Create Alarms
 
 ```hcl
-resource "aws_cloudwatch_metric_alarm" "mysql_high_memory" {
-  alarm_name          = "mysql-high-memory"
+resource "aws_cloudwatch_metric_alarm" "high_memory" {
+  alarm_name          = "${var.project_id}-${var.env}-high-memory"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
   metric_name         = "MemoryUsed"
-  namespace           = "EC2/MySQL"
+  namespace           = "EC2/"
   period              = 300
   statistic           = "Average"
   threshold           = 80
   
   dimensions = {
-    InstanceId = module.mysql.mysql.instance.id
+    InstanceId = module.docker_server.mysql.instance.id
   }
 }
 ```
 
+## Backups (EBS Snapshots)
+
+### How It Works
+
+When `enable_ebs_snapshots = true`:
+
+- **Technology**: AWS Data Lifecycle Manager (DLM) - fully managed by AWS
+- **Schedule**: Daily at 3 AM UTC by default (configurable)
+- **Retention**: Last 7 snapshots kept automatically (configurable)
+- **Incremental**: Only changed blocks stored (cost-efficient)
+- **Tags**: Snapshots auto-tagged for easy identification
+
+### Configuration Examples
+
+**Development:**
+```hcl
+enable_ebs_snapshots         = false  # No snapshots needed
+```
+
+**Production:**
+```hcl
+enable_ebs_snapshots        = true
+ebs_snapshot_interval_hours = 24       # Daily
+ebs_snapshot_time           = "03:00"  # 3 AM UTC
+ebs_snapshot_retention_count = 14      # Keep 2 weeks
+```
+
+### List Snapshots
+
+```bash
+# List all snapshots for this server
+aws ec2 describe-snapshots \
+  --filters "Name=tag:Name,Values=*{project}*{env}*" \
+  --query 'Snapshots[*].[SnapshotId,StartTime,VolumeSize,Description]' \
+  --output table
+```
+
+### Restore from Snapshot
+
+**Option 1: Create new volume from snapshot**
+```bash
+# Get latest snapshot ID
+SNAPSHOT_ID=$(aws ec2 describe-snapshots \
+  --filters "Name=tag:Name,Values=*your-server*" \
+  --query 'Snapshots | sort_by(@, &StartTime) | [-1].SnapshotId' \
+  --output text)
+
+# Create volume from snapshot
+aws ec2 create-volume \
+  --snapshot-id $SNAPSHOT_ID \
+  --availability-zone eu-west-2a \
+  --volume-type gp3
+
+# Attach to instance or launch new instance with this volume
+```
+
+**Option 2: Launch new instance from snapshot**
+```bash
+# Create AMI from snapshot
+aws ec2 create-image \
+  --instance-id i-ORIGINAL-INSTANCE-ID \
+  --name "server-backup-$(date +%Y%m%d)" \
+  --description "Server backup from snapshot"
+
+# Update Terraform with new AMI ID to launch new instance
+```
+
+## Security Features
+
+### 1. Encrypted Storage
+- EBS volumes encrypted at rest using AWS managed keys
+- Enabled by default (`enable_ebs_encryption = true`)
+
+### 2. IAM Roles (Least Privilege)
+The EC2 instance has minimal permissions:
+- ✅ CloudWatch Logs write access
+- ✅ SSM Session Manager access
+- ❌ Cannot create/modify other AWS resources
+
+### 3. IMDSv2 Enforced
+- Instance Metadata Service v2 required
+- Prevents SSRF attacks
+- Session-based access to instance metadata
+
+### 4. SSH-less Access
+- SSM Session Manager recommended (no SSH keys to manage)
+- IAM-based access control
+- All sessions logged in CloudTrail
+
+### 5. Private Subnet Deployment
+- Recommended to deploy in private subnets
+- No direct internet access
+- Access via NAT Gateway or VPC endpoints
+
 ## Troubleshooting
 
-### Issue: Can't connect to MySQL
+### Issue: Can't connect via SSM
 
-**Check security group:**
+**Check SSM agent status:**
 ```bash
-# Ensure app security group is allowed
-aws ec2 describe-security-groups --group-ids sg-mysql
+# SSM agent is pre-installed on Ubuntu 24.04
+# If issues occur, check IAM role and VPC endpoints
+
+# Verify instance has SSM role attached
+aws ec2 describe-instances --instance-ids i-xxx \
+  --query 'Reservations[0].Instances[0].IamInstanceProfile'
+
+# Check VPC endpoints (if in private subnet without NAT)
+# Required endpoints: ssm, ssmmessages, ec2messages
 ```
 
-**Test connection from app server:**
+### Issue: Docker commands fail
+
+**Check Docker installation:**
 ```bash
-telnet 10.0.1.50 3306
-mysql -h 10.0.1.50 -u appuser -p appdb
-```
+# Connect to instance
+aws ssm start-session --target i-xxx
 
-### Issue: Forgot password
+# Check Docker status
+sudo systemctl status docker
 
-**Retrieve from Secrets Manager:**
-```bash
-aws secretsmanager get-secret-value \
-  --secret-id production/myapp/mysql/mysql-user-password \
-  --query SecretString \
-  --output text
-```
+# Restart Docker if needed
+sudo systemctl restart docker
 
-### Issue: MySQL container not running
-
-**Connect to instance and check:**
-```bash
-docker ps -a | grep mysql-server
-docker logs mysql-server
-sudo /usr/local/bin/start_mysql_container.sh
+# Verify user is in docker group
+groups ubuntu
 ```
 
 ### Issue: High disk usage
 
-**Check disk usage:**
+**Check disk space:**
 ```bash
 df -h
-docker exec mysql-server du -sh /var/lib/mysql/*
+
+# Clean up Docker
+docker system df
+docker system prune -a --volumes  # Remove unused containers/images/volumes
 ```
 
-**Solutions:**
-- Increase `storage_size` variable
-- Clean up old binary logs
-- Archive old data
+## Cost Estimation
 
-## Cost Optimization
-
-| Configuration | Monthly Cost |
-|--------------|--------------|
-| t3.micro (1 GB RAM, 20 GB storage) | $7-10 |
-| t3.small (2 GB RAM, 50 GB storage) | $18-25 |
-| t3.medium (4 GB RAM, 100 GB storage) | $35-45 |
+| Component | Configuration | Monthly Cost (eu-west-2) |
+|-----------|--------------|-------------------------|
+| **Compute** | t3a.medium (2 vCPU, 4 GB) | ~$24.00 |
+| **Storage** | 20 GB gp3 | ~$1.60 |
+| **Snapshots** | 7 snapshots × 20 GB | ~$3.50 |
+| **CloudWatch Logs** | ~1 GB/month | ~$0.50 |
+| **Data Transfer** | Minimal internal | ~$0.00 |
+| **Total** | | **~$29.60/month** |
 
 **Tips to reduce costs:**
-1. Use gp3 instead of io1/io2 volumes
-2. Reduce CloudWatch log retention
-3. Disable detailed monitoring if not needed
-4. Use smaller instance type for non-production
+- Use t3a instead of t3 (10% cheaper)
+- Reduce log retention from 30 to 7 days
+- Disable detailed monitoring if not needed
+- Use smaller instance for non-production
+- Clean up unused Docker images regularly
 
 ## Security Checklist
 
 Before deploying to production:
 
 - [ ] Deploy in private subnet
-- [ ] Use auto-generated passwords (don't set `mysql_root_password`)
-- [ ] Enable EBS encryption (`enable_ebs_encryption = true`)
+- [ ] Enable EBS encryption
 - [ ] Enable CloudWatch monitoring
-- [ ] Enable automated backups
-- [ ] Use SSM Session Manager (disable SSH keys)
-- [ ] Restrict security group to application only
-- [ ] Configure S3 bucket versioning for backups
+- [ ] Enable EBS snapshots
+- [ ] Use SSM Session Manager (disable SSH)
+- [ ] Restrict security group to minimum required ports
+- [ ] Enable termination protection
 - [ ] Set up CloudWatch alarms
-- [ ] Test backup and restore procedure
-- [ ] Document password retrieval process
+- [ ] Test snapshot restore procedure
 - [ ] Review IAM policies
+- [ ] Configure VPC endpoints (if no NAT Gateway)
 
 ## Related Documentation
 
-- [Security Improvements](./SECURITY_IMPROVEMENTS.md) - Detailed security features
-- [AWS Secrets Manager](https://docs.aws.amazon.com/secretsmanager/)
-- [Systems Manager Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html)
-- [MySQL 8.0 Reference Manual](https://dev.mysql.com/doc/refman/8.0/en/)
+- [Session Manager Guide](./documentations/SessionManager.md)
+- [CloudWatch Logs](./documentations/CLOUDWATCH_LOGS.md)
+- [Snapshots Overview](./documentations/SNAPSHOTS.md)
+- [AWS Systems Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html)
 
 ---
 
-**Module is production-ready with comprehensive security features!** 🔒
+**Module ready for production use with Docker pre-installed!** 🐳
 

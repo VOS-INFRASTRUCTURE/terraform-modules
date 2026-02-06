@@ -1,96 +1,91 @@
-# CloudWatch Logs Collection - System Logs
+# CloudWatch Logs Collection - Docker EC2 Server
 
 ## Overview
 
-The CloudWatch agent now collects **comprehensive system logs** in addition to MySQL-specific logs. This provides full visibility into system events, security, and troubleshooting.
+The CloudWatch agent collects **comprehensive system and Docker logs** for monitoring, troubleshooting, and security auditing.
 
 ---
 
 ## Logs Collected
 
-### 1. MySQL Application Logs
+### System Logs
 
 | Log File | Stream Name | Purpose |
 |----------|-------------|---------|
-| `/var/log/mysql-setup.log` | `{instance_id}/setup.log` | EC2 instance setup and MySQL installation logs |
-| `/home/ubuntu/mysql_data/error.log` | `{instance_id}/mysql-error.log` | MySQL server errors and warnings |
-| `/var/log/mysql-backup.log` | `{instance_id}/backup.log` | MySQL backup script execution logs |
-
-### 2. System Logs (NEW! ✅)
-
-| Log File | Stream Name | Purpose |
-|----------|-------------|---------|
+| `/var/log/server-setup.log` | `{instance_id}/setup.log` | EC2 instance setup and configuration logs |
 | `/var/log/syslog` | `{instance_id}/syslog` | **System-wide logs** - all system events, services, daemons |
-| `/var/log/auth.log` | `{instance_id}/auth.log` | **Authentication logs** - SSH logins, sudo usage, authentication failures |
+| `/var/log/auth.log` | `{instance_id}/auth.log` | **Authentication logs** - login attempts, sudo usage, authentication failures |
 | `/var/log/cloud-init.log` | `{instance_id}/cloud-init.log` | **Cloud-init logs** - EC2 initialization process |
 | `/var/log/cloud-init-output.log` | `{instance_id}/cloud-init-output.log` | **Cloud-init output** - User data script execution |
-| `/var/log/docker.log` | `{instance_id}/docker.log` | **Docker daemon logs** - Container management events |
+| `/var/log/docker.log` | `{instance_id}/docker.log` | **Docker daemon logs** - Container management events (if Docker logging configured) |
 
 ---
 
-## Why Collect System Logs?
+## Why Collect These Logs?
 
-### Security Monitoring
+### 1. Security Monitoring
 
-**Auth.log** shows:
-- ✅ SSH login attempts (successful and failed)
+**Auth.log** provides visibility into:
+- ✅ SSM Session Manager connections
 - ✅ Sudo command execution
 - ✅ User authentication events
-- ✅ Potential brute force attacks
 - ✅ Unauthorized access attempts
 
-**Example:**
+**Example - Suspicious Activity Detection:**
 ```
-Jan 19 02:15:32 ip-10-0-1-50 sshd[1234]: Failed password for invalid user admin from 192.168.1.100
-Jan 19 02:15:35 ip-10-0-1-50 sshd[1234]: Failed password for invalid user admin from 192.168.1.100
-Jan 19 02:15:38 ip-10-0-1-50 sshd[1234]: Failed password for invalid user admin from 192.168.1.100
+Jan 19 02:15:32 ip-10-0-1-50 sudo: ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/bin/bash
+Jan 19 02:15:35 ip-10-0-1-50 sudo: ubuntu : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/usr/bin/cat /etc/shadow
 ```
-→ **Alert:** Potential brute force attack detected!
+→ **Alert:** Unusual privilege escalation detected!
 
-### System Troubleshooting
+### 2. System Troubleshooting
 
 **Syslog** shows:
 - ✅ Service start/stop events
-- ✅ Kernel messages
-- ✅ System errors
+- ✅ Kernel messages and system errors
 - ✅ Package installation logs
 - ✅ Network events
+- ✅ Cron job execution
 
-**Example:**
+**Example - Service Failure:**
 ```
-Jan 19 03:00:01 ip-10-0-1-50 CRON[5678]: (root) CMD (/usr/local/bin/backup_mysql.sh)
-Jan 19 03:00:15 ip-10-0-1-50 systemd[1]: docker.service: Failed with result 'exit-code'.
+Jan 19 03:00:01 ip-10-0-1-50 systemd[1]: docker.service: Failed with result 'exit-code'.
+Jan 19 03:00:02 ip-10-0-1-50 systemd[1]: docker.service: Start request repeated too quickly.
 ```
-→ **Troubleshoot:** Docker service crashed during backup
+→ **Troubleshoot:** Docker service crashed, check logs for root cause
 
-### Deployment Debugging
+### 3. Deployment Debugging
 
-**Cloud-init logs** show:
+**Cloud-init logs** capture:
 - ✅ User data script execution
 - ✅ Package installation progress
 - ✅ Configuration file creation
 - ✅ Errors during instance bootstrap
 
-**Example:**
+**Example - Successful Deployment:**
 ```
 Cloud-init v. 23.1.2 running 'modules:final' at Sun, 19 Jan 2026 02:00:00 +0000
+Installing Docker...
 Successfully installed Docker version 24.0.7
-MySQL container started successfully
+CloudWatch agent configured and started
+Instance setup completed successfully
 ```
 
-### Docker Troubleshooting
+### 4. Docker Container Monitoring
 
-**Docker logs** show:
+**Docker logs** reveal:
 - ✅ Container lifecycle events
 - ✅ Image pull operations
 - ✅ Docker daemon errors
 - ✅ Container restart events
+- ✅ Resource allocation issues
 
-**Example:**
+**Example - Container Issues:**
 ```
-Jan 19 03:15:22 ip-10-0-1-50 dockerd[1234]: Container mysql-server health check failed
-Jan 19 03:15:25 ip-10-0-1-50 dockerd[1234]: Container mysql-server restarted
+Jan 19 03:15:22 ip-10-0-1-50 dockerd[1234]: Container app-server OOMKilled
+Jan 19 03:15:25 ip-10-0-1-50 dockerd[1234]: Container app-server restarted (restart policy: always)
 ```
+→ **Action:** Container ran out of memory, increase memory limits
 
 ---
 
@@ -99,163 +94,186 @@ Jan 19 03:15:25 ip-10-0-1-50 dockerd[1234]: Container mysql-server restarted
 ### Via AWS Console
 
 1. **Navigate to CloudWatch:**
-   ```
-   AWS Console → CloudWatch → Log groups → /aws/ec2/{env}-{project}-{base_name}-mysql
-   ```
+   - AWS Console → CloudWatch → Log groups
+   - Find your log group: `/aws/ec2/{project}-{env}-{base_name}`
 
 2. **Select log stream:**
-   ```
-   Log streams:
-   ├── i-0123456789abcdef/syslog
-   ├── i-0123456789abcdef/auth.log
-   ├── i-0123456789abcdef/mysql-error.log
-   ├── i-0123456789abcdef/setup.log
-   ├── i-0123456789abcdef/backup.log
-   ├── i-0123456789abcdef/cloud-init.log
-   ├── i-0123456789abcdef/cloud-init-output.log
-   └── i-0123456789abcdef/docker.log
-   ```
+   - Each EC2 instance has its own streams identified by `{instance_id}`
+   - Example streams:
+     - `i-0a1b2c3d4e5f/setup.log`
+     - `i-0a1b2c3d4e5f/syslog`
+     - `i-0a1b2c3d4e5f/auth.log`
 
-3. **Search and filter:**
-   - Use CloudWatch Logs Insights for advanced queries
-   - Filter by time range
-   - Search for specific error messages
+3. **View logs:**
+   - Click on stream name
+   - Use time range selector to filter
+   - Use search box to filter by keyword
 
 ### Via AWS CLI
 
+#### View Recent Logs (Live Tail)
+
 ```bash
-# View syslog (live tail)
-aws logs tail /aws/ec2/production-myapp-mysql-mysql \
-  --log-stream-names i-0123456789abcdef/syslog \
-  --follow
+# Get project and environment from Terraform
+PROJECT=$(terraform output -json docker_server | jq -r '.project_id')
+ENV=$(terraform output -json docker_server | jq -r '.environment')
+INSTANCE_ID=$(terraform output -json docker_server | jq -r '.instance.id')
 
-# View auth logs (last hour)
-aws logs tail /aws/ec2/production-myapp-mysql-mysql \
-  --log-stream-names i-0123456789abcdef/auth.log \
-  --since 1h
+# Tail setup logs
+aws logs tail "/aws/ec2/${PROJECT}-${ENV}-{base_name}/setup.log" --follow
 
-# View MySQL errors
-aws logs tail /aws/ec2/production-myapp-mysql-mysql \
-  --log-stream-names i-0123456789abcdef/mysql-error.log \
-  --follow
+# Tail system logs
+aws logs tail "/aws/ec2/${PROJECT}-${ENV}-{base_name}/syslog" --follow
 
-# View backup logs
-aws logs tail /aws/ec2/production-myapp-mysql-mysql \
-  --log-stream-names i-0123456789abcdef/backup.log
+# Tail auth logs (security events)
+aws logs tail "/aws/ec2/${PROJECT}-${ENV}-{base_name}/auth.log" --follow
 ```
 
-### CloudWatch Logs Insights Queries
+#### Search Logs for Specific Events
 
-**Find failed SSH attempts:**
-```sql
-fields @timestamp, @message
-| filter @logStream like /auth.log/
-| filter @message like /Failed password/
-| sort @timestamp desc
-| limit 100
+```bash
+# Search for errors in setup logs
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/setup" \
+  --filter-pattern "ERROR"
+
+# Search for failed authentication attempts
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/auth" \
+  --filter-pattern "Failed password"
+
+# Search for Docker errors
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/syslog" \
+  --filter-pattern "docker"
 ```
 
-**Find MySQL errors:**
-```sql
-fields @timestamp, @message
-| filter @logStream like /mysql-error.log/
-| filter @message like /ERROR/
-| sort @timestamp desc
-| limit 50
-```
+#### Download Logs for Analysis
 
-**Find Docker container restarts:**
-```sql
-fields @timestamp, @message
-| filter @logStream like /docker.log/
-| filter @message like /restarted/
-| sort @timestamp desc
-```
+```bash
+# Download last hour of syslog
+aws logs get-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name "${INSTANCE_ID}/syslog" \
+  --start-time $(date -u -d '1 hour ago' +%s)000 \
+  --output json > syslog-$(date +%Y%m%d-%H%M).json
 
-**Find backup failures:**
-```sql
-fields @timestamp, @message
-| filter @logStream like /backup.log/
-| filter @message like /error|failed|Error|Failed/
-| sort @timestamp desc
+# Download auth logs from last 24 hours
+aws logs get-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name "${INSTANCE_ID}/auth.log" \
+  --start-time $(date -u -d '24 hours ago' +%s)000 \
+  --output json > auth-$(date +%Y%m%d).json
 ```
 
 ---
 
-## Create CloudWatch Alarms
+## Common Log Analysis Patterns
 
-### SSH Brute Force Detection
+### 1. Find Failed Deployments
+
+```bash
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/cloud-init" \
+  --filter-pattern "error" \
+  --start-time $(date -u -d '1 hour ago' +%s)000
+```
+
+### 2. Monitor Sudo Usage
+
+```bash
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/auth" \
+  --filter-pattern "sudo" \
+  --start-time $(date -u -d '24 hours ago' +%s)000
+```
+
+### 3. Track Container Restarts
+
+```bash
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/syslog" \
+  --filter-pattern "docker" \
+  --start-time $(date -u -d '1 hour ago' +%s)000
+```
+
+### 4. Find System Errors
+
+```bash
+aws logs filter-log-events \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --log-stream-name-prefix "${INSTANCE_ID}/syslog" \
+  --filter-pattern "?ERROR ?CRITICAL ?FATAL" \
+  --start-time $(date -u -d '6 hours ago' +%s)000
+```
+
+---
+
+## Setting Up CloudWatch Alarms
+
+### Example: Alert on Authentication Failures
 
 ```hcl
-resource "aws_cloudwatch_log_metric_filter" "ssh_brute_force" {
-  name           = "ssh-brute-force-attempts"
-  log_group_name = "/aws/ec2/production-myapp-mysql-mysql"
-  pattern        = "[time, host, process, ...] Failed password"
+resource "aws_cloudwatch_log_metric_filter" "failed_auth" {
+  name           = "${var.project_id}-${var.env}-failed-auth"
+  log_group_name = aws_cloudwatch_log_group.mysql_logs[0].name
+  pattern        = "[Mon, day, timestamp, ip, id, msg1=\"Failed\", msg2=\"password\", ...]"
 
   metric_transformation {
-    name      = "SSHFailedLoginAttempts"
-    namespace = "MySQL/Security"
+    name      = "FailedAuthCount"
+    namespace = "CustomSecurity"
     value     = "1"
   }
 }
 
-resource "aws_cloudwatch_metric_alarm" "ssh_brute_force_alarm" {
-  alarm_name          = "mysql-ssh-brute-force"
+resource "aws_cloudwatch_metric_alarm" "multiple_failed_auth" {
+  alarm_name          = "${var.project_id}-${var.env}-brute-force-alert"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
-  metric_name         = "SSHFailedLoginAttempts"
-  namespace           = "MySQL/Security"
+  metric_name         = "FailedAuthCount"
+  namespace           = "CustomSecurity"
   period              = 300  # 5 minutes
   statistic           = "Sum"
-  threshold           = 5  # More than 5 failed attempts in 5 minutes
-  alarm_description   = "SSH brute force attack detected on MySQL server"
+  threshold           = 5    # Alert if 5+ failed attempts in 5 minutes
+  alarm_description   = "Alert on potential brute force attack"
   
-  alarm_actions = [var.sns_topic_arn]
+  alarm_actions = [aws_sns_topic.security_alerts.arn]
 }
 ```
 
-### MySQL Error Detection
+### Example: Alert on Docker Service Failures
 
 ```hcl
-resource "aws_cloudwatch_log_metric_filter" "mysql_errors" {
-  name           = "mysql-errors"
-  log_group_name = "/aws/ec2/production-myapp-mysql-mysql"
-  pattern        = "[ERROR]"
+resource "aws_cloudwatch_log_metric_filter" "docker_failure" {
+  name           = "${var.project_id}-${var.env}-docker-failure"
+  log_group_name = aws_cloudwatch_log_group.mysql_logs[0].name
+  pattern        = "[timestamp, host, process, ...msg=\"docker.service: Failed\"]"
 
   metric_transformation {
-    name      = "MySQLErrors"
-    namespace = "MySQL/Application"
+    name      = "DockerFailureCount"
+    namespace = "CustomSystem"
     value     = "1"
   }
 }
 
-resource "aws_cloudwatch_metric_alarm" "mysql_errors_alarm" {
-  alarm_name          = "mysql-high-error-rate"
+resource "aws_cloudwatch_metric_alarm" "docker_service_down" {
+  alarm_name          = "${var.project_id}-${var.env}-docker-down"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "MySQLErrors"
-  namespace           = "MySQL/Application"
-  period              = 300
+  evaluation_periods  = 1
+  metric_name         = "DockerFailureCount"
+  namespace           = "CustomSystem"
+  period              = 60
   statistic           = "Sum"
-  threshold           = 10  # More than 10 errors in 10 minutes
+  threshold           = 0
+  alarm_description   = "Alert when Docker service fails"
   
-  alarm_actions = [var.sns_topic_arn]
-}
-```
-
-### Backup Failure Detection
-
-```hcl
-resource "aws_cloudwatch_log_metric_filter" "backup_failures" {
-  name           = "mysql-backup-failures"
-  log_group_name = "/aws/ec2/production-myapp-mysql-mysql"
-  pattern        = "[time, msg*=*failed* || msg*=*error*]"
-
-  metric_transformation {
-    name      = "MySQLBackupFailures"
-    namespace = "MySQL/Backup"
-    value     = "1"
-  }
+  alarm_actions = [aws_sns_topic.ops_alerts.arn]
 }
 ```
 
@@ -263,80 +281,92 @@ resource "aws_cloudwatch_log_metric_filter" "backup_failures" {
 
 ## Log Retention and Costs
 
-**Default retention:** 7 days (configurable via `log_retention_days` variable)
+### Default Configuration
 
-**Cost estimate:**
-- CloudWatch Logs ingestion: $0.50/GB
-- CloudWatch Logs storage: $0.03/GB/month
+- **Retention**: 7 days (configurable via `log_retention_days`)
+- **Cost**: ~$0.50 per GB ingested + $0.03 per GB stored
 
-**Typical usage:**
-- System logs: ~100-500 MB/month
-- MySQL logs: ~50-200 MB/month
-- **Total cost:** $0.50-1.00/month
+### Recommended Retention Periods
 
-**To reduce costs:**
+| Environment | Retention | Reasoning |
+|-------------|-----------|-----------|
+| Development | 7 days | Cost optimization |
+| Staging | 14 days | Moderate debugging needs |
+| Production | 30-90 days | Compliance and audit requirements |
+
+### Cost Optimization
+
 ```hcl
-module "mysql" {
-  # ... other config ...
-  log_retention_days = 3  # Reduce from default 7 days
+module "docker_dev" {
+  source = "../../ec2_servers/ec2_x86_docker"
+  
+  log_retention_days = 7  # Reduce costs for non-production
 }
+
+module "docker_prod" {
+  source = "../../ec2_servers/ec2_x86_docker"
+  
+  log_retention_days = 90  # Compliance requirement
+}
+```
+
+### Export Logs to S3 (Long-term Storage)
+
+For compliance or long-term retention:
+
+```bash
+# Create S3 export task (much cheaper than CloudWatch Logs)
+aws logs create-export-task \
+  --log-group-name "/aws/ec2/${PROJECT}-${ENV}-{base_name}" \
+  --from $(date -u -d '30 days ago' +%s)000 \
+  --to $(date -u +%s)000 \
+  --destination s3-bucket-name \
+  --destination-prefix cloudwatch-logs/
 ```
 
 ---
 
-## Troubleshooting Common Issues
+## Troubleshooting CloudWatch Agent
 
-### Logs not appearing in CloudWatch
+### Verify Agent is Running
 
-**Check:**
-1. CloudWatch agent is running:
-   ```bash
-   sudo systemctl status amazon-cloudwatch-agent
-   ```
+```bash
+# Connect to instance
+aws ssm start-session --target i-xxx
 
-2. CloudWatch agent configuration:
-   ```bash
-   cat /opt/aws/amazon-cloudwatch-agent/etc/config.json
-   ```
+# Check agent status
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a query \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
 
-3. IAM role has CloudWatch permissions:
-   ```bash
-   aws iam get-role-policy --role-name {role-name} --policy-name cloudwatch-access
-   ```
+# Check agent logs
+tail -f /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+```
 
-### Log files don't exist
+### Restart CloudWatch Agent
 
-Some logs may not exist until events occur:
-- `/var/log/mysql-backup.log` - created after first backup
-- `/var/log/docker.log` - may be `/var/log/docker.log` or journalctl
-- `/home/ubuntu/mysql_data/error.log` - created by MySQL container
-
-### High CloudWatch costs
-
-**Solutions:**
-1. Reduce retention period
-2. Filter verbose logs
-3. Use log sampling for high-volume streams
+```bash
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+```
 
 ---
 
-## Summary
+## Best Practices
 
-**Before:** Only MySQL application logs ❌  
-**After:** Complete system visibility ✅
+1. **Enable CloudWatch monitoring in production** (`enable_cloudwatch_monitoring = true`)
+2. **Set appropriate retention periods** (balance cost vs. compliance needs)
+3. **Create metric filters and alarms** for critical events
+4. **Regularly review logs** for security and performance issues
+5. **Export old logs to S3** for cost-effective long-term storage
+6. **Use CloudWatch Insights** for advanced log analysis
+7. **Set up SNS alerts** for critical log patterns
 
-**New logs added:**
-- ✅ System logs (syslog)
-- ✅ Authentication logs (auth.log)
-- ✅ Cloud-init logs
-- ✅ Docker logs
-- ✅ Backup logs
+---
 
-**Benefits:**
-- 🔒 Security monitoring (detect intrusions)
-- 🐛 Better debugging (system-wide events)
-- 📊 Complete audit trail
-- ⚠️ Proactive alerting (errors before failures)
-
-**The CloudWatch logging is now comprehensive and production-ready!** 📊
+**Comprehensive logging enables proactive monitoring and fast incident response!** 📊
 

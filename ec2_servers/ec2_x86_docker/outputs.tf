@@ -19,6 +19,7 @@ output "server" {
     security = {
       ebs_encrypted        = var.enable_ebs_encryption
       iam_role_arn         = aws_iam_role.ec2_x86_docker.arn
+      iam_role_id         = aws_iam_role.ec2_x86_docker.id
       iam_instance_profile = aws_iam_instance_profile.ec2_x86_docker.name
       security_group_ids   = var.security_group_ids
       ssm_access_enabled   = var.enable_ssm_access
