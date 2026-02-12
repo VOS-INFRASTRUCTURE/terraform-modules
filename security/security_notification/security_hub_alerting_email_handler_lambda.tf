@@ -149,6 +149,7 @@ resource "aws_lambda_function" "security_email_handler" {
       FROM_EMAIL   = var.ses_from_email
       TO_EMAILS    = join(",", var.ses_to_emails)
       PROJECT_NAME = var.project_id
+      ENVIRONMENT = var.env
       LOG_LEVEL    = var.lambda_log_level
     }
   }

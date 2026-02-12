@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
 PROJECT_NAME = os.environ.get("PROJECT_NAME", "AWS")  # Default to "AWS" if not set
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "UNKNOWN")  # Default to "UNKNOWN" if not set
 
 SEVERITY_COLOR = {
     "CRITICAL": "#8B0000",
@@ -130,7 +131,7 @@ def lambda_handler(event, context):
     severity_emoji = "🔴" if normalized_sev == "CRITICAL" else "🟠"
 
     attachment_text = f"""
-*[{PROJECT_NAME}] {severity_emoji} {severity} Security Finding*
+*[{PROJECT_NAME} - {ENVIRONMENT}] {severity_emoji} {severity} Security Finding*
 
 *Title:* {title}
 *Severity:* {severity}
