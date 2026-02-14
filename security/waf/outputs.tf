@@ -17,12 +17,12 @@ output "waf" {
     # Web ACL - Main WAF resource
     # ──────────────────────────────────────────────────────────────────────
     web_acl = {
-      id          = aws_wafv2_web_acl.waf.id                    # Web ACL ID
-      arn         = aws_wafv2_web_acl.waf.arn                   # Web ACL ARN
-      name        = aws_wafv2_web_acl.waf.name                  # Web ACL name
-      capacity    = aws_wafv2_web_acl.waf.capacity              # Current WCU usage
+      id          = aws_wafv2_web_acl.waf[0].id                    # Web ACL ID
+      arn         = aws_wafv2_web_acl.waf[0].arn                   # Web ACL ARN
+      name        = aws_wafv2_web_acl.waf[0].name                  # Web ACL name
+      capacity    = aws_wafv2_web_acl.waf[0].capacity              # Current WCU usage
       scope       = var.waf_scope                                       # REGIONAL or CLOUDFRONT
-      description = aws_wafv2_web_acl.waf.description          # Web ACL description
+      description = aws_wafv2_web_acl.waf[0].description          # Web ACL description
     }
 
     # ──────────────────────────────────────────────────────────────────────

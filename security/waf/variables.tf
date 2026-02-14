@@ -174,7 +174,7 @@ variable "enable_bot_control" {
 variable "bot_control_inspection_level" {
   description = "Bot Control inspection level (COMMON or TARGETED)"
   type        = string
-  default     = "COMMON"
+  default     = "COMMON"  # COMMON inspects common bot traffic, TARGETED inspects all traffic for bots (higher cost)
 
   validation {
     condition     = contains(["COMMON", "TARGETED"], var.bot_control_inspection_level)
