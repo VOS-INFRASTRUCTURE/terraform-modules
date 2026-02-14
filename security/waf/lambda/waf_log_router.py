@@ -1,30 +1,49 @@
 import base64
 import json
 import logging
+import re
 
+# Configure logger
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+def sanitize_log(value: str) -> str:
+    """
+    Sanitize a string before logging to prevent log injection.
+    Removes newlines, carriage returns, and tabs.
+    Converts non-string values to string.
+    """
+    if not isinstance(value, str):
+        value = str(value)
+    return re.sub(r'[\r\n\t]', ' ', value)
 
 def lambda_handler(event, context):
     output = []
 
-    for record in event.get("records", []):
-        record_id = record["recordId"]
+    records = event.get("records", [])
+    logger.info({"event_records_count": len(records)})
+
+    for record in records:
+        record_id = sanitize_log(record.get("recordId", "unknown"))
 
         try:
+            # Decode and parse WAF log payload
             payload = base64.b64decode(record["data"])
             waf_log = json.loads(payload)
 
-            # WAF decision is always uppercase ALLOW / BLOCK
-            action = waf_log.get("action", "ALLOW")
+            # Extract action and log_type
+            action = sanitize_log(waf_log.get("action", "ALLOW").upper())
+            log_type = "blocked" if action == "BLOCK" else "allowed"
 
-            if action == "BLOCK":
-                log_type = "blocked"
-            else:
-                log_type = "allowed"
+            # Log safely using sanitized values
+            logger.info({
+                "message": "Processing WAF record",
+                "record_id": record_id,
+                "action": action,
+                "log_type": log_type
+            })
 
-            logger.info(f"Processing record {record_id}: action={action}, log_type={log_type}")
-
+            # Append processed record to output
             output.append({
                 "recordId": record_id,
                 "result": "Ok",
@@ -37,13 +56,23 @@ def lambda_handler(event, context):
             })
 
         except Exception as e:
-            # Never let Firehose fail the batch
-            logger.error(f"Error processing record {record_id}: {str(e)}")
+            # Log errors safely
+            logger.error({
+                "message": "Error processing WAF record",
+                "record_id": record_id,
+                "error": sanitize_log(str(e))
+            })
+
+            # Mark record as failed
             output.append({
                 "recordId": record_id,
                 "result": "ProcessingFailed",
                 "data": record["data"]
             })
 
-    logger.info(f"Processed {len(output)} records")
+    logger.info({
+        "message": "Finished processing WAF records",
+        "total_records": len(output)
+    })
+
     return {"records": output}
