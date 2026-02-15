@@ -107,6 +107,42 @@ variable "enable_anonymous_ip_list" {
 }
 
 ################################################################################
+# Path Exclusions (Scope-Down Statements)
+################################################################################
+
+variable "core_rule_sets_excluded_paths" {
+  description = <<-EOT
+    List of URI paths to exclude from Core Rule Set, Admin Protection, Known Bad Inputs, and SQLi rules.
+    Uses scope_down_statement to exclude paths from specific rule groups (not all rules).
+
+    Example: ["/log-viewer", "/admin/debug", "/internal/metrics"]
+
+    How it works:
+    - Excluded paths are NOT evaluated by Core Rule Set, Admin Protection, Known Bad Inputs, and SQLi rules
+    - Other rules (Rate Limiting, IP Reputation) still apply to excluded paths
+    - No additional WCU cost (uses scope_down_statement, not a separate rule)
+
+    Security considerations:
+    - Excluded paths still have protection from: Rate limiting, IP reputation, Bot Control (if enabled)
+    - Excluded paths bypass: OWASP protection, SQL injection detection, known CVE patterns, admin protection
+    - Only exclude internal/admin paths that are secured by other means (authentication, IP restrictions)
+    - Review excluded paths regularly
+
+    Common use cases:
+    - /log-viewer - Query parameters that look like SQL injection
+    - /admin/debug - Paths that trigger path traversal rules
+    - /internal/metrics - Special characters in monitoring endpoints
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for path in var.core_rule_sets_excluded_paths : can(regex("^/", path))])
+    error_message = "All excluded paths must start with '/'"
+  }
+}
+
+################################################################################
 # Rate Limiting
 ################################################################################
 

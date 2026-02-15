@@ -88,6 +88,19 @@ output "waf" {
     }
 
     # ──────────────────────────────────────────────────────────────────────
+    # Path Exclusions - Paths excluded from Core/Admin/SQLi/KnownBadInputs rules
+    # Uses scope_down_statement (no additional WCU cost)
+    # ──────────────────────────────────────────────────────────────────────
+    core_rule_set_path_exclusions = {
+      enabled                    = length(var.core_rule_sets_excluded_paths) > 0
+      excluded_paths             = var.core_rule_sets_excluded_paths
+      count                      = length(var.core_rule_sets_excluded_paths)
+      affected_rules             = ["CoreRuleSet"]
+      implementation             = "scope_own_statement"
+      wcu_cost                   = 0  # Scope-down statements don't add WCU cost
+    }
+
+    # ──────────────────────────────────────────────────────────────────────
     # CloudWatch Metrics
     # ──────────────────────────────────────────────────────────────────────
     metrics = {

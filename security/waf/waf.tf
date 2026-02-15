@@ -51,6 +51,9 @@ resource "aws_wafv2_web_acl" "waf" {
   # Core Rule Set (OWASP Top 10)
   # Capacity: 700 WCU
   # Protects against: XSS, LFI, RCE, SQLi (basic), path traversal
+  #
+  # Path Exclusions: Applied via scope_down_statement if var.core_rule_sets_excluded_paths
+  # is not empty. Excluded paths will NOT be evaluated by this rule group.
   # ------------------------------------------------------------------------
   dynamic "rule" {
     for_each = var.enable_core_rule_set ? [1] : []
@@ -67,6 +70,40 @@ resource "aws_wafv2_web_acl" "waf" {
         managed_rule_group_statement {
           name        = "AWSManagedRulesCommonRuleSet"
           vendor_name = "AWS"
+
+          # Exclude specific paths from this rule group evaluation
+          # Scope-down statement: "Evaluate this rule group ONLY if path does NOT match core_rule_sets_excluded_paths"
+          dynamic "scope_down_statement" {
+            for_each = length(var.core_rule_sets_excluded_paths) > 0 ? [1] : []
+
+            content {
+              not_statement {
+                statement {
+                  or_statement {
+                    dynamic "statement" {
+                      for_each = var.core_rule_sets_excluded_paths
+
+                      content {
+                        byte_match_statement {
+                          search_string         = statement.value
+                          positional_constraint = "STARTS_WITH"
+
+                          field_to_match {
+                            uri_path {}
+                          }
+
+                          text_transformation {
+                            priority = 0
+                            type     = "NONE"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
 

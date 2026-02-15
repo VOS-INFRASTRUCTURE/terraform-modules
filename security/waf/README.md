@@ -121,6 +121,15 @@ module "waf" {
   enable_admin_protection     = true   # Admin page protection
   enable_anonymous_ip_list    = false  # Blocks VPNs (may affect users)
 
+  # Path Exclusions - Exclude from Core/Admin/SQLi/KnownBadInputs rules
+  # Uses scope_down_statement (no WCU cost)
+  # Other rules (rate limiting, IP reputation) still apply
+  core_rule_sets_excluded_paths = [
+    "/log-viewer",        # Internal log viewer (query params look like SQL)
+    "/admin/debug",       # Debug panel (secured by auth + IP restriction)
+    "/internal/metrics",  # Monitoring endpoint
+  ]
+
   # Rate Limiting
   enable_rate_limiting = true
   rate_limit_threshold = 5000  # Higher threshold for high-traffic sites
