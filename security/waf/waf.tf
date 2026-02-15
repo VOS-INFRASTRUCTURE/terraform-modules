@@ -71,6 +71,20 @@ resource "aws_wafv2_web_acl" "waf" {
           name        = "AWSManagedRulesCommonRuleSet"
           vendor_name = "AWS"
 
+          # Exclude specific rules from this rule group
+          # SizeRestrictions_BODY: Blocks large request bodies (file uploads)
+          # Enable this exclusion if your application supports file uploads
+          dynamic "rule_action_override" {
+            for_each = var.exclude_size_restrictions_body ? [1] : []
+
+            content {
+              name = "SizeRestrictions_BODY"
+              action_to_use {
+                count {}
+              }
+            }
+          }
+
           # Exclude specific paths from this rule group evaluation
           # Scope-down statement: "Evaluate this rule group ONLY if path does NOT match core_rule_sets_excluded_paths"
           dynamic "scope_down_statement" {

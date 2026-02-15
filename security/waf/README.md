@@ -84,6 +84,10 @@ module "waf" {
   enable_sqli_rule_set        = true   # SQL injection
   enable_ip_reputation_list   = true   # Malicious IPs
 
+  # File Upload Support - Exclude SizeRestrictions_BODY rule
+  # Set to true if your app supports file uploads (profile pics, documents, etc.)
+  exclude_size_restrictions_body = false  # Default: false (blocks large bodies)
+
   # Rate Limiting
   enable_rate_limiting = true
   rate_limit_threshold = 2000  # 2000 requests per IP per 5 minutes
@@ -485,6 +489,32 @@ Common attacks blocked:
 - Path traversal
 
 **Recommendation**: Always enable ✅
+
+**File Upload Support**: 
+If your application supports file uploads (profile pictures, documents, attachments), you may need to exclude the `SizeRestrictions_BODY` rule:
+
+```terraform
+enable_core_rule_set           = true
+exclude_size_restrictions_body = true  # Allow file uploads
+```
+
+**What this does**:
+- Changes `SizeRestrictions_BODY` rule from BLOCK to COUNT (log only)
+- Allows large request bodies (needed for multipart/form-data file uploads)
+- All other Core Rule Set rules still actively protect your application
+- The rule still logs large bodies, but doesn't block them
+
+**When to enable exclusion**:
+- ✅ Your app has file upload functionality
+- ✅ You're seeing legitimate uploads being blocked
+- ✅ You have application-level upload size limits
+- ✅ You've configured ALB request body size limits
+
+**Security considerations when excluded**:
+- ⚠️ Ensure your application validates and limits upload sizes
+- ⚠️ Set maximum file sizes at the application level
+- ⚠️ Consider using S3 presigned URLs for large uploads instead
+- ⚠️ Monitor CloudWatch logs for excessive large body requests
 
 #### 2. Known Bad Inputs - 200 WCU
 **Protects against**: Known malicious patterns and CVEs

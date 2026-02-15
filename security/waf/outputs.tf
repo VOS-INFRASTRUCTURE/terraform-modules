@@ -88,6 +88,19 @@ output "waf" {
     }
 
     # ──────────────────────────────────────────────────────────────────────
+    # Rule Exclusions - Specific rules excluded from managed rule groups
+    # ──────────────────────────────────────────────────────────────────────
+    rule_exclusions = {
+      size_restrictions_body = {
+        enabled     = var.exclude_size_restrictions_body
+        rule_name   = "SizeRestrictions_BODY"
+        rule_group  = "CoreRuleSet"
+        action      = var.exclude_size_restrictions_body ? "COUNT" : "BLOCK"
+        reason      = "Allow file uploads (multipart/form-data)"
+      }
+    }
+
+    # ──────────────────────────────────────────────────────────────────────
     # Path Exclusions - Paths excluded from Core/Admin/SQLi/KnownBadInputs rules
     # Uses scope_down_statement (no additional WCU cost)
     # ──────────────────────────────────────────────────────────────────────

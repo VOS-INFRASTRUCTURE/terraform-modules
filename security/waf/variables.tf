@@ -76,6 +76,32 @@ variable "enable_core_rule_set" {
   default     = true
 }
 
+variable "exclude_size_restrictions_body" {
+  description = <<-EOT
+    Exclude SizeRestrictions_BODY rule from Core Rule Set (changes action to COUNT instead of BLOCK).
+
+    Why exclude this rule:
+    - SizeRestrictions_BODY blocks requests with large body sizes (typically >8KB)
+    - This is problematic for file uploads (multipart/form-data)
+    - Common scenarios: Profile picture uploads, document uploads, image uploads
+
+    When to enable (set to true):
+    - Your application supports file uploads
+    - You're seeing legitimate uploads being blocked
+    - You have other upload size limits in place (application-level, ALB limits)
+
+    Security considerations:
+    - When excluded, this rule will COUNT (log only) instead of BLOCK
+    - All other Core Rule Set rules still apply (XSS, SQLi, etc.)
+    - Ensure your application has upload size limits to prevent abuse
+    - ALB has a 1MB payload limit by default (can be increased to 8MB)
+
+    Default: false (rule is active and blocks large bodies)
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "enable_known_bad_inputs" {
   description = "Enable AWS Managed Known Bad Inputs Rule Set - 200 WCU"
   type        = bool
