@@ -102,6 +102,44 @@ variable "exclude_size_restrictions_body" {
   default     = false
 }
 
+variable "exclude_cross_site_scripting_body" {
+  description = <<-EOT
+    Exclude CrossSiteScripting_BODY rule from Core Rule Set (changes action to COUNT instead of BLOCK).
+
+    Why exclude this rule:
+    - CrossSiteScripting_BODY blocks request bodies containing HTML/JavaScript patterns
+    - This is problematic for legitimate use cases with HTML content
+    - Common scenarios:
+      * Rich text editors (TinyMCE, CKEditor, Quill)
+      * Code snippet sharing platforms
+      * Documentation with code examples
+      * HTML email composition
+      * Markdown editors with HTML preview
+
+    When to enable (set to true):
+    - Your application has rich text editing functionality
+    - Users can submit HTML/JavaScript content legitimately
+    - You're seeing legitimate content being blocked (e.g., <script> in code examples)
+    - You have server-side XSS sanitization in place
+
+    Security considerations:
+    - When excluded, this rule will COUNT (log only) instead of BLOCK
+    - ⚠️ CRITICAL: Implement server-side XSS sanitization/escaping
+    - ⚠️ CRITICAL: Never render user HTML without sanitization
+    - Use libraries like DOMPurify, bleach, or html-sanitizer
+    - All other Core Rule Set rules still apply (SQLi, path traversal, etc.)
+    - CrossSiteScripting_QUERYARGUMENTS still blocks XSS in URL parameters
+
+    Example sanitization (Node.js):
+      const DOMPurify = require('isomorphic-dompurify');
+      const cleanHtml = DOMPurify.sanitize(userInput);
+
+    Default: false (rule is active and blocks XSS patterns in body)
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "enable_known_bad_inputs" {
   description = "Enable AWS Managed Known Bad Inputs Rule Set - 200 WCU"
   type        = bool

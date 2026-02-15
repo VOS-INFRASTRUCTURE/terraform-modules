@@ -85,6 +85,20 @@ resource "aws_wafv2_web_acl" "waf" {
             }
           }
 
+          # CrossSiteScripting_BODY: Blocks potential XSS in request body
+          # Enable this exclusion if your application handles HTML/JavaScript content
+          # (e.g., rich text editors, code examples, documentation platforms)
+          dynamic "rule_action_override" {
+            for_each = var.exclude_cross_site_scripting_body ? [1] : []
+
+            content {
+              name = "CrossSiteScripting_BODY"
+              action_to_use {
+                count {}
+              }
+            }
+          }
+
           # Exclude specific paths from this rule group evaluation
           # Scope-down statement: "Evaluate this rule group ONLY if path does NOT match core_rule_sets_excluded_paths"
           dynamic "scope_down_statement" {

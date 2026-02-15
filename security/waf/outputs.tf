@@ -98,6 +98,13 @@ output "waf" {
         action      = var.exclude_size_restrictions_body ? "COUNT" : "BLOCK"
         reason      = "Allow file uploads (multipart/form-data)"
       }
+      cross_site_scripting_body = {
+        enabled     = var.exclude_cross_site_scripting_body
+        rule_name   = "CrossSiteScripting_BODY"
+        rule_group  = "CoreRuleSet"
+        action      = var.exclude_cross_site_scripting_body ? "COUNT" : "BLOCK"
+        reason      = "Allow HTML/JavaScript content in request body (rich text editors, code examples)"
+      }
     }
 
     # ──────────────────────────────────────────────────────────────────────

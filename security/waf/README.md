@@ -88,6 +88,11 @@ module "waf" {
   # Set to true if your app supports file uploads (profile pics, documents, etc.)
   exclude_size_restrictions_body = false  # Default: false (blocks large bodies)
 
+  # Rich Text/HTML Content Support - Exclude CrossSiteScripting_BODY rule
+  # Set to true if your app has rich text editors or allows HTML/JS content
+  # ⚠️ REQUIRES server-side XSS sanitization!
+  exclude_cross_site_scripting_body = false  # Default: false (blocks XSS in body)
+
   # Rate Limiting
   enable_rate_limiting = true
   rate_limit_threshold = 2000  # 2000 requests per IP per 5 minutes
@@ -515,6 +520,53 @@ exclude_size_restrictions_body = true  # Allow file uploads
 - ⚠️ Set maximum file sizes at the application level
 - ⚠️ Consider using S3 presigned URLs for large uploads instead
 - ⚠️ Monitor CloudWatch logs for excessive large body requests
+
+**Rich Text / HTML Content Support**:
+If your application supports rich text editors or allows HTML/JavaScript content submission (code examples, documentation), you may need to exclude the `CrossSiteScripting_BODY` rule:
+
+```terraform
+enable_core_rule_set                = true
+exclude_cross_site_scripting_body   = true  # Allow HTML/JS in request body
+```
+
+**What this does**:
+- Changes `CrossSiteScripting_BODY` rule from BLOCK to COUNT (log only)
+- Allows HTML/JavaScript patterns in request body
+- All other XSS protection remains active (query parameters, headers, cookies)
+- Other Core Rule Set rules still apply (SQLi, path traversal, RCE, etc.)
+
+**When to enable exclusion**:
+- ✅ Your app has rich text editors (TinyMCE, CKEditor, Quill)
+- ✅ Users can post code snippets/examples
+- ✅ You have a documentation platform with HTML content
+- ✅ You have server-side XSS sanitization in place
+
+**Security considerations when excluded (CRITICAL)**:
+- ⚠️ **MANDATORY**: Implement server-side HTML sanitization (DOMPurify, bleach, etc.)
+- ⚠️ **MANDATORY**: Never render user HTML without escaping/sanitization
+- ⚠️ Use Content Security Policy (CSP) headers
+- ⚠️ Store HTML content separately from executable code
+- ⚠️ XSS protection in URL parameters/headers still active
+- ⚠️ Regular security audits of HTML rendering code
+
+**Example server-side sanitization**:
+```javascript
+// Node.js with DOMPurify
+const createDOMPurify = require('isomorphic-dompurify');
+const DOMPurify = createDOMPurify();
+
+app.post('/api/content', (req, res) => {
+  const userHtml = req.body.content;
+  
+  // Sanitize before storing/rendering
+  const cleanHtml = DOMPurify.sanitize(userHtml, {
+    ALLOWED_TAGS: ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: ['href', 'target']
+  });
+  
+  // Store cleanHtml in database
+});
+```
 
 #### 2. Known Bad Inputs - 200 WCU
 **Protects against**: Known malicious patterns and CVEs
