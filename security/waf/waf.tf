@@ -99,6 +99,20 @@ resource "aws_wafv2_web_acl" "waf" {
             }
           }
 
+          # NoUserAgent_HEADER: Blocks requests without User-Agent header
+          # Enable this exclusion if you have health checks, internal APIs, or monitoring
+          # tools that don't send User-Agent headers (e.g., Kubernetes probes, Lambda)
+          dynamic "rule_action_override" {
+            for_each = var.exclude_no_user_agent_header ? [1] : []
+
+            content {
+              name = "NoUserAgent_HEADER"
+              action_to_use {
+                count {}
+              }
+            }
+          }
+
           # Exclude specific paths from this rule group evaluation
           # Scope-down statement: "Evaluate this rule group ONLY if path does NOT match core_rule_sets_excluded_paths"
 

@@ -93,6 +93,11 @@ module "waf" {
   # ⚠️ REQUIRES server-side XSS sanitization!
   exclude_cross_site_scripting_body = false  # Default: false (blocks XSS in body)
 
+  # Health Check/Internal API Support - Exclude NoUserAgent_HEADER rule
+  # Set to true if you have health checks, monitoring tools, or internal services
+  # that don't send User-Agent headers (e.g., K8s probes, Lambda functions)
+  exclude_no_user_agent_header = false  # Default: false (blocks missing User-Agent)
+
   # Rate Limiting
   enable_rate_limiting = true
   rate_limit_threshold = 2000  # 2000 requests per IP per 5 minutes
@@ -568,6 +573,40 @@ app.post('/api/content', (req, res) => {
 });
 ```
 
+**Health Checks / Internal API Support**:
+If your application has health check endpoints, monitoring tools, or internal microservices that don't send User-Agent headers, you may need to exclude the `NoUserAgent_HEADER` rule:
+
+```terraform
+enable_core_rule_set          = true
+exclude_no_user_agent_header  = true  # Allow requests without User-Agent
+```
+
+**What this does**:
+- Changes `NoUserAgent_HEADER` rule from BLOCK to COUNT (log only)
+- Allows requests without a User-Agent header
+- All other Core Rule Set rules still actively protect your application
+- The rule still logs missing User-Agent, but doesn't block them
+
+**When to enable exclusion**:
+- ✅ You have Kubernetes liveness/readiness probes
+- ✅ Internal microservices communicate without User-Agent
+- ✅ Lambda functions or serverless apps make internal calls
+- ✅ IoT devices with minimal HTTP clients
+- ✅ ALB/NLB health checks don't send User-Agent
+- ✅ Monitoring/automation scripts without User-Agent
+
+**Better alternatives (consider first)**:
+1. **Exclude specific paths**: Use `core_rule_sets_excluded_paths = ["/health", "/ready"]` instead
+2. **Add User-Agent to tools**: Configure your health checks to send a User-Agent header
+3. **Scope-down by IP**: Allow no-User-Agent only from specific internal IPs
+
+**Security considerations when excluded**:
+- ⚠️ Missing User-Agent is a common bot/scraper indicator
+- ⚠️ Consider implementing custom rate limiting for no-User-Agent requests
+- ⚠️ Monitor CloudWatch metrics for NoUserAgent_HEADER counts
+- ⚠️ Review logs regularly for suspicious no-User-Agent traffic
+- ⚠️ Other bot detection mechanisms should be in place
+
 #### 2. Known Bad Inputs - 200 WCU
 **Protects against**: Known malicious patterns and CVEs
 
@@ -1007,4 +1046,3 @@ For issues or questions:
 **Last Updated**: January 11, 2026  
 **Version**: 1.0.0  
 **Maintained By**: Security Team
-

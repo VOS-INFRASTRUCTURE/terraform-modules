@@ -105,6 +105,13 @@ output "waf" {
         action      = var.exclude_cross_site_scripting_body ? "COUNT" : "BLOCK"
         reason      = "Allow HTML/JavaScript content in request body (rich text editors, code examples)"
       }
+      no_user_agent_header = {
+        enabled     = var.exclude_no_user_agent_header
+        rule_name   = "NoUserAgent_HEADER"
+        rule_group  = "CoreRuleSet"
+        action      = var.exclude_no_user_agent_header ? "COUNT" : "BLOCK"
+        reason      = "Allow requests without User-Agent header (health checks, internal APIs, monitoring tools)"
+      }
     }
 
     # ──────────────────────────────────────────────────────────────────────

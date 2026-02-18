@@ -140,6 +140,49 @@ variable "exclude_cross_site_scripting_body" {
   default     = false
 }
 
+variable "exclude_no_user_agent_header" {
+  description = <<-EOT
+    Exclude NoUserAgent_HEADER rule from Core Rule Set (changes action to COUNT instead of BLOCK).
+
+    Why exclude this rule:
+    - NoUserAgent_HEADER blocks requests without a User-Agent header
+    - This is commonly used to block basic bots and scrapers
+    - However, legitimate use cases exist without User-Agent headers
+
+    Common scenarios requiring exclusion:
+    - Monitoring/health check tools (Kubernetes liveness/readiness probes)
+    - Internal API calls from microservices
+    - Serverless functions (Lambda, Cloud Functions)
+    - IoT devices with minimal HTTP clients
+    - Mobile apps with custom HTTP implementations
+    - Automation scripts and scheduled jobs
+    - Load balancer health checks (ALB, NLB)
+
+    When to enable (set to true):
+    - You have health check endpoints that don't send User-Agent
+    - Internal services communicate without User-Agent headers
+    - You're seeing legitimate requests being blocked
+    - Your monitoring system doesn't set User-Agent
+
+    Security considerations:
+    - When excluded, this rule will COUNT (log only) instead of BLOCK
+    - ⚠️ Missing User-Agent is a common bot indicator
+    - Consider implementing custom rate limiting for no-User-Agent requests
+    - Monitor CloudWatch metrics for NoUserAgent_HEADER counts
+    - Alternative: Add User-Agent to your health checks/internal tools
+    - All other Core Rule Set rules still apply
+
+    Best practice alternatives:
+    1. Exclude specific paths instead (e.g., /health, /ready) using core_rule_sets_excluded_paths
+    2. Add User-Agent header to your tools/scripts
+    3. Use scope-down statement to allow no-User-Agent only from specific IPs
+
+    Default: false (rule is active and blocks requests without User-Agent)
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "enable_known_bad_inputs" {
   description = "Enable AWS Managed Known Bad Inputs Rule Set - 200 WCU"
   type        = bool
