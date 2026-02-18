@@ -29,8 +29,8 @@ output "server" {
     # Monitoring configuration
     monitoring = {
       enabled            = var.enable_cloudwatch_monitoring
-      log_group_name     = var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : null
-      log_group_arn      = var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].arn : null
+      log_group_name     = var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : null
+      log_group_arn      = var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].arn : null
       log_retention_days = var.log_retention_days
     }
 

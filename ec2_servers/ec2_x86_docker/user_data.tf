@@ -79,37 +79,37 @@ if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
         "collect_list": [
           {
             "file_path": "/var/log/server-setup.log",
-            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/setup.log",
             "timezone": "UTC"
           },
           {
             "file_path": "/var/log/syslog",
-            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/syslog",
             "timezone": "UTC"
           },
           {
             "file_path": "/var/log/auth.log",
-            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/auth.log",
             "timezone": "UTC"
           },
           {
             "file_path": "/var/log/cloud-init.log",
-            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/cloud-init.log",
             "timezone": "UTC"
           },
           {
             "file_path": "/var/log/cloud-init-output.log",
-            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/cloud-init-output.log",
             "timezone": "UTC"
           },
           {
             "file_path": "/var/log/docker.log",
-            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.mysql_logs[0].name : ""}",
+            "log_group_name": "${var.enable_cloudwatch_monitoring ? aws_cloudwatch_log_group.ec2_x86_logs[0].name : ""}",
             "log_stream_name": "{instance_id}/docker.log",
             "timezone": "UTC"
           }
