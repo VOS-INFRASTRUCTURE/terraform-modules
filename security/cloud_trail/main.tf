@@ -149,6 +149,27 @@ resource "aws_cloudtrail" "trail" {
     include_management_events = true
   }
 
+  ##########################################################################
+  # Remediation for AWS Security Hub Control: S3.22
+  # "S3 general purpose buckets should log object-level read events"
+  #
+  # Finding ID : arn:aws:securityhub.../ab97a3c7-57eb-4212-a95c-40f9cf869b69
+  # Severity   : MEDIUM
+  #
+  # Logs S3 object-level READ events (GetObject, HeadObject, etc.)
+  # across ALL buckets in the account, satisfying the multi-region
+  # trail + read data events requirement.
+  ##########################################################################
+  event_selector {
+    read_write_type           = "ReadOnly"  # Captures GET, HEAD, LIST operations
+    include_management_events = false       # Already covered by the selector above
+
+    data_resource {
+      type   = "AWS::S3::Object"
+      values = ["arn:aws:s3:::"]            # Wildcard — applies to ALL S3 buckets
+    }
+  }
+
   tags = {
     Name        = "${var.env}-${var.project_id}-audit-trail"
     Environment = var.env
