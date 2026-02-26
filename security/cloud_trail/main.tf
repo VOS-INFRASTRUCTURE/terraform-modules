@@ -150,23 +150,27 @@ resource "aws_cloudtrail" "trail" {
   }
 
   ##########################################################################
-  # Remediation for AWS Security Hub Control: S3.22
-  # "S3 general purpose buckets should log object-level read events"
+  # Remediation for AWS Security Hub Controls:
   #
-  # Finding ID : arn:aws:securityhub.../ab97a3c7-57eb-4212-a95c-40f9cf869b69
-  # Severity   : MEDIUM
+  # S3.22 - "S3 general purpose buckets should log object-level read events"
+  #         Finding ID: arn:aws:securityhub.../ab97a3c7-57eb-4212-a95c-40f9cf869b69
   #
-  # Logs S3 object-level READ events (GetObject, HeadObject, etc.)
-  # across ALL buckets in the account, satisfying the multi-region
-  # trail + read data events requirement.
+  # S3.23 - "S3 general purpose buckets should log object-level write events"
+  #         Finding ID: arn:aws:securityhub.../ec1b1a41-65af-49ea-be02-b6822b25e626
+  #
+  # Severity: MEDIUM
+  #
+  # Logs ALL S3 object-level events (GET, HEAD, LIST, PUT, DELETE, etc.)
+  # across ALL buckets in the account, satisfying both the read and write
+  # data events requirements for a multi-region trail.
   ##########################################################################
   event_selector {
-    read_write_type           = "ReadOnly"  # Captures GET, HEAD, LIST operations
-    include_management_events = false       # Already covered by the selector above
+    read_write_type           = "All"   # Captures both READ (S3.22) and WRITE (S3.23)
+    include_management_events = false   # Already covered by the existing selector above
 
     data_resource {
       type   = "AWS::S3::Object"
-      values = ["arn:aws:s3:::"]            # Wildcard — applies to ALL S3 buckets
+      values = ["arn:aws:s3:::"]        # Wildcard — applies to ALL S3 buckets
     }
   }
 
