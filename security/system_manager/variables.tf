@@ -18,10 +18,10 @@ variable "enable_ssm_public_sharing_block" {
   default     = true
 }
 
-variable "enable_ssm_automation_logging" {
-  type    = bool
-  default = true
-}
+# variable "enable_ssm_automation_logging" {
+#   type    = bool
+#   default = true
+# }
 
 variable "tags" {
   description = "Additional tags to apply to resources"

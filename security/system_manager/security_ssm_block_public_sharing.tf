@@ -28,26 +28,26 @@ resource "aws_ssm_service_setting" "block_public_sharing" {
   setting_id    = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:servicesetting/ssm/documents/console/public-sharing-permission"
   setting_value = "Disable"
 }
-
-################################################################################
-# SSM Automation CloudWatch Logging (Security Control)
 #
-# Purpose: Ensure all SSM Automation executions are logged to CloudWatch
-#          for auditing and compliance.
+# ################################################################################
+# # SSM Automation CloudWatch Logging (Security Control)
+# #
+# # Purpose: Ensure all SSM Automation executions are logged to CloudWatch
+# #          for auditing and compliance.
+# #
+# # Security Hub Control: securityhub-ssm-automation-logging-enabled
+# # Severity: MEDIUM
+# # Standard: AWS Foundational Security Best Practices v1.0.0
+# ################################################################################
 #
-# Security Hub Control: securityhub-ssm-automation-logging-enabled
-# Severity: MEDIUM
-# Standard: AWS Foundational Security Best Practices v1.0.0
-################################################################################
-
-resource "aws_ssm_service_setting" "enable_automation_logging" {
-  count = var.enable_ssm_automation_logging ? 1 : 0
-
-  # This is the service setting ID for SSM Automation logging
-  setting_id    = "/ssm/automation/enable-logging"
-  setting_value = "Enabled"
-}
-
+# resource "aws_ssm_service_setting" "enable_automation_logging" {
+#   count = var.enable_ssm_automation_logging ? 1 : 0
+#
+#   # This is the service setting ID for SSM Automation logging
+#   setting_id    = "/ssm/automation/enable-logging"
+#   setting_value = "Enabled"
+# }
+#
 
 ################################################################################
 # Data Sources (required for the ARN construction)
@@ -74,18 +74,18 @@ output "ssm_security" {
   }
 }
 
-
-################################################################################
-# Outputs
-################################################################################
-
-output "ssm_automation_logging" {
-  description = "SSM Automation CloudWatch logging configuration"
-  value = {
-    enabled       = var.enable_ssm_automation_logging
-    setting_id    = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].setting_id : null
-    setting_value = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].setting_value : null
-    status        = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].status : null
-    arn           = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].arn : null
-  }
-}
+#
+# ################################################################################
+# # Outputs
+# ################################################################################
+#
+# output "ssm_automation_logging" {
+#   description = "SSM Automation CloudWatch logging configuration"
+#   value = {
+#     enabled       = var.enable_ssm_automation_logging
+#     setting_id    = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].setting_id : null
+#     setting_value = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].setting_value : null
+#     status        = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].status : null
+#     arn           = var.enable_ssm_automation_logging ? aws_ssm_service_setting.enable_automation_logging[0].arn : null
+#   }
+# }
