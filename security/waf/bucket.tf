@@ -124,3 +124,27 @@ resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
   }
 }
 
+resource "aws_s3_bucket_policy" "require_ssl" {
+  bucket = aws_s3_bucket.waf_logs[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid = "RequireSSL"
+        Effect = "Deny"
+        Principal = "*"
+        Action = "s3:*"
+        Resource = [
+          aws_s3_bucket.waf_logs[0].arn,
+          "${aws_s3_bucket.waf_logs[0].arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  })
+}
