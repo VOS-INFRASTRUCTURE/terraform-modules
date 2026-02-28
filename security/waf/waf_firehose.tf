@@ -54,6 +54,14 @@ resource "aws_kinesis_firehose_delivery_stream" "waf_logs" {
         }
       }
     }
+
+
+  }
+
+  server_side_encryption {
+    enabled  = true
+    key_type = "CUSTOMER_MANAGED_CMK"
+    key_arn  = aws_kms_key.firehose.arn
   }
 
   tags = merge(
