@@ -44,6 +44,13 @@
 locals {
   ct_bucket_name    = "${var.env}-${var.project_id}-cloudtrail-logs"
   ct_log_group_name = "/aws/cloudtrail/${var.env}-${var.project_id}-audit-trail"
+
+  # When a central (cross-account) bucket name is provided, use it directly.
+  # Otherwise fall back to the local bucket created in bucket.tf.
+  # The central bucket must already have a policy allowing CloudTrail from
+  # this account to write — this module does not manage that policy.
+  using_local_bucket       = var.central_s3_bucket_name == null
+  effective_s3_bucket_name = var.central_s3_bucket_name != null ? var.central_s3_bucket_name : local.ct_bucket_name
 }
 
 ################################################################################
@@ -128,14 +135,14 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch" {
 
 resource "aws_cloudtrail" "trail" {
   depends_on = [
-    aws_s3_bucket_policy.cloudtrail,
+    aws_s3_bucket_policy.cloudtrail,  # no-op when central bucket is used (count=0)
     aws_cloudwatch_log_group.this,
     aws_iam_role.cloudtrail_cloudwatch,
     aws_iam_role_policy.cloudtrail_cloudwatch
   ]
 
   name                          = "${var.env}-${var.project_id}-audit-trail"
-  s3_bucket_name                = aws_s3_bucket.cloudtrail_logs.id
+  s3_bucket_name                = local.effective_s3_bucket_name
   include_global_service_events = true
   is_multi_region_trail         = true
   enable_logging                = true

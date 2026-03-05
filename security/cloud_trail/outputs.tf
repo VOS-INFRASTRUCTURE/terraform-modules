@@ -15,13 +15,25 @@ output "cloudtrail" {
   value = {
     # ──────────────────────────────────────────────────────────────────────
     # S3 Bucket - Long-term audit log storage
+    #
+    # When central_s3_bucket_name is provided, this reflects the external
+    # bucket.  Local bucket attributes (arn, id) are null because this module
+    # does not own the central bucket.
     # ──────────────────────────────────────────────────────────────────────
     bucket = {
-      name       = aws_s3_bucket.cloudtrail_logs.bucket      # S3 bucket name
-      arn        = aws_s3_bucket.cloudtrail_logs.arn         # S3 bucket ARN
-      id         = aws_s3_bucket.cloudtrail_logs.id          # S3 bucket ID
-      versioning = "Enabled"                                  # Versioning status
-      encryption = "AES256"                                   # Encryption type
+      name = local.effective_s3_bucket_name                               # Bucket name (local or central)
+
+      # Only populated for locally-managed buckets
+      arn  = local.using_local_bucket ? aws_s3_bucket.cloudtrail_logs[0].arn : null
+      id   = local.using_local_bucket ? aws_s3_bucket.cloudtrail_logs[0].id  : null
+
+      # Indicates source of bucket
+      is_central_bucket    = !local.using_local_bucket                    # true when using cross-account bucket
+      central_bucket_owner = var.central_s3_bucket_account_id             # null when using local bucket
+
+      # Settings only relevant for locally-managed bucket
+      versioning = local.using_local_bucket ? (var.enable_bucket_versioning ? "Enabled" : "Disabled") : null
+      encryption = local.using_local_bucket ? "AES256" : null
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -95,6 +107,7 @@ output "cloudtrail" {
     summary = {
       module_enabled     = true                              # Module is active
       dual_delivery      = true                              # Both S3 and CloudWatch
+      using_central_bucket           = !local.using_local_bucket            # Using cross-account central bucket?
 
       # Alerting configuration
       security_alarms_enabled        = var.enable_cloudtrail_security_alarms

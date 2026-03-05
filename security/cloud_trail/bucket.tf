@@ -4,6 +4,10 @@
 # Purpose: S3 bucket for storing CloudTrail audit logs with secure access,
 #          encryption, versioning, and lifecycle management.
 #
+# NOTE: All resources in this file are skipped when central_s3_bucket_name
+#       is provided. In that case the trail writes directly to the central
+#       bucket which must already carry the appropriate bucket policy.
+#
 # Features:
 # - Public access blocked
 # - Server-side encryption (AES256)
@@ -17,6 +21,9 @@
 ################################################################################
 
 resource "aws_s3_bucket" "cloudtrail_logs" {
+  # Skip when a central bucket is provided — nothing to create locally.
+  count = var.central_s3_bucket_name == null ? 1 : 0
+
   bucket        = local.ct_bucket_name
   force_destroy = var.force_destroy
 
@@ -35,7 +42,8 @@ resource "aws_s3_bucket" "cloudtrail_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_public_access_block" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
+  count  = var.central_s3_bucket_name == null ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail_logs[0].id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -48,7 +56,8 @@ resource "aws_s3_bucket_public_access_block" "cloudtrail" {
 ################################################################################
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
+  count  = var.central_s3_bucket_name == null ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail_logs[0].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -70,8 +79,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
 ################################################################################
 
 resource "aws_s3_bucket_versioning" "cloudtrail" {
-  count  = var.enable_bucket_versioning ? 1 : 0
-  bucket = aws_s3_bucket.cloudtrail_logs.id
+  count  = var.central_s3_bucket_name == null && var.enable_bucket_versioning ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail_logs[0].id
 
   versioning_configuration {
     status = "Enabled"
@@ -87,7 +96,8 @@ resource "aws_s3_bucket_versioning" "cloudtrail" {
 ################################################################################
 
 resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
+  count  = var.central_s3_bucket_name == null ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail_logs[0].id
 
   rule {
     id     = "cloudtrail-retention"
@@ -114,7 +124,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
 ################################################################################
 
 resource "aws_s3_bucket_policy" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail_logs.id
+  count  = var.central_s3_bucket_name == null ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail_logs[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -126,7 +137,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
           Service = "cloudtrail.amazonaws.com"
         }
         Action   = "s3:GetBucketAcl"
-        Resource = aws_s3_bucket.cloudtrail_logs.arn
+        Resource = aws_s3_bucket.cloudtrail_logs[0].arn
       },
       {
         Sid    = "AWSCloudTrailWrite"
@@ -135,7 +146,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
           Service = "cloudtrail.amazonaws.com"
         }
         Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.cloudtrail_logs.arn}/*"
+        Resource = "${aws_s3_bucket.cloudtrail_logs[0].arn}/*"
         Condition = {
           StringEquals = {
             "s3:x-amz-acl" = "bucket-owner-full-control"
@@ -145,4 +156,3 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
     ]
   })
 }
-
