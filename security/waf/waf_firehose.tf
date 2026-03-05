@@ -18,7 +18,9 @@ resource "aws_kinesis_firehose_delivery_stream" "waf_logs" {
 
   extended_s3_configuration {
     role_arn   = aws_iam_role.waf_firehose_role[0].arn
-    bucket_arn = aws_s3_bucket.waf_logs[0].arn
+    # Delivers to either the locally-managed bucket or the central bucket,
+    # depending on whether central_s3_bucket_name is set.
+    bucket_arn = local.effective_s3_bucket_arn
 
     # Required when dynamic partitioning is enabled
     buffering_size     = var.firehose_buffering_size      # MB (minimum: 64)

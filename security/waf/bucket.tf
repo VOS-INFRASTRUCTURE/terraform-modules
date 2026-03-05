@@ -4,6 +4,10 @@
 # Purpose: S3 bucket for storing WAF logs with intelligent routing and
 #          lifecycle management via Kinesis Firehose.
 #
+# NOTE: All resources in this file are skipped when central_s3_bucket_name
+#       is provided. In that case Firehose delivers directly to the central
+#       bucket which must already carry the appropriate resource policy.
+#
 # Features:
 # - Public access blocked
 # - Server-side encryption (AES256)
@@ -19,7 +23,8 @@
 ################################################################################
 
 resource "aws_s3_bucket" "waf_logs" {
-  count = var.enable_waf_logging ? 1 : 0
+  # Skip when a central bucket is provided OR when logging is disabled.
+  count = var.enable_waf_logging && var.central_s3_bucket_name == null ? 1 : 0
 
   bucket        = "${var.env}-${var.project_id}-${local.frontend_alb_key_name}-waf-logs"
   force_destroy = var.force_destroy_log_bucket
@@ -41,7 +46,7 @@ resource "aws_s3_bucket" "waf_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_public_access_block" "waf_logs" {
-  count = var.enable_waf_logging ? 1 : 0
+  count = var.enable_waf_logging && var.central_s3_bucket_name == null ? 1 : 0
 
   bucket = aws_s3_bucket.waf_logs[0].id
 
@@ -56,7 +61,7 @@ resource "aws_s3_bucket_public_access_block" "waf_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "waf_logs" {
-  count = var.enable_waf_logging ? 1 : 0
+  count = var.enable_waf_logging && var.central_s3_bucket_name == null ? 1 : 0
 
   bucket = aws_s3_bucket.waf_logs[0].id
 
@@ -77,7 +82,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "waf_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
-  count = var.enable_waf_logging ? 1 : 0
+  count = var.enable_waf_logging && var.central_s3_bucket_name == null ? 1 : 0
 
   bucket = aws_s3_bucket.waf_logs[0].id
 
@@ -124,17 +129,22 @@ resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
   }
 }
 
+################################################################################
+# S3 Bucket Policy - Deny non-TLS requests
+################################################################################
+
 resource "aws_s3_bucket_policy" "require_ssl" {
+  count  = var.enable_waf_logging && var.central_s3_bucket_name == null ? 1 : 0
   bucket = aws_s3_bucket.waf_logs[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid = "RequireSSL"
-        Effect = "Deny"
+        Sid       = "RequireSSL"
+        Effect    = "Deny"
         Principal = "*"
-        Action = "s3:*"
+        Action    = "s3:*"
         Resource = [
           aws_s3_bucket.waf_logs[0].arn,
           "${aws_s3_bucket.waf_logs[0].arn}/*"

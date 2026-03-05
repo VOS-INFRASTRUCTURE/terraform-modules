@@ -63,8 +63,24 @@ data "aws_caller_identity" "current" {}
 ################################################################################
 
 locals {
-  resource_prefix = var.env
+  resource_prefix       = var.env
   frontend_alb_key_name = var.alb_name != null ? var.alb_name : "app-alb"
+
+  # When a central (cross-account) bucket name is provided, use it directly.
+  # Otherwise fall back to the local bucket created in bucket.tf.
+  # The central bucket must already have a resource policy allowing Firehose
+  # from this account to deliver logs — this module does not manage that policy.
+  using_local_bucket = var.central_s3_bucket_name == null
+
+  # Resolved bucket name — used in outputs and IAM policy resources.
+  effective_s3_bucket_name = local.using_local_bucket ? (
+    var.enable_waf_logging ? "${var.env}-${var.project_id}-${local.frontend_alb_key_name}-waf-logs" : null
+  ) : var.central_s3_bucket_name
+
+  # Resolved bucket ARN — used directly in Firehose and IAM policy.
+  effective_s3_bucket_arn = local.using_local_bucket ? (
+    var.enable_waf_logging ? aws_s3_bucket.waf_logs[0].arn : null
+  ) : "arn:aws:s3:::${var.central_s3_bucket_name}"
 }
 
 ################################################################################

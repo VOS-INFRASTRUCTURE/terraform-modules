@@ -55,9 +55,10 @@ resource "aws_iam_role_policy" "waf_firehose_policy" {
           "s3:GetBucketLocation",
           "s3:ListBucket"
         ]
+        # Grants access to whichever bucket is in use (local or central).
         Resource = [
-          aws_s3_bucket.waf_logs[0].arn,
-          "${aws_s3_bucket.waf_logs[0].arn}/*"
+          local.effective_s3_bucket_arn,
+          "${local.effective_s3_bucket_arn}/*"
         ]
       },
       {

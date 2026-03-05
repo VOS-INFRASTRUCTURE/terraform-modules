@@ -35,22 +35,34 @@ output "waf" {
 
     # ──────────────────────────────────────────────────────────────────────
     # Logging - S3 bucket and Firehose configuration
+    #
+    # When central_s3_bucket_name is provided, bucket_arn and local bucket
+    # attributes are null — this module does not own the central bucket.
     # ──────────────────────────────────────────────────────────────────────
     logging = var.enable_waf_logging ? {
-      bucket_name         = aws_s3_bucket.waf_logs[0].bucket                    # S3 bucket name
-      bucket_arn          = aws_s3_bucket.waf_logs[0].arn                       # S3 bucket ARN
-      firehose_stream_arn = aws_kinesis_firehose_delivery_stream.waf_logs[0].arn  # Firehose stream ARN
-      firehose_stream_name = aws_kinesis_firehose_delivery_stream.waf_logs[0].name # Firehose stream name
+      # Resolved bucket name (local or central)
+      bucket_name          = local.effective_s3_bucket_name
 
+      # Only populated for locally-managed buckets
+      bucket_arn           = local.using_local_bucket ? aws_s3_bucket.waf_logs[0].arn : null
+
+      # Indicates source of bucket
+      is_central_bucket    = !local.using_local_bucket
+      central_bucket_owner = var.central_s3_bucket_account_id  # null when using local bucket
+
+      firehose_stream_arn  = aws_kinesis_firehose_delivery_stream.waf_logs[0].arn
+      firehose_stream_name = aws_kinesis_firehose_delivery_stream.waf_logs[0].name
+
+      # Retention settings — only meaningful for locally-managed bucket
       retention = {
-        blocked_days = var.blocked_logs_retention_days     # Blocked logs retention
-        allowed_days = var.allowed_logs_retention_days     # Allowed logs retention
-        error_days   = var.error_logs_retention_days       # Error logs retention
+        blocked_days = local.using_local_bucket ? var.blocked_logs_retention_days : null
+        allowed_days = local.using_local_bucket ? var.allowed_logs_retention_days : null
+        error_days   = local.using_local_bucket ? var.error_logs_retention_days   : null
       }
 
       lambda_router = {
-        function_name = aws_lambda_function.waf_log_router[0].function_name  # Lambda function name
-        function_arn  = aws_lambda_function.waf_log_router[0].arn            # Lambda function ARN
+        function_name = aws_lambda_function.waf_log_router[0].function_name
+        function_arn  = aws_lambda_function.waf_log_router[0].arn
       }
     } : null
 
@@ -140,12 +152,13 @@ output "waf" {
     # Configuration Summary - Quick reference
     # ──────────────────────────────────────────────────────────────────────
     summary = {
-      module_enabled      = true
-      environment         = var.env
-      project_id          = var.project_id
-      waf_enabled         = true
-      logging_enabled     = var.enable_waf_logging
-      alb_associated      = var.alb_arn != null
+      module_enabled       = true
+      environment          = var.env
+      project_id           = var.project_id
+      waf_enabled          = true
+      logging_enabled      = var.enable_waf_logging
+      alb_associated       = var.alb_arn != null
+      using_central_bucket = !local.using_local_bucket   # true when central_s3_bucket_name is set
 
       # Estimated WCU usage (approximate)
       total_wcu_used = (

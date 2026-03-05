@@ -460,3 +460,52 @@ variable "enable_firehose_compression" {
   default     = true
 }
 
+################################################################################
+# Central / Cross-Account S3 Bucket (optional)
+#
+# When your organisation uses a dedicated logging/security account that owns a
+# central S3 bucket for WAF logs, provide its name here.
+#
+# Behaviour:
+# - central_s3_bucket_name != null  →  use the central bucket; all local S3
+#   bucket resources in bucket.tf are disabled (count = 0). Firehose delivers
+#   directly to the central bucket.
+# - central_s3_bucket_name == null  →  create and manage a local bucket as
+#   usual (default behaviour).
+#
+# Pre-requisites when using a central bucket:
+# 1. The central bucket's resource policy must allow firehose.amazonaws.com to
+#    call s3:PutObject, s3:AbortMultipartUpload, s3:GetBucketLocation and
+#    s3:ListBucket for the bucket and its objects prefix.
+# 2. If the central bucket uses a KMS CMK, the KMS key policy must also grant
+#    GenerateDataKey / Decrypt rights to firehose.amazonaws.com.
+# 3. Lifecycle policies on the central bucket are managed by that account;
+#    the retention variables in this module have no effect when using a
+#    central bucket.
+#
+# central_s3_bucket_account_id is informational only – exposed in outputs for
+# reference and is not used to create any cross-account resources.
+################################################################################
+
+variable "central_s3_bucket_name" {
+  description = <<-EOT
+    Name of an existing (central / cross-account) S3 bucket to use for WAF
+    logs delivered via Kinesis Firehose.  When set, no local S3 bucket is
+    created by this module.  The bucket must already have the correct resource
+    policy to allow Firehose from this account to write logs.
+    Leave as null (default) to let the module create and manage a local bucket.
+  EOT
+  type    = string
+  default = null
+}
+
+variable "central_s3_bucket_account_id" {
+  description = <<-EOT
+    AWS account ID that owns the central S3 bucket (informational only).
+    Used only in outputs and documentation; not required for functionality.
+    Leave as null when using a locally-managed bucket.
+  EOT
+  type    = string
+  default = null
+}
+
