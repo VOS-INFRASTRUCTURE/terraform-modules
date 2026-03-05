@@ -15,13 +15,26 @@ output "config" {
   value = var.enable_aws_config ? {
     # ──────────────────────────────────────────────────────────────────────
     # S3 Bucket - Configuration log storage
+    #
+    # When central_s3_bucket_name is provided, this reflects the external
+    # bucket.  Local bucket attributes (arn, id, versioning, encryption) are
+    # null because this module does not own the central bucket.
     # ──────────────────────────────────────────────────────────────────────
     bucket = {
-      name       = aws_s3_bucket.config_logs[0].bucket       # S3 bucket name
-      arn        = aws_s3_bucket.config_logs[0].arn          # S3 bucket ARN
-      id         = aws_s3_bucket.config_logs[0].id           # S3 bucket ID
-      versioning = var.enable_bucket_versioning              # Versioning enabled?
-      encryption = var.kms_key_arn != null ? "KMS" : "AES256" # Encryption type
+      # Bucket name — always populated (local or central)
+      name = local.effective_s3_bucket_name
+
+      # ARN / ID — only available for locally-managed buckets
+      arn = local.using_local_bucket ? aws_s3_bucket.config_logs[0].arn : null
+      id  = local.using_local_bucket ? aws_s3_bucket.config_logs[0].id  : null
+
+      # Indicates whether this is a locally-created bucket or an external one
+      is_central_bucket    = !local.using_local_bucket
+      central_bucket_owner = var.central_s3_bucket_account_id # null when using local bucket
+
+      # Settings below are only relevant for the locally-managed bucket
+      versioning = local.using_local_bucket ? var.enable_bucket_versioning : null
+      encryption = local.using_local_bucket ? (var.kms_key_arn != null ? "KMS" : "AES256") : null
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -49,11 +62,12 @@ output "config" {
 
     # ──────────────────────────────────────────────────────────────────────
     # Lifecycle Policy - S3 cost optimization settings
+    # Only meaningful when using a locally-managed bucket.
     # ──────────────────────────────────────────────────────────────────────
     lifecycle = {
-      enabled                 = var.enable_lifecycle_policy      # Lifecycle policy enabled?
-      glacier_transition_days = var.glacier_transition_days      # Days before moving to Glacier
-      log_expiration_days     = var.log_expiration_days          # Days before permanent deletion
+      enabled                 = local.using_local_bucket ? var.enable_lifecycle_policy : false  # Lifecycle policy enabled?
+      glacier_transition_days = local.using_local_bucket ? var.glacier_transition_days : null   # Days before moving to Glacier
+      log_expiration_days     = local.using_local_bucket ? var.log_expiration_days     : null   # Days before permanent deletion
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -68,12 +82,12 @@ output "config" {
     # Configuration Summary - Quick reference for module status
     # ──────────────────────────────────────────────────────────────────────
     summary = {
-      module_enabled       = true                                # Module is active
-      recording_active     = aws_config_configuration_recorder_status.this[0].is_enabled
-      notifications_active = var.sns_topic_arn != null           # SNS notifications configured?
-      cost_optimization    = var.enable_lifecycle_policy         # Lifecycle policy reducing costs?
+      module_enabled        = true                                                              # Module is active
+      recording_active      = aws_config_configuration_recorder_status.this[0].is_enabled      # Recorder running?
+      notifications_active  = var.sns_topic_arn != null                                        # SNS notifications configured?
+      cost_optimization     = local.using_local_bucket && var.enable_lifecycle_policy          # Lifecycle policy reducing costs?
+      using_central_bucket  = !local.using_local_bucket                                        # Using cross-account central bucket?
     }
   } : null
 }
-
 

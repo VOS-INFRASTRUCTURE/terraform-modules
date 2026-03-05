@@ -67,6 +67,53 @@ variable "s3_key_prefix" {
 }
 
 ################################################################################
+# Central / Cross-Account S3 Bucket (optional)
+#
+# When your organisation uses a dedicated logging/security account that owns a
+# central S3 bucket for AWS Config, provide its name here.
+#
+# Behaviour:
+# - central_s3_bucket_name != null  →  use the central bucket; skip creating a
+#   local bucket entirely (all bucket.tf resources are disabled).
+# - central_s3_bucket_name == null  →  create and manage a local bucket as
+#   usual (default behaviour).
+#
+# Pre-requisites when using a central bucket:
+# 1. The central bucket's bucket policy must already permit the AWS Config
+#    service in THIS account to call s3:GetBucketAcl, s3:ListBucket and
+#    s3:PutObject under the AWSLogs/<this-account-id>/* prefix.
+# 2. If the central bucket uses a KMS CMK, the KMS key policy must also grant
+#    GenerateDataKey / Decrypt rights to config.amazonaws.com.
+#
+# The account ID of the central bucket's owner is needed only when the bucket
+# policy on the central side uses account-ID conditions.  It is NOT used by
+# this module to create any cross-account resources; it is purely informational
+# and exposed in the outputs for reference.
+################################################################################
+
+variable "central_s3_bucket_name" {
+  description = <<-EOT
+    Name of an existing (central / cross-account) S3 bucket to use for AWS
+    Config logs.  When set, no local S3 bucket is created by this module.
+    The bucket must already have the correct bucket policy to allow the AWS
+    Config service from this account to write logs.
+    Leave as null (default) to let the module create and manage a local bucket.
+  EOT
+  type        = string
+  default     = null
+}
+
+variable "central_s3_bucket_account_id" {
+  description = <<-EOT
+    AWS account ID that owns the central S3 bucket (informational only).
+    Used only in outputs and documentation; not required for functionality.
+    Leave as null when using a locally-managed bucket.
+  EOT
+  type        = string
+  default     = null
+}
+
+################################################################################
 # S3 Lifecycle Policy
 ################################################################################
 

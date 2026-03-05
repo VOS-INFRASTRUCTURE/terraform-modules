@@ -36,6 +36,26 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+################################################################################
+# Effective S3 Bucket
+#
+# When a central (cross-account) bucket name is provided, we use it directly.
+# Otherwise we fall back to the local bucket created in bucket.tf.
+#
+# The central bucket must already have a policy that allows the Config service
+# in this account to write.  No local bucket is created in that case.
+################################################################################
+
+locals {
+  # The bucket name passed to the delivery channel.
+  effective_s3_bucket_name = var.central_s3_bucket_name != null ? var.central_s3_bucket_name : (
+    length(aws_s3_bucket.config_logs) > 0 ? aws_s3_bucket.config_logs[0].bucket : ""
+  )
+
+  # Flag: are we using a locally-managed bucket?
+  using_local_bucket = var.central_s3_bucket_name == null
+}
+
 
 ################################################################################
 # Configuration Recorder
@@ -83,7 +103,7 @@ resource "aws_config_delivery_channel" "this" {
   count = var.enable_aws_config ? 1 : 0
 
   name           = "${var.env}-${var.project_id}-config-delivery"
-  s3_bucket_name = aws_s3_bucket.config_logs[0].bucket
+  s3_bucket_name = local.effective_s3_bucket_name
   s3_key_prefix  = var.s3_key_prefix
   sns_topic_arn  = var.sns_topic_arn
 
@@ -91,9 +111,12 @@ resource "aws_config_delivery_channel" "this" {
     delivery_frequency = var.snapshot_delivery_frequency
   }
 
+  # When using a local bucket, wait for the recorder and bucket policy.
+  # When using a central bucket, the bucket policy is managed externally —
+  # we only need to wait for the recorder to exist.
   depends_on = [
     aws_config_configuration_recorder.this,
-    aws_s3_bucket_policy.config_logs
+    aws_s3_bucket_policy.config_logs,
   ]
 }
 

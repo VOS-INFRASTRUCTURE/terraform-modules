@@ -14,10 +14,16 @@
 
 ################################################################################
 # S3 Bucket for AWS Config Logs
+#
+# Only created when central_s3_bucket_name is NOT provided.
+# When a central (cross-account) bucket is supplied, all resources in this
+# file are disabled and the delivery channel in main.tf points directly at
+# the central bucket.
 ################################################################################
 
 resource "aws_s3_bucket" "config_logs" {
-  count = var.enable_aws_config ? 1 : 0
+  # Skip when a central bucket is provided — nothing to create locally.
+  count = var.enable_aws_config && var.central_s3_bucket_name == null ? 1 : 0
 
   bucket        = "${var.env}-${var.project_id}-aws-config-logs"
   force_destroy = var.force_destroy_bucket
@@ -40,7 +46,7 @@ resource "aws_s3_bucket" "config_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_public_access_block" "config_logs" {
-  count  = var.enable_aws_config ? 1 : 0
+  count  = var.enable_aws_config && var.central_s3_bucket_name == null ? 1 : 0
   bucket = aws_s3_bucket.config_logs[0].id
 
   block_public_acls       = true
@@ -54,7 +60,7 @@ resource "aws_s3_bucket_public_access_block" "config_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_versioning" "config_logs" {
-  count  = var.enable_aws_config && var.enable_bucket_versioning ? 1 : 0
+  count  = var.enable_aws_config && var.central_s3_bucket_name == null && var.enable_bucket_versioning ? 1 : 0
   bucket = aws_s3_bucket.config_logs[0].id
 
   versioning_configuration {
@@ -67,7 +73,7 @@ resource "aws_s3_bucket_versioning" "config_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "config_logs" {
-  count  = var.enable_aws_config ? 1 : 0
+  count  = var.enable_aws_config && var.central_s3_bucket_name == null ? 1 : 0
   bucket = aws_s3_bucket.config_logs[0].id
 
   rule {
@@ -87,7 +93,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "config_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_lifecycle_configuration" "config_logs" {
-  count  = var.enable_aws_config && var.enable_lifecycle_policy ? 1 : 0
+  count  = var.enable_aws_config && var.central_s3_bucket_name == null && var.enable_lifecycle_policy ? 1 : 0
   bucket = aws_s3_bucket.config_logs[0].id
 
   rule {
@@ -118,7 +124,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "config_logs" {
 ################################################################################
 
 resource "aws_s3_bucket_policy" "config_logs" {
-  count  = var.enable_aws_config ? 1 : 0
+  count  = var.enable_aws_config && var.central_s3_bucket_name == null ? 1 : 0
   bucket = aws_s3_bucket.config_logs[0].id
 
   policy = jsonencode({
@@ -131,8 +137,8 @@ resource "aws_s3_bucket_policy" "config_logs" {
         Principal = "*"
         Action    = "s3:*"
         Resource = [
-          aws_s3_bucket.config_logs.arn,
-          "${aws_s3_bucket.config_logs.arn}/*"
+          aws_s3_bucket.config_logs[0].arn,
+          "${aws_s3_bucket.config_logs[0].arn}/*"
         ]
         Condition = {
           Bool = {
