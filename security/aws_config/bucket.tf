@@ -124,6 +124,22 @@ resource "aws_s3_bucket_policy" "config_logs" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # ── Deny non-TLS requests ──────────────────────────────────────────────
+      {
+        Sid       = "DenyNonTLS"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.config_logs.arn,
+          "${aws_s3_bucket.config_logs.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
       {
         Sid    = "AWSConfigBucketPermissionsCheck"
         Effect = "Allow"
