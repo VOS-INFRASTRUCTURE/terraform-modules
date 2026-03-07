@@ -53,7 +53,8 @@ resource "aws_iam_role_policy" "waf_firehose_policy" {
           "s3:PutObject",
           "s3:AbortMultipartUpload",
           "s3:GetBucketLocation",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "s3:ListBucketMultipartUploads"
         ]
         # Grants access to whichever bucket is in use (local or central).
         Resource = [
