@@ -27,7 +27,7 @@ resource "aws_kinesis_firehose_delivery_stream" "waf_logs" {
     # Dynamic prefix using Lambda partition keys
     prefix = "waf/account-id=!{partitionKeyFromLambda:account_id}/region=!{partitionKeyFromLambda:region}/action=!{partitionKeyFromLambda:log_type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
 
-    error_output_prefix = "waf/errors/!{firehose:error-output-type}/account-id=!{partitionKeyFromLambda:account_id}/region=!{partitionKeyFromLambda:region}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
+    error_output_prefix = "waf/errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
 
     dynamic_partitioning_configuration { enabled = true }
 
