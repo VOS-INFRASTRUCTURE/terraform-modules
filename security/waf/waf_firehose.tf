@@ -18,24 +18,18 @@ resource "aws_kinesis_firehose_delivery_stream" "waf_logs" {
 
   extended_s3_configuration {
     role_arn   = aws_iam_role.waf_firehose_role[0].arn
-    # Delivers to either the locally-managed bucket or the central bucket,
-    # depending on whether central_s3_bucket_name is set.
     bucket_arn = local.effective_s3_bucket_arn
 
-    # Required when dynamic partitioning is enabled
-    buffering_size     = var.firehose_buffering_size      # MB (minimum: 64)
-    buffering_interval = var.firehose_buffering_interval  # seconds
-
+    buffering_size     = var.firehose_buffering_size
+    buffering_interval = var.firehose_buffering_interval
     compression_format = var.enable_firehose_compression ? "GZIP" : "UNCOMPRESSED"
 
-    # Dynamic routing from Lambda
-    prefix              = "!{partitionKeyFromLambda:log_type}/"
-    error_output_prefix = "errors/"
+    # Dynamic prefix using Lambda partition keys
+    prefix = "waf/account-id=!{partitionKeyFromLambda:account_id}/region=!{partitionKeyFromLambda:region}/action=!{partitionKeyFromLambda:log_type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
 
-    # Enable dynamic partitioning
-    dynamic_partitioning_configuration {
-      enabled = true
-    }
+    error_output_prefix = "waf/errors/account-id=!{partitionKeyFromLambda:account_id}/region=!{partitionKeyFromLambda:region}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
+
+    dynamic_partitioning_configuration { enabled = true }
 
     cloudwatch_logging_options {
       enabled         = true
@@ -43,21 +37,16 @@ resource "aws_kinesis_firehose_delivery_stream" "waf_logs" {
       log_stream_name = "S3Delivery"
     }
 
-    # Lambda processor for log routing
     processing_configuration {
       enabled = true
-
       processors {
         type = "Lambda"
-
         parameters {
           parameter_name  = "LambdaArn"
           parameter_value = aws_lambda_function.waf_log_router[0].arn
         }
       }
     }
-
-
   }
 
   server_side_encryption {

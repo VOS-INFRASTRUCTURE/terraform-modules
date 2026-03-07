@@ -694,6 +694,53 @@ Inspection levels:
 ### Log Flow
 
 ```
+┌──────────────────────────┐
+│        AWS WAF           │
+│        Web ACL           │
+└───────────────┬──────────┘
+                │
+                │ WAF Logs
+                ▼
+┌──────────────────────────┐
+│  Kinesis Data Firehose   │
+│  Delivery Stream         │
+│                          │
+│ Buffers logs (1-5 MB)   │
+└───────────────┬──────────┘
+                │
+                │ Invoke
+                ▼
+┌─────────────────────────────────┐
+│         Lambda Function         │
+│         Log Transformer         │
+│                                 │
+│ 1. Decode record                │
+│ 2. Inspect WAF action           │
+│ 3. Add partition metadata       │
+│    - action                     │
+│    - accountId                  │
+│    - region                     │
+│                                 │
+│ Returns dynamic partition keys  │
+└───────────────┬─────────────────┘
+                │
+                │ Transformed records
+                ▼
+┌──────────────────────────┐
+│  Kinesis Firehose        │
+│  Dynamic Partitioning    │
+└───────────────┬──────────┘
+                │
+                │ Writes using
+                │ Firehose IAM Role
+                ▼
+┌───────────────────────────────────────────┐
+│                  S3                       │
+│         Central Logging Bucket            │
+│         org-security-logs                 │
+└───────────────────────────────────────────┘
+
+
 ┌─────────────────┐
 │   AWS WAF       │
 │   Web ACL       │
