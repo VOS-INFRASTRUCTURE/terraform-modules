@@ -73,9 +73,9 @@ resource "aws_lambda_function" "waf_log_router" {
   filename         = "${path.module}/lambda/waf_log_router.zip"
   source_code_hash = filebase64sha256("${path.module}/lambda/waf_log_router.zip")
 
-  # Ensure the log group is created by Terraform before Lambda runs,
-  # otherwise Lambda auto-creates it with infinite retention.
-  depends_on = [aws_cloudwatch_log_group.waf_log_router_lambda]
+  # # Ensure the log group is created by Terraform before Lambda runs,
+  # # otherwise Lambda auto-creates it with infinite retention.
+  # depends_on = [aws_cloudwatch_log_group.waf_log_router_lambda]
 
   tags = merge(
     var.tags,

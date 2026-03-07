@@ -48,30 +48,30 @@ resource "aws_cloudwatch_log_stream" "waf_firehose_s3_delivery" {
   name           = "S3Delivery"
   log_group_name = aws_cloudwatch_log_group.waf_firehose[0].name
 }
-
-################################################################################
-# WAF Log Router Lambda Log Group
 #
-# Explicitly created so retention is set to 90 days.
-# Without this, Lambda auto-creates the group with infinite retention.
-# Name must match /aws/lambda/<function_name>.
-################################################################################
-
-resource "aws_cloudwatch_log_group" "waf_log_router_lambda" {
-  count = var.enable_waf_logging ? 1 : 0
-
-  name              = "/aws/lambda/${var.env}-${var.project_id}-waf-log-router"
-  retention_in_days = 90 # 3 months
-
-  tags = merge(
-    var.tags,
-    {
-      Name        = "${var.env}-${var.project_id}-waf-log-router-logs"
-      Environment = var.env
-      Project     = var.project_id
-      Purpose     = "WAF-LogRouter"
-      ManagedBy   = "Terraform"
-    }
-  )
-}
-
+# ################################################################################
+# # WAF Log Router Lambda Log Group
+# #
+# # Explicitly created so retention is set to 90 days.
+# # Without this, Lambda auto-creates the group with infinite retention.
+# # Name must match /aws/lambda/<function_name>.
+# ################################################################################
+#
+# resource "aws_cloudwatch_log_group" "waf_log_router_lambda" {
+#   count = var.enable_waf_logging ? 1 : 0
+#
+#   name              = "/aws/lambda/${var.env}-${var.project_id}-waf-log-router"
+#   retention_in_days = 90 # 3 months
+#
+#   tags = merge(
+#     var.tags,
+#     {
+#       Name        = "${var.env}-${var.project_id}-waf-log-router-logs"
+#       Environment = var.env
+#       Project     = var.project_id
+#       Purpose     = "WAF-LogRouter"
+#       ManagedBy   = "Terraform"
+#     }
+#   )
+# }
+#
