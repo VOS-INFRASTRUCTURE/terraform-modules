@@ -4,9 +4,16 @@
 # Purpose: Allow Firehose to write to S3, invoke Lambda, and write logs.
 #
 # Permissions:
-# - S3: Write WAF logs to bucket
+# - S3: Write WAF logs to bucket (local OR cross-account central bucket)
+# - KMS: Encrypt/decrypt data for Firehose stream encryption
 # - Lambda: Invoke log router function
 # - CloudWatch Logs: Write delivery logs
+#
+# Cross-account notes (when central_s3_bucket_name is set):
+# - The Firehose role in THIS account needs s3:PutObject etc. on the
+#   central bucket ARN  ← already handled via local.effective_s3_bucket_arn
+# - The central bucket's RESOURCE POLICY must also allow this role
+#   ← use the waf_central_bucket_policy output to get the exact JSON
 ################################################################################
 
 resource "aws_iam_role" "waf_firehose_role" {
@@ -22,6 +29,12 @@ resource "aws_iam_role" "waf_firehose_role" {
         Service = "firehose.amazonaws.com"
       }
       Action = "sts:AssumeRole"
+      # Restrict assumption to this account only — prevents confused deputy
+      Condition = {
+        StringEquals = {
+          "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+        }
+      }
     }]
   })
 
@@ -47,6 +60,10 @@ resource "aws_iam_role_policy" "waf_firehose_policy" {
     Version = "2012-10-17"
     Statement = [
       {
+        # S3 write access — resolves to either the local bucket or the
+        # central cross-account bucket via local.effective_s3_bucket_arn.
+        # For cross-account delivery the central bucket's resource policy
+        # must ALSO allow this role (use waf_central_bucket_policy output).
         Sid    = "S3Access"
         Effect = "Allow"
         Action = [
@@ -56,11 +73,25 @@ resource "aws_iam_role_policy" "waf_firehose_policy" {
           "s3:ListBucket",
           "s3:ListBucketMultipartUploads"
         ]
-        # Grants access to whichever bucket is in use (local or central).
         Resource = [
           local.effective_s3_bucket_arn,
           "${local.effective_s3_bucket_arn}/*"
         ]
+      },
+      {
+        # KMS permissions for Firehose stream SSE (CUSTOMER_MANAGED_CMK).
+        # Required so Firehose can encrypt/decrypt the stream data before
+        # writing to S3.
+        Sid    = "KMSAccess"
+        Effect = "Allow"
+        Action = [
+          "kms:GenerateDataKey",
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:ReEncrypt*",
+          "kms:DescribeKey"
+        ]
+        Resource = aws_kms_key.firehose.arn
       },
       {
         Sid    = "LambdaInvoke"
@@ -84,3 +115,45 @@ resource "aws_iam_role_policy" "waf_firehose_policy" {
     ]
   })
 }
+
+################################################################################
+# Lambda S3 Write Policy
+#
+# Purpose: Allow the WAF Log Router Lambda to write directly to S3.
+#
+# Why Lambda needs S3 access:
+# In this architecture Firehose uses Lambda as a *record transformer* (it
+# adds partition keys). Firehose—not Lambda—writes the final records to S3.
+# However, Lambda DOES need s3:PutObject when it writes error/debug output
+# directly, and some routing patterns write directly from Lambda.
+#
+# For cross-account delivery (central_s3_bucket_name set) the Lambda role
+# also needs permission on the central bucket so that any direct writes
+# from Lambda land correctly.
+################################################################################
+
+resource "aws_iam_role_policy" "waf_lambda_s3_policy" {
+  count = var.enable_waf_logging ? 1 : 0
+
+  name = "${var.env}-${var.project_id}-waf-lambda-s3-policy"
+  role = aws_iam_role.waf_lambda_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # Write access to whichever bucket is active (local or central).
+        # For cross-account (central bucket) the bucket resource policy must
+        # also allow this Lambda role ARN — see waf_central_bucket_policy output.
+        Sid    = "S3WriteAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:AbortMultipartUpload"
+        ]
+        Resource = "${local.effective_s3_bucket_arn}/*"
+      }
+    ]
+  })
+}
+

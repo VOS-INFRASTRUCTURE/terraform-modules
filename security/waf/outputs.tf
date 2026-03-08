@@ -64,6 +64,10 @@ output "waf" {
         function_name = aws_lambda_function.waf_log_router[0].function_name
         function_arn  = aws_lambda_function.waf_log_router[0].arn
       }
+
+      # ARN of the Firehose IAM role — must be added to the central bucket
+      # resource policy when central_s3_bucket_name is set (cross-account).
+      firehose_role_arn = aws_iam_role.waf_firehose_role[0].arn
     } : null
 
     # ──────────────────────────────────────────────────────────────────────
@@ -217,5 +221,105 @@ output "waf" {
       )
     }
   } : null
+}
+
+################################################################################
+# Cross-Account Central Bucket Policy Helper
+#
+# When central_s3_bucket_name is set, this output provides the exact bucket
+# resource policy JSON that must be applied to the central bucket in the
+# logging/security account.
+#
+# The bucket owner (logging account admin) must add these statements to the
+# central bucket's resource policy.
+#
+# How to apply (from the logging account):
+#   1. Run: terraform output -raw waf_central_bucket_policy
+#   2. Copy the JSON
+#   3. In the logging account, go to S3 → <bucket> → Permissions → Bucket policy
+#   4. Merge the statement(s) into the existing policy (or set as new policy)
+#
+# Or via AWS CLI (logging account):
+#   aws s3api put-bucket-policy \
+#     --bucket <central_bucket_name> \
+#     --policy "$(terraform output -raw waf_central_bucket_policy)"
+################################################################################
+
+output "waf_central_bucket_policy" {
+  description = <<-EOT
+    Ready-to-apply S3 bucket resource policy JSON for the central (cross-account)
+    WAF log bucket. Apply this in the LOGGING ACCOUNT that owns the bucket.
+
+    Only populated when central_s3_bucket_name is provided.
+    When using a local bucket this output is null.
+  EOT
+
+  value = !local.using_local_bucket && var.enable_waf_logging ? jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # Allow Firehose delivery role from the source account to write logs.
+        # This is the primary statement needed to fix S3.AccessDenied errors.
+        Sid    = "AllowFirehoseCrossAccountWrite-${var.env}-${var.project_id}"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.waf_firehose_role[0].arn
+        }
+        Action = [
+          "s3:PutObject",
+          "s3:AbortMultipartUpload",
+          "s3:GetBucketLocation",
+          "s3:ListBucket",
+          "s3:ListBucketMultipartUploads"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.central_s3_bucket_name}",
+          "arn:aws:s3:::${var.central_s3_bucket_name}/*"
+        ]
+        Condition = {
+          # Restrict to source account — prevents confused deputy attacks
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      },
+      {
+        # Allow Lambda log router to write directly to the central bucket.
+        # Lambda acts as a Firehose record transformer but may also write
+        # error records directly.
+        Sid    = "AllowLambdaCrossAccountWrite-${var.env}-${var.project_id}"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.waf_lambda_role[0].arn
+        }
+        Action = [
+          "s3:PutObject",
+          "s3:AbortMultipartUpload"
+        ]
+        Resource = "arn:aws:s3:::${var.central_s3_bucket_name}/*"
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      },
+      {
+        # Deny all non-TLS (HTTP) access — security hardening baseline.
+        Sid       = "DenyNonTLS"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          "arn:aws:s3:::${var.central_s3_bucket_name}",
+          "arn:aws:s3:::${var.central_s3_bucket_name}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
+  }) : null
 }
 
