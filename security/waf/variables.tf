@@ -195,6 +195,84 @@ variable "enable_sqli_rule_set" {
   default     = true
 }
 
+variable "exclude_sqli_body" {
+  description = <<-EOT
+    Exclude SQLi_BODY rule from SQL Injection Rule Set (changes action to COUNT instead of BLOCK).
+
+    Why exclude this rule:
+    - SQLi_BODY inspects the raw request body for SQL injection patterns
+    - Multipart binary file uploads (multipart/form-data) frequently trigger false positives because:
+      * MIME boundaries (e.g. --WebKitFormBoundaryXXX) contain dashes/hyphens
+      * Content-Disposition headers contain characters matched by SQLi patterns
+      * Binary file content may contain byte sequences resembling SQL keywords or operators
+      * Characters like ( ) , * 0 are common in binary data and SQLi signatures
+
+    Confirmed false-positive triggers from Athena WAF logs:
+      * single_match LIKE '%WebKitFormBoundary%'  → multipart form boundary
+      * single_match LIKE '%Content-Disposition%' → part header
+      * single_match LIKE '%,%'                   → commas in form data
+      * single_match LIKE '%(%'                   → parentheses in binary data
+      * single_match LIKE '%*%'                   → asterisks in binary data
+
+    When to enable (set to true):
+    - Your application accepts file uploads (images, documents, PDFs, etc.)
+    - You are seeing legitimate multipart/form-data POSTs being blocked by AWSManagedRulesSQLiRuleSet
+    - You have verified (via WAF logs / Athena) that blocks are false positives on upload requests
+
+    Security considerations:
+    - When excluded, SQLi_BODY will COUNT (log only) instead of BLOCK
+    - SQLi_QUERYARGUMENTS, SQLi_COOKIE, and SQLi_URIPATH remain fully active (BLOCK)
+    - ⚠️ Ensure your application uses parameterised queries / prepared statements
+    - ⚠️ Never concatenate raw user input into SQL queries
+    - Consider using sqli_rule_sets_excluded_paths to scope the exclusion to upload endpoints only
+
+    Alternative (more targeted):
+    - Use sqli_rule_sets_excluded_paths = ["/upload", "/files"] to skip SQLi inspection
+      only on specific upload paths, leaving all other paths fully protected.
+
+    Default: false (SQLi_BODY is active and blocks SQL injection patterns in body)
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "sqli_rule_sets_excluded_paths" {
+  description = <<-EOT
+    List of URI paths to exclude from the SQL Injection Rule Set evaluation via scope_down_statement.
+
+    This is a more targeted alternative (or complement) to exclude_sqli_body:
+    instead of disabling body inspection globally, the entire SQLi rule group is
+    skipped only when the request path starts with one of these prefixes.
+
+    Example: ["/upload", "/files/upload", "/api/attachments"]
+
+    How it works:
+    - The SQLi rule group will NOT evaluate requests whose URI path starts with
+      any of the listed prefixes
+    - All other rule groups (Core Rule Set, IP Reputation, Rate Limiting) still apply
+    - Uses scope_down_statement — no additional WCU cost
+
+    Use case:
+    - Your upload endpoint is /api/v1/upload → set ["/api/v1/upload"]
+    - All other paths remain fully protected against SQL injection
+
+    Security considerations:
+    - Excluded paths bypass: SQL injection body/query/cookie/URI inspection
+    - Excluded paths retain: Rate limiting, IP reputation, Core Rule Set protection
+    - ⚠️ Only exclude endpoints that genuinely handle binary/multipart uploads
+    - Use authentication/authorisation on excluded upload endpoints as a compensating control
+
+    Default: [] (all paths are inspected by SQLi rule group)
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for path in var.sqli_rule_sets_excluded_paths : can(regex("^/", path))])
+    error_message = "All excluded paths must start with '/'"
+  }
+}
+
 variable "enable_ip_reputation_list" {
   description = "Enable AWS Managed IP Reputation List - 25 WCU"
   type        = bool

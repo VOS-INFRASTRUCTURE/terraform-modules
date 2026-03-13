@@ -251,6 +251,13 @@ resource "aws_wafv2_web_acl" "waf" {
   # SQL Injection Protection
   # Capacity: 200 WCU
   # Protects against: Advanced SQL injection attacks
+  #
+  # False-positive handling for multipart/binary file uploads:
+  # - exclude_sqli_body = true  → SQLi_BODY changed to COUNT (log only)
+  #   Use when binary upload data triggers SQLi_BODY across all endpoints.
+  # - sqli_rule_sets_excluded_paths = ["/upload", ...]  → entire rule group
+  #   skipped for those URI paths via scope_down_statement. More targeted.
+  # Both options can be combined.
   # ------------------------------------------------------------------------
   dynamic "rule" {
     for_each = var.enable_sqli_rule_set ? [1] : []
@@ -267,6 +274,95 @@ resource "aws_wafv2_web_acl" "waf" {
         managed_rule_group_statement {
           name        = "AWSManagedRulesSQLiRuleSet"
           vendor_name = "AWS"
+
+          # ----------------------------------------------------------------
+          # SQLi_BODY exclusion: change to COUNT for multipart upload false positives
+          #
+          # The SQLi rule set inspects the raw request body byte-by-byte.
+          # Multipart binary uploads (images, PDFs, documents) frequently
+          # contain byte sequences that resemble SQL operators/keywords:
+          #   - WebKitFormBoundary headers → dashes, identifiers
+          #   - Content-Disposition values → commas, semicolons
+          #   - Binary file data           → NULL bytes, ( ) * characters
+          # Setting this to COUNT allows uploads to pass while still logging
+          # the match so you can monitor for real attacks in CloudWatch.
+          # ----------------------------------------------------------------
+          dynamic "rule_action_override" {
+            for_each = var.exclude_sqli_body ? [1] : []
+
+            content {
+              name = "SQLi_BODY"
+              action_to_use {
+                count {}
+              }
+            }
+          }
+
+          # ----------------------------------------------------------------
+          # Scope-down: skip entire SQLi rule group for specific upload paths
+          #
+          # More targeted than exclude_sqli_body — the rule group is bypassed
+          # completely only when the URI starts with a listed prefix.
+          # All other paths remain fully protected.
+          # ----------------------------------------------------------------
+
+          # Case 1: Single excluded path
+          dynamic "scope_down_statement" {
+            for_each = length(var.sqli_rule_sets_excluded_paths) == 1 ? [1] : []
+
+            content {
+              not_statement {
+                statement {
+                  byte_match_statement {
+                    search_string         = var.sqli_rule_sets_excluded_paths[0]
+                    positional_constraint = "STARTS_WITH"
+
+                    field_to_match {
+                      uri_path {}
+                    }
+
+                    text_transformation {
+                      priority = 0
+                      type     = "NONE"
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          # Case 2: Multiple excluded paths — must use or_statement (requires 2+)
+          dynamic "scope_down_statement" {
+            for_each = length(var.sqli_rule_sets_excluded_paths) > 1 ? [1] : []
+
+            content {
+              not_statement {
+                statement {
+                  or_statement {
+                    dynamic "statement" {
+                      for_each = var.sqli_rule_sets_excluded_paths
+
+                      content {
+                        byte_match_statement {
+                          search_string         = statement.value
+                          positional_constraint = "STARTS_WITH"
+
+                          field_to_match {
+                            uri_path {}
+                          }
+
+                          text_transformation {
+                            priority = 0
+                            type     = "NONE"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
 

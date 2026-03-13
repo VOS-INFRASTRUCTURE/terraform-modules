@@ -128,6 +128,15 @@ output "waf" {
         action      = var.exclude_no_user_agent_header ? "COUNT" : "BLOCK"
         reason      = "Allow requests without User-Agent header (health checks, internal APIs, monitoring tools)"
       }
+      # SQLi_BODY exclusion: prevents multipart binary upload false positives
+      # WebKitFormBoundary, Content-Disposition, binary data trigger SQLi_BODY
+      sqli_body = {
+        enabled     = var.exclude_sqli_body
+        rule_name   = "SQLi_BODY"
+        rule_group  = "SQLiRuleSet"
+        action      = var.exclude_sqli_body ? "COUNT" : "BLOCK"
+        reason      = "Prevent false positives on multipart/form-data binary file uploads (WebKitFormBoundary, binary content)"
+      }
     }
 
     # ──────────────────────────────────────────────────────────────────────
@@ -141,6 +150,16 @@ output "waf" {
       affected_rules             = ["CoreRuleSet"]
       implementation             = "scope_own_statement"
       wcu_cost                   = 0  # Scope-down statements don't add WCU cost
+    }
+
+    # SQLi rule group path exclusions — most targeted fix for upload endpoints
+    sqli_path_exclusions = {
+      enabled        = length(var.sqli_rule_sets_excluded_paths) > 0
+      excluded_paths = var.sqli_rule_sets_excluded_paths
+      count          = length(var.sqli_rule_sets_excluded_paths)
+      affected_rules = ["SQLiRuleSet"]
+      implementation = "scope_down_statement"
+      wcu_cost       = 0  # Scope-down statements don't add WCU cost
     }
 
     # ──────────────────────────────────────────────────────────────────────
