@@ -44,6 +44,8 @@ EOF
     namespace = local.security_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "unauthorized_api_calls" {
@@ -81,6 +83,8 @@ EOF
     namespace = local.security_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "root_account_usage" {
@@ -119,6 +123,8 @@ EOF
     namespace = local.security_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "console_login_no_mfa" {
@@ -163,6 +169,8 @@ EOF
     namespace = local.security_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "iam_policy_changes" {
@@ -204,6 +212,8 @@ EOF
     namespace = local.security_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "cloudtrail_changes" {

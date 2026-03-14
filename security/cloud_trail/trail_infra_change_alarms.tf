@@ -38,6 +38,8 @@ EOF
     namespace = local.infra_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "security_group_changes" {
@@ -83,6 +85,8 @@ EOF
     namespace = local.infra_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "vpc_changes" {
@@ -122,6 +126,8 @@ EOF
     namespace = local.infra_metrics_namespace
     value     = "1"
   }
+
+  depends_on = [aws_cloudwatch_log_group.this]
 }
 
 resource "aws_cloudwatch_metric_alarm" "s3_policy_changes" {
