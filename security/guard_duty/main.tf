@@ -59,6 +59,9 @@ resource "aws_guardduty_detector" "this" {
   # Note: Data sources (S3, EKS, RDS, Lambda, EBS Malware) are enabled
   #       via separate aws_guardduty_detector_feature resources below.
   #       The old datasources {} block is deprecated.
+  #
+  # ⚠️ When centrally_managed = true, ALL detector feature resources below
+  #    are skipped. Features are managed by the delegated admin account instead.
 
   tags = merge(
     var.tags,
@@ -100,7 +103,7 @@ resource "aws_guardduty_detector" "this" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "s3_data_events" {
-  count = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "S3_DATA_EVENTS"
@@ -128,7 +131,7 @@ resource "aws_guardduty_detector_feature" "s3_data_events" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "eks_audit_logs" {
-  count = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "EKS_AUDIT_LOGS"
@@ -157,7 +160,7 @@ resource "aws_guardduty_detector_feature" "eks_audit_logs" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "rds_login_events" {
-  count = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "RDS_LOGIN_EVENTS"
@@ -185,7 +188,7 @@ resource "aws_guardduty_detector_feature" "rds_login_events" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "lambda_network_logs" {
-  count = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "LAMBDA_NETWORK_LOGS"
@@ -213,7 +216,7 @@ resource "aws_guardduty_detector_feature" "lambda_network_logs" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
-  count = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "EBS_MALWARE_PROTECTION"
@@ -283,7 +286,7 @@ resource "aws_guardduty_detector_feature" "ebs_malware_protection" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "runtime_monitoring" {
-  count = var.enable_guardduty ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed ? 1 : 0
 
 
   lifecycle {
@@ -324,7 +327,7 @@ resource "aws_guardduty_detector_feature" "runtime_monitoring" {
 # ──────────────────────────────────────────────────────────────────────────────
 
 resource "aws_guardduty_detector_feature" "eks_runtime_monitoring" {
-  count = var.enable_guardduty && var.enable_runtime_monitoring && var.enable_eks_runtime_agent ? 1 : 0
+  count = var.enable_guardduty && !var.centrally_managed && var.enable_runtime_monitoring && var.enable_eks_runtime_agent ? 1 : 0
 
   detector_id = aws_guardduty_detector.this[0].id
   name        = "EKS_RUNTIME_MONITORING"

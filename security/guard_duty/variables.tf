@@ -12,6 +12,37 @@ variable "enable_guardduty" {
   default     = true
 }
 
+variable "centrally_managed" {
+  description = <<-EOT
+    Set to true when GuardDuty is managed centrally by an AWS Organizations
+    delegated administrator account (e.g., a dedicated security account).
+
+    When true:
+    - The GuardDuty detector is still created/referenced in this account (member account)
+    - ALL aws_guardduty_detector_feature resources are SKIPPED entirely
+    - Feature configuration (S3, EKS, RDS, Lambda, EBS Malware, Runtime Monitoring)
+      is controlled exclusively by the central/admin account
+    - Attempting to manage features from a member account when under central
+      management will cause API conflicts and Terraform errors
+
+    When false (default):
+    - This account manages its own GuardDuty features independently
+    - Each feature is enabled/disabled via the individual enable_* variables
+
+    When to use:
+    - Your organisation uses AWS Organizations with a GuardDuty delegated admin
+    - A security team centrally controls protection plans for all member accounts
+    - You see errors like "not authorized to modify detector features" in member accounts
+
+    Note: The detector itself (aws_guardduty_detector) is still created so Terraform
+    can reference its ID for outputs. The detector may also already exist if the
+    central admin enrolled this account — in that case use import or set
+    enable_guardduty = false and manage it via the admin account entirely.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "env" {
   description = "Environment name (e.g., production, staging, development)"
   type        = string

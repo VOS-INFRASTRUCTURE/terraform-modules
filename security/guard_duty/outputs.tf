@@ -64,10 +64,17 @@ output "guard_duty" {
     # Configuration Summary - Quick reference
     # ──────────────────────────────────────────────────────────────────────
     summary = {
-      module_enabled         = true                                                               # Module is active
-      environment            = var.env                                                            # Environment name
-      project_id             = var.project_id                                                     # Project identifier
-      total_features_enabled = (
+      module_enabled    = true                                                               # Module is active
+      environment       = var.env                                                            # Environment name
+      project_id        = var.project_id                                                     # Project identifier
+
+      # Indicates whether feature management is delegated to an AWS Organizations
+      # central/admin account. When true, all detector feature resources are skipped
+      # and the individual enable_* variables have no effect.
+      centrally_managed = var.centrally_managed
+      management_mode   = var.centrally_managed ? "CENTRAL (features managed by delegated admin)" : "SELF (features managed by this account)"
+
+      total_features_enabled = var.centrally_managed ? null : (
         (var.enable_s3_data_events ? 1 : 0) +
         (var.enable_eks_audit_logs ? 1 : 0) +
         (var.enable_rds_protection ? 1 : 0) +
