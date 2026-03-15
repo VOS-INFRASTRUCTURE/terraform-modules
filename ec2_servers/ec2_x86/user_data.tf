@@ -18,7 +18,6 @@ echo "=== Starting  EC2 setup at $(date) ==="
 
 # Update system
 apt-get update -y
-apt-get upgrade -y
 
 # Install required packages
 apt-get install -y \
