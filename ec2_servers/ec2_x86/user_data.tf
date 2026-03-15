@@ -49,6 +49,17 @@ if [ "${var.install_docker}" = "true" ]; then
   usermod -aG docker ubuntu
 fi
 
+# Install Nginx (conditional based on variable)
+if [ "${var.install_nginx}" = "true" ]; then
+  apt-get install -y nginx
+
+  # Start and enable Nginx
+  systemctl start nginx
+  systemctl enable nginx
+
+  echo "Nginx installed and started at $(date)"
+fi
+
 # Install CloudWatch agent (conditional based on variable)
 if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
   wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb

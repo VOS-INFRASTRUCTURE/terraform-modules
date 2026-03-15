@@ -106,6 +106,12 @@ variable "install_docker" {
   default     = true
 }
 
+variable "install_nginx" {
+  description = "Install Nginx on the EC2 instance. Useful for reverse proxy or static file serving."
+  type        = bool
+  default     = false
+}
+
 variable "enable_cloudwatch_monitoring" {
   description = "Enable CloudWatch logs and metrics"
   type        = bool
