@@ -100,6 +100,12 @@ variable "enable_ssm_access" {
 # Monitoring & Logging
 ################################################################################
 
+variable "install_docker" {
+  description = "Install Docker on the EC2 instance. Disable if only using native processes."
+  type        = bool
+  default     = true
+}
+
 variable "enable_cloudwatch_monitoring" {
   description = "Enable CloudWatch logs and metrics"
   type        = bool

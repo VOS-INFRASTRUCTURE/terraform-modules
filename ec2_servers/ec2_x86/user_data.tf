@@ -36,16 +36,18 @@ unzip -q /tmp/awscliv2.zip -d /tmp
 /tmp/aws/install
 rm -rf /tmp/awscliv2.zip /tmp/aws
 
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
+# Install Docker (conditional based on variable)
+if [ "${var.install_docker}" = "true" ]; then
+  curl -fsSL https://get.docker.com -o get-docker.sh
+  sh get-docker.sh
 
-# Start and enable Docker
-systemctl start docker
-systemctl enable docker
+  # Start and enable Docker
+  systemctl start docker
+  systemctl enable docker
 
-# Add ubuntu user to docker group
-usermod -aG docker ubuntu
+  # Add ubuntu user to docker group
+  usermod -aG docker ubuntu
+fi
 
 # Install CloudWatch agent (conditional based on variable)
 if [ "${var.enable_cloudwatch_monitoring}" = "true" ]; then
