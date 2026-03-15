@@ -58,6 +58,10 @@ module "docker_prod_server" {
   subnet_id     = "subnet-private-1a"
   security_group_ids = ["sg-app-servers"]
 
+  # Docker and Nginx
+  install_docker = true
+  install_nginx = false
+  
   # Storage
   storage_size          = 50   # 50 GB
   storage_type          = "gp3"
