@@ -42,6 +42,8 @@ resource "aws_instance" "ec2_x86_docker" {
   # Note: Even if instance is terminated, EBS snapshots persist independently
   disable_api_termination = var.enable_termination_protection
 
+  source_dest_check = var.source_dest_check
+
   user_data = base64encode(local.user_data)
 
   metadata_options {

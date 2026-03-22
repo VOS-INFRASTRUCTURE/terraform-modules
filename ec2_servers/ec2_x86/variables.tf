@@ -74,6 +74,12 @@ variable "enable_termination_protection" {
   default     = false
 }
 
+variable "source_dest_check" {
+  description = "Enable source/destination check (disable if instance will be used as a NAT or router)"
+  type        = bool
+  default     = true
+}
+
 ################################################################################
 # Access Configuration
 ################################################################################
