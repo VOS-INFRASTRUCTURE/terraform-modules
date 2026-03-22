@@ -15,6 +15,22 @@ output "server" {
       instance_type     = aws_instance.ec2_x86_docker.instance_type
     }
 
+    # Networking – Primary ENI (eth0)
+    # The primary network interface is automatically created and attached to the
+    # instance at launch. It carries the main private IP, subnet placement,
+    # and security group associations.
+    networking = {
+      primary_eni_id             = aws_instance.ec2_x86_docker.primary_network_interface_id
+      subnet_id                  = aws_instance.ec2_x86_docker.subnet_id
+      private_ip                 = aws_instance.ec2_x86_docker.private_ip
+      private_dns                = aws_instance.ec2_x86_docker.private_dns
+      public_ip                  = aws_instance.ec2_x86_docker.public_ip
+      public_dns                 = aws_instance.ec2_x86_docker.public_dns
+      ipv6_addresses             = aws_instance.ec2_x86_docker.ipv6_addresses
+      source_dest_check          = aws_instance.ec2_x86_docker.source_dest_check
+      security_group_ids         = aws_instance.ec2_x86_docker.vpc_security_group_ids
+    }
+
     # Security configuration
     security = {
       ebs_encrypted        = var.enable_ebs_encryption
