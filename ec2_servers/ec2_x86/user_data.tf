@@ -20,12 +20,25 @@ echo "=== Starting  EC2 setup at $(date) ==="
 # Ubuntu 24.04 runs unattended-upgrades and apt-daily on boot, which holds
 # the dpkg lock. Without this wait, our apt-get commands will fail with
 # "Could not get lock /var/lib/dpkg/lock-frontend" errors.
+#
+# Timeout: 30 attempts × 10 seconds = 5 minutes max wait.
+# After timeout, unattended-upgrades is killed forcefully so setup can proceed.
 echo "Waiting for apt/dpkg locks to be released..."
+LOCK_WAIT_ATTEMPTS=0
+LOCK_WAIT_MAX=30
 while fuser /var/lib/dpkg/lock-frontend  >/dev/null 2>&1 || \
       fuser /var/lib/dpkg/lock           >/dev/null 2>&1 || \
       fuser /var/lib/apt/lists/lock      >/dev/null 2>&1 || \
       fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
-  echo "  apt/dpkg lock held by another process, retrying in 10s..."
+  LOCK_WAIT_ATTEMPTS=$((LOCK_WAIT_ATTEMPTS + 1))
+  if [ "$LOCK_WAIT_ATTEMPTS" -ge "$LOCK_WAIT_MAX" ]; then
+    echo "WARNING: apt/dpkg lock still held after $((LOCK_WAIT_MAX * 10))s. Killing unattended-upgrades..."
+    systemctl stop unattended-upgrades || true
+    killall -q unattended-upgrade || true
+    sleep 5
+    break
+  fi
+  echo "  apt/dpkg lock held by another process (attempt $LOCK_WAIT_ATTEMPTS/$LOCK_WAIT_MAX), retrying in 10s..."
   sleep 10
 done
 echo "apt/dpkg locks released, continuing with setup..."
