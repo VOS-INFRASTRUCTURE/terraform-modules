@@ -16,6 +16,20 @@ exec 2>&1
 
 echo "=== Starting  EC2 setup at $(date) ==="
 
+# Wait for any running apt/dpkg operations to complete.
+# Ubuntu 24.04 runs unattended-upgrades and apt-daily on boot, which holds
+# the dpkg lock. Without this wait, our apt-get commands will fail with
+# "Could not get lock /var/lib/dpkg/lock-frontend" errors.
+echo "Waiting for apt/dpkg locks to be released..."
+while fuser /var/lib/dpkg/lock-frontend  >/dev/null 2>&1 || \
+      fuser /var/lib/dpkg/lock           >/dev/null 2>&1 || \
+      fuser /var/lib/apt/lists/lock      >/dev/null 2>&1 || \
+      fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+  echo "  apt/dpkg lock held by another process, retrying in 10s..."
+  sleep 10
+done
+echo "apt/dpkg locks released, continuing with setup..."
+
 # Update system
 apt-get update -y
 
