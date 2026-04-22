@@ -256,7 +256,126 @@ DROP ROLE logical_replica_user;
 
 ---
 
+## Read-Only ODBC/JDBC User (No Replication)
+
+If you only need a user for **read-only application queries** (reporting tools,
+ODBC connections, BI tools, dashboards) and do **not** need CDC / WAL access,
+use this simpler pattern — no `REPLICATION` privilege required.
+
+### When to use this vs the replication user
+
+| Role                    | `REPLICATION` | Use case                                      |
+|-------------------------|---------------|-----------------------------------------------|
+| `logical_replica_user`  | ✅ Yes        | CDC streaming, Debezium, `pg_recvlogical`      |
+| `contect_ro_user`       | ❌ No         | ODBC, JDBC, BI tools, reporting, dashboards    |
+
+> You can (and often should) have **both** — one for CDC streaming, one for
+> read-only application queries. They serve different purposes and should
+> have separate credentials.
+
+### Setup Script
+
+```sql
+-- ============================================================
+-- Read-Only User (ODBC / JDBC / Reporting)
+-- No WAL / replication access
+-- Replace: contec_pgsql_arm_db, PASSWORD
+-- ============================================================
+
+-- Step 1: Create the user (LOGIN only, no REPLICATION)
+CREATE USER contect_ro_user WITH PASSWORD 'PASSWORD';
+
+-- Step 2: Allow connection to the target database
+GRANT CONNECT ON DATABASE contec_pgsql_arm_db TO contect_ro_user;
+
+-- Step 3: Allow schema visibility
+GRANT USAGE ON SCHEMA public TO contect_ro_user;
+
+-- Step 4: Read access to all existing tables and sequences
+GRANT SELECT ON ALL TABLES    IN SCHEMA public TO contect_ro_user;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO contect_ro_user;
+
+-- Step 5: Read access to all FUTURE tables and sequences
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES    TO contect_ro_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON SEQUENCES TO contect_ro_user;
+
+-- Step 6: Explicitly lock out write operations
+-- (belt-and-suspenders — the SELECT-only grants above already prevent this,
+--  but an explicit REVOKE makes the intent clear and guards against
+--  any future accidental GRANT)
+REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM contect_ro_user;
+```
+
+### Why the explicit REVOKE at the end?
+
+PostgreSQL does not grant `INSERT`, `UPDATE`, or `DELETE` to a new user by
+default — so technically the `REVOKE` is not strictly necessary if you only
+ever ran `GRANT SELECT`. However it is **good defensive practice** because:
+
+| Reason | Explanation |
+|--------|-------------|
+| **Intent is explicit** | Anyone reading the script immediately sees this is read-only by design |
+| **Guards against accidents** | If someone runs a broad `GRANT ALL` later, this revoke re-asserts the boundary |
+| **Audit evidence** | Shows deliberate access control in change logs / audit trails |
+
+### Verify the Read-Only User
+
+```sql
+-- Confirm user exists (no replication flag)
+SELECT rolname, rolreplication, rolcanlogin, rolsuper
+FROM pg_roles
+WHERE rolname = 'contect_ro_user';
+
+-- Confirm database access
+SELECT has_database_privilege('contect_ro_user', 'contec_pgsql_arm_db', 'CONNECT');
+
+-- Confirm SELECT is allowed on a table
+SELECT has_table_privilege('contect_ro_user', 'public.your_table', 'SELECT');
+
+-- Confirm write operations are NOT allowed
+SELECT
+  has_table_privilege('contect_ro_user', 'public.your_table', 'INSERT') AS can_insert,
+  has_table_privilege('contect_ro_user', 'public.your_table', 'UPDATE') AS can_update,
+  has_table_privilege('contect_ro_user', 'public.your_table', 'DELETE') AS can_delete;
+-- Expected: all three return false
+```
+
+### pg_hba.conf for the Read-Only User
+
+Unlike the replication user, this user only needs a **standard host entry**
+— no `replication` database line required:
+
+```
+# pg_hba.conf
+# TYPE    DATABASE              USER               ADDRESS       METHOD
+host      contec_pgsql_arm_db   contect_ro_user    10.0.0.0/8    scram-sha-256
+```
+
+### Revoke / Cleanup
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE SELECT ON TABLES    FROM contect_ro_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE SELECT ON SEQUENCES FROM contect_ro_user;
+
+REVOKE SELECT ON ALL TABLES    IN SCHEMA public FROM contect_ro_user;
+REVOKE SELECT ON ALL SEQUENCES IN SCHEMA public FROM contect_ro_user;
+REVOKE USAGE  ON SCHEMA public FROM contect_ro_user;
+REVOKE CONNECT ON DATABASE contec_pgsql_arm_db FROM contect_ro_user;
+
+DROP USER contect_ro_user;
+```
+
+---
+
 ## Summary
+
+### Replication User (`logical_replica_user`) — CDC + WAL access
 
 | Step | SQL | Covers future objects? |
 |------|-----|------------------------|
@@ -267,5 +386,22 @@ DROP ROLE logical_replica_user;
 | **Future tables** | `ALTER DEFAULT PRIVILEGES ... GRANT SELECT ON TABLES` | ✅ Yes |
 | Existing sequences | `GRANT USAGE, SELECT ON ALL SEQUENCES` | ❌ Existing only |
 | **Future sequences** | `ALTER DEFAULT PRIVILEGES ... GRANT USAGE, SELECT ON SEQUENCES` | ✅ Yes |
-| Replication connection | `pg_hba.conf` entry with `replication` database | — |
+| Replication connection | `pg_hba.conf` with `replication` database line | — |
+| Normal query connection | `pg_hba.conf` with database name line | — |
+
+### Read-Only User (`contect_ro_user`) — ODBC/JDBC query access only
+
+| Step | SQL | Covers future objects? |
+|------|-----|------------------------|
+| Create user | `CREATE USER ... WITH PASSWORD` | — |
+| DB connection | `GRANT CONNECT ON DATABASE` | — |
+| Schema visibility | `GRANT USAGE ON SCHEMA` | ❌ Manual per schema |
+| Existing tables | `GRANT SELECT ON ALL TABLES` | ❌ Existing only |
+| Existing sequences | `GRANT SELECT ON ALL SEQUENCES` | ❌ Existing only |
+| **Future tables** | `ALTER DEFAULT PRIVILEGES ... GRANT SELECT ON TABLES` | ✅ Yes |
+| **Future sequences** | `ALTER DEFAULT PRIVILEGES ... GRANT SELECT ON SEQUENCES` | ✅ Yes |
+| Lock out writes | `REVOKE INSERT, UPDATE, DELETE ON ALL TABLES` | — |
+| Normal query connection | `pg_hba.conf` with database name line only | — |
+
+
 
