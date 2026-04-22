@@ -374,9 +374,7 @@ Once testing is complete, use this checklist before going live:
 
 ---
 
-## 📌 Quick Reference — Useful SQL Commands
-
-```sql
+## 📌 Quick Reference — Useful SQL Commands```sql
 -- Check wal_level
 SHOW wal_level;
 
