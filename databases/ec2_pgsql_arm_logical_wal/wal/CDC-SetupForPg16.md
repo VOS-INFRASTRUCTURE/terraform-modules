@@ -36,7 +36,37 @@ max_replication_slots = 10
 
 ---
 
-### 1.3 WAL Retention Safety Cap (Prevent Disk Runaway)
+### 1.3 WAL Keep Size (Baseline WAL Retention)
+
+```conf
+# Minimum amount of WAL to keep on disk regardless of replication slots.
+# Default: 0 (PostgreSQL only keeps what active slots and checkpoints need)
+#
+# This is NOT the same as max_slot_wal_keep_size:
+#   - wal_keep_size          → minimum WAL floor, kept for standbys WITHOUT slots
+#   - max_slot_wal_keep_size → maximum WAL ceiling, caps what slots can retain
+#
+# For pure CDC (logical slots only, no physical standby):
+#   - wal_keep_size = 0 is fine — slots manage their own retention
+#   - Setting it to 1GB is a small safety buffer in case a slot temporarily drops
+#     and a reconnect needs recent WAL before the slot is recreated
+#
+# For setups with physical standby replicas (no slots on the standby):
+#   - Set to enough WAL to survive a standby lagging during maintenance
+#   - 1GB is a reasonable starting point
+wal_keep_size = 1GB
+```
+
+> **Default:** `0` — PostgreSQL will NOT retain any extra WAL beyond what active
+> replication slots and checkpoints require. With slots in place this is usually fine,
+> but `1GB` is a low-cost safety net that does not significantly impact disk.
+
+> 💡 `wal_keep_size` accepts units like `1GB`, `512MB` directly in PostgreSQL 13+.
+> In PostgreSQL 12 and earlier the setting was called `wal_keep_segments` (a count, not size).
+
+---
+
+### 1.4 WAL Retention Safety Cap (Prevent Disk Runaway)
 
 ```conf
 # Maximum WAL size to retain for all replication slots combined
@@ -69,6 +99,7 @@ sudo -u postgres psql -c "SHOW wal_level;"
 # Confirm other settings
 sudo -u postgres psql -c "SHOW max_wal_senders;"
 sudo -u postgres psql -c "SHOW max_replication_slots;"
+sudo -u postgres psql -c "SHOW wal_keep_size;"
 sudo -u postgres psql -c "SHOW max_slot_wal_keep_size;"
 ```
 
@@ -330,6 +361,7 @@ Once testing is complete, use this checklist before going live:
 - [ ] `wal_level = logical` confirmed in running PostgreSQL (`SHOW wal_level;`)
 - [ ] `max_replication_slots` ≥ number of CDC consumers + replicas
 - [ ] `max_wal_senders` ≥ number of CDC consumers + replicas
+- [ ] `wal_keep_size = 1GB` set as a safety buffer (default is `0`)
 - [ ] `max_slot_wal_keep_size = 16GB` set to prevent disk runaway
 - [ ] `pg_hba.conf` allows replication from consumer host/CIDR
 - [ ] `logical_replica_user` created with `REPLICATION` privilege
