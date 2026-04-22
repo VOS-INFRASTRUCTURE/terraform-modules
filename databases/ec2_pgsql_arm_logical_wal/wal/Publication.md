@@ -66,7 +66,68 @@ These two are often confused but serve completely different purposes:
 
 ---
 
-## 3. Why Publication is Necessary
+## 3. Is Publication Only for Replicas?
+
+**No.** This is a very common misconception. Publications serve **two
+completely separate use cases**, both of which involve logical decoding:
+
+```
+Publication is used by:
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Use Case 1 – Native Logical Replication (Primary → Replica)│
+  │                                                             │
+  │  Primary                          Replica                   │
+  │  CREATE PUBLICATION app_pub  →    CREATE SUBSCRIPTION sub   │
+  │  FOR TABLE orders, users          PUBLICATION app_pub;      │
+  │                                                             │
+  │  Purpose: keep a second PostgreSQL instance in sync         │
+  │  Plugin:  pgoutput (built-in)                               │
+  └─────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Use Case 2 – CDC / Change Data Capture (your use case)     │
+  │                                                             │
+  │  Primary                          Any Consumer              │
+  │  CREATE PUBLICATION cdc_pub  →    Debezium / custom app     │
+  │  FOR ALL TABLES                   reads slot with pgoutput  │
+  │                                                             │
+  │  Purpose: stream change events to Kafka, search, audit, etc │
+  │  Plugin:  pgoutput (mandatory) or wal2json (no pub needed)  │
+  └─────────────────────────────────────────────────────────────┘
+```
+
+The underlying mechanism is identical — both use **logical decoding** and
+**replication slots**. The difference is only in who the consumer is:
+
+| Use Case                                        | Consumer              | Plugin used     | Requires Publication?   |
+|-------------------------------------------------|-----------------------|-----------------|-------------------------|
+| Logical replication (replica)                   | Another PostgreSQL DB | `pgoutput`      | ✅ Yes                  |
+| CDC via Debezium                                | Kafka / your app      | `pgoutput`      | ✅ Yes                  |
+| CDC via `pg_recvlogical` + `pgoutput`           | Custom consumer / CLI | `pgoutput`      | ✅ Yes                  |
+| CDC via `pg_recvlogical` + `wal2json`           | Custom consumer / CLI | `wal2json`      | ❌ No                   |
+| CDC via `pg_recvlogical` + `test_decoding`      | Debugging only        | `test_decoding` | ❌ No                   |
+| CDC via `wal2json` (direct SQL polling)         | Custom consumer       | `wal2json`      | ❌ No (decodes raw WAL) |
+
+> **Key insight:** `pg_recvlogical` is a **CLI tool**, not a plugin.
+> It can stream from a slot using any plugin you specify with `--plugin=`.
+> Whether a publication is required depends entirely on **which plugin** it
+> is told to use — not on the tool itself:
+>
+> ```bash
+> # Requires a publication (uses pgoutput)
+> pg_recvlogical --slot=my_slot --plugin=pgoutput --start -f - -d mydb
+>
+> # Does NOT require a publication (uses wal2json)
+> pg_recvlogical --slot=my_slot --plugin=wal2json --start -f - -d mydb
+> ```
+>
+> The rule is simple: **`pgoutput` always needs a publication.
+> `wal2json` and `test_decoding` never do.**
+
+---
+
+## 4. Why Publication is Necessary
 
 Without a publication you **cannot**:
 
