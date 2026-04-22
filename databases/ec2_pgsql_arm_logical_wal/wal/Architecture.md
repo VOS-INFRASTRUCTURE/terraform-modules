@@ -5,6 +5,14 @@
 ## 1. High-Level Overview
 
 ```
+              port 5432
+                  │
+        ┌─────────┴─────────┐
+        │                   │
+   SQL Session        Replication Session
+   (normal)           (WAL stream)
+   
+   
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        PostgreSQL (Primary)                         │
 │                      wal_level = logical                            │

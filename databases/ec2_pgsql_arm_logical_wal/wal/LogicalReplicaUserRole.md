@@ -181,6 +181,12 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO logical_replica_user;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO logical_replica_user;
+
+-- Step 6: Explicitly lock out write operations
+-- (belt-and-suspenders — the SELECT-only grants above already prevent this,
+--  but an explicit REVOKE makes the intent clear and guards against
+--  any future accidental GRANT)
+REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM logical_replica_user;
 ```
 
 ---
