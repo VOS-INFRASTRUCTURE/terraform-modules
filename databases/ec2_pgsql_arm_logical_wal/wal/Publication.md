@@ -258,28 +258,142 @@ Step 4 – PostgreSQL streams filtered changes
 
 ## 6. Managing Publications
 
+### 6.1 List All Publications
+
 ```sql
--- List all publications
-SELECT pubname, puballtables, pubinsert, pubupdate, pubdelete, pubtruncate
-FROM pg_publication;
+-- Basic list: name, scope, and which operations are published
+SELECT
+  pubname              AS publication_name,
+  puballtables         AS all_tables,
+  pubinsert            AS publishes_insert,
+  pubupdate            AS publishes_update,
+  pubdelete            AS publishes_delete,
+  pubtruncate          AS publishes_truncate
+FROM pg_publication
+ORDER BY pubname;
+```
 
--- See which tables belong to a publication
-SELECT schemaname, tablename
+Expected output:
+```
+ publication_name | all_tables | publishes_insert | publishes_update | publishes_delete | publishes_truncate
+------------------+------------+------------------+------------------+------------------+--------------------
+ all_tables_pub   | t          | t                | t                | t                | t
+ orders_pub       | f          | t                | t                | f                | f
+```
+
+```sql
+-- Show owner alongside publication details
+SELECT
+  p.pubname       AS publication_name,
+  r.rolname       AS owner,
+  p.puballtables  AS all_tables,
+  p.pubinsert,
+  p.pubupdate,
+  p.pubdelete,
+  p.pubtruncate
+FROM pg_publication p
+JOIN pg_roles r ON r.oid = p.pubowner
+ORDER BY p.pubname;
+```
+
+```sql
+-- List which specific tables belong to each publication
+-- NOTE: returns no rows for FOR ALL TABLES publications (puballtables = true)
+SELECT
+  pubname       AS publication_name,
+  schemaname,
+  tablename
 FROM pg_publication_tables
-WHERE pubname = 'app_pub';
+ORDER BY pubname, schemaname, tablename;
+```
 
--- Add a table to an existing publication
-ALTER PUBLICATION app_pub ADD TABLE new_table;
+```sql
+-- Combined view: publication + table count (shows 'ALL TABLES' for global ones)
+SELECT
+  p.pubname AS publication_name,
+  CASE
+    WHEN p.puballtables THEN 'ALL TABLES (dynamic)'
+    ELSE count(pt.tablename)::text || ' table(s)'
+  END AS scope
+FROM pg_publication p
+LEFT JOIN pg_publication_tables pt ON pt.pubname = p.pubname
+GROUP BY p.pubname, p.puballtables
+ORDER BY p.pubname;
+```
+
+---
+
+### 6.2 Alter an Existing Publication
+
+```sql
+-- Add a table to an existing named publication
+ALTER PUBLICATION orders_pub ADD TABLE payments;
 
 -- Remove a table from a publication
-ALTER PUBLICATION app_pub DROP TABLE old_table;
+ALTER PUBLICATION orders_pub DROP TABLE old_table;
+
+-- Replace the entire table list
+ALTER PUBLICATION orders_pub SET TABLE orders, order_items, payments;
 
 -- Change which operations are published
-ALTER PUBLICATION app_pub SET (publish = 'insert, update');
+ALTER PUBLICATION orders_pub SET (publish = 'insert, update');
 
--- Drop a publication (does NOT drop the slot)
-DROP PUBLICATION app_pub;
+-- Rename a publication
+ALTER PUBLICATION orders_pub RENAME TO transactions_pub;
 ```
+
+---
+
+### 6.3 Drop (Delete) a Publication
+
+> ⚠️ **Important before dropping:**
+> - Dropping a publication does **NOT** drop the replication slot.
+> - Any active consumer using `pgoutput` with this publication will **error immediately** on the next read.
+> - Any `SUBSCRIPTION` on a replica pointing to this publication will **stop replicating**.
+> - If you recreate the publication with the same name, consumers may resume from their last LSN — but there is a risk of a gap in changes during the time it was missing.
+> - Always notify or stop consumers **before** dropping a publication.
+
+```sql
+-- Drop a single publication
+DROP PUBLICATION all_tables_pub;
+
+-- Drop only if it exists (safe for scripts, no error if missing)
+DROP PUBLICATION IF EXISTS all_tables_pub;
+
+-- Drop multiple publications at once
+DROP PUBLICATION IF EXISTS all_tables_pub, orders_pub, cdc_pub;
+```
+
+---
+
+### 6.4 Safe Deletion Workflow
+
+Follow this order to avoid consumer errors:
+
+```sql
+-- Step 1: Check which slots are currently active (connected consumers)
+SELECT slot_name, active, plugin, confirmed_flush_lsn
+FROM pg_replication_slots
+WHERE active = true;
+
+-- Step 2: Stop or pause your CDC consumer (Debezium, Airbyte, etc.) first
+--         before proceeding. Do NOT drop the publication while active = true.
+
+-- Step 3: Drop the slot BEFORE the publication
+--         (prevents orphaned slots accumulating WAL)
+SELECT pg_drop_replication_slot('your_slot_name');
+
+-- Step 4: Now safely drop the publication
+DROP PUBLICATION IF EXISTS all_tables_pub;
+
+-- Step 5: Verify both are gone
+SELECT slot_name FROM pg_replication_slots;
+SELECT pubname   FROM pg_publication;
+```
+
+> 💡 Drop the **slot first**, then the **publication**.
+> Dropping the publication first leaves the slot alive and still accumulating WAL —
+> it just cannot serve useful data to `pgoutput` consumers anymore.
 
 ---
 

@@ -165,9 +165,90 @@ GRANT SELECT ON SEQUENCES TO logical_replica_user;
 
 ---
 
-## ✅ Phase 4 — Create the Replication Slot
+## ✅ Phase 4 — Create a Publication
 
-### 4.1 Create a Logical Replication Slot
+A **publication** defines which tables and operations (INSERT, UPDATE, DELETE, TRUNCATE)
+are exposed for logical decoding / CDC consumers.
+
+> **When is a publication required?**
+> - **`pgoutput` plugin** (Debezium, native logical replication) → ✅ **Required**
+> - **`wal2json` plugin** (Airbyte, custom consumers via `pg_recvlogical`) → ❌ Not required — `wal2json` decodes raw WAL directly without a publication
+>
+> It is still good practice to create one so the setup is consumer-agnostic
+> and ready for any tool without reconfiguration.
+
+---
+
+### 4.1 Create Publication for ALL Tables (Including Future Tables)
+
+```sql
+-- Connect to your target database
+\c your_db
+
+-- Publish all operations on ALL current and future tables in the database
+-- FOR ALL TABLES automatically includes tables created after this command
+CREATE PUBLICATION all_tables_pub FOR ALL TABLES;
+```
+
+> `FOR ALL TABLES` covers every table in the database, **including tables created in the future**.
+> No need to alter the publication when you add new tables.
+
+---
+
+### 4.2 Create Publication for Specific Tables Only (Optional)
+
+If you want to limit CDC to specific tables (e.g., for privacy or performance):
+
+```sql
+-- Publish only specific tables
+CREATE PUBLICATION selective_pub FOR TABLE orders, customers, products;
+
+-- Add a table to an existing publication later
+ALTER PUBLICATION selective_pub ADD TABLE payments;
+
+-- Remove a table from a publication
+ALTER PUBLICATION selective_pub DROP TABLE products;
+```
+
+---
+
+### 4.3 Verify the Publication
+
+```sql
+-- List all publications
+SELECT pubname, puballtables, pubinsert, pubupdate, pubdelete, pubtruncate
+FROM pg_publication;
+
+-- List which tables are in a publication (only for non-ALL TABLES publications)
+SELECT schemaname, tablename
+FROM pg_publication_tables
+WHERE pubname = 'all_tables_pub';
+```
+
+Expected output for `FOR ALL TABLES`:
+```
+    pubname      | puballtables | pubinsert | pubupdate | pubdelete | pubtruncate
+-----------------+--------------+-----------+-----------+-----------+-------------
+ all_tables_pub  | t            | t         | t         | t         | t
+```
+
+> `puballtables = t` confirms it covers all tables including future ones.
+
+---
+
+### 4.4 Grant Publication Usage to CDC User
+
+```sql
+-- The replication user needs SELECT on tables in the publication
+-- (already done in Phase 3 — included here as a reminder)
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO logical_replica_user;
+```
+
+---
+
+## ✅ Phase 5 — Create the Replication Slot
+
+### 5.1 Create a Logical Replication Slot
 
 ```sql
 -- Connect to your target database (not postgres)
@@ -193,7 +274,7 @@ Available output plugins:
 
 ---
 
-### 4.2 Verify Slot Was Created
+### 5.2 Verify Slot Was Created
 
 ```sql
 SELECT slot_name, plugin, slot_type, active, restart_lsn, confirmed_flush_lsn
@@ -211,12 +292,12 @@ Expected output:
 
 ---
 
-## ✅ Phase 5 — Test with pg_recvlogical
+## ✅ Phase 6 — Test with pg_recvlogical
 
 `pg_recvlogical` is the built-in PostgreSQL CLI tool to stream logical WAL changes.
 It ships with `postgresql-client`.
 
-### 5.1 Install pg_recvlogical (if not already available)
+### 6.1 Install pg_recvlogical (if not already available)
 
 ```bash
 sudo apt-get install -y postgresql-client-16
@@ -225,7 +306,7 @@ pg_recvlogical --version
 
 ---
 
-### 5.2 Stream Changes to stdout (Live Test)
+### 6.2 Stream Changes to stdout (Live Test)
 
 Open a terminal and run:
 
@@ -248,7 +329,7 @@ pg_recvlogical \
 
 ---
 
-### 5.3 Generate Test Data (In Another Terminal)
+### 6.3 Generate Test Data (In Another Terminal)
 
 ```sql
 -- Connect to your database
@@ -273,7 +354,7 @@ DELETE FROM cdc_test WHERE id = 1;
 
 ---
 
-### 5.4 Expected Output from pg_recvlogical
+### 6.4 Expected Output from pg_recvlogical
 
 You should see JSON like this streaming in the first terminal:
 
@@ -296,7 +377,7 @@ You should see JSON like this streaming in the first terminal:
 
 ---
 
-### 5.5 Stream to a File Instead of stdout
+### 6.5 Stream to a File Instead of stdout
 
 ```bash
 pg_recvlogical \
@@ -318,7 +399,7 @@ tail -f /tmp/cdc-output.json
 
 ---
 
-## ✅ Phase 6 — Monitor Slot Lag
+## ✅ Phase 7 — Monitor Slot Lag
 
 Always monitor your slot after creation. An idle or lagging slot will retain WAL and can fill your disk.
 
@@ -339,7 +420,7 @@ ORDER BY wal_lag DESC;
 
 ---
 
-## ✅ Phase 7 — Drop the Slot (When Done Testing)
+## ✅ Phase 8 — Drop the Slot (When Done Testing)
 
 > ⚠️ **Always drop unused slots.** An abandoned slot will retain all WAL since creation
 > and can fill your disk completely.
@@ -354,7 +435,7 @@ SELECT slot_name FROM pg_replication_slots;
 
 ---
 
-## ✅ Phase 8 — Production Slot Setup Checklist
+## ✅ Phase 9 — Production Slot Setup Checklist
 
 Once testing is complete, use this checklist before going live:
 
@@ -366,6 +447,7 @@ Once testing is complete, use this checklist before going live:
 - [ ] `pg_hba.conf` allows replication from consumer host/CIDR
 - [ ] `logical_replica_user` created with `REPLICATION` privilege
 - [ ] Default privileges set so future tables are auto-readable (`ALTER DEFAULT PRIVILEGES`)
+- [ ] Publication created (`CREATE PUBLICATION all_tables_pub FOR ALL TABLES`)
 - [ ] One slot created per consumer — do NOT share a slot between two consumers
 - [ ] Slot lag monitored via CloudWatch or cron-based alert
 - [ ] Test insert / update / delete events received and decoded correctly
