@@ -350,6 +350,9 @@ UPDATE cdc_test SET name = 'updated' WHERE id = 1;
 
 -- Delete a row
 DELETE FROM cdc_test WHERE id = 1;
+
+-- Drop the test table when done
+DROP TABLE cdc_test;
 ```
 
 ---
