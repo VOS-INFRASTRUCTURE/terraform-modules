@@ -61,7 +61,7 @@ output "redis" {
       cloudwatch_logs        = var.enable_cloudwatch_logs
       log_group_name         = var.enable_cloudwatch_logs ? aws_cloudwatch_log_group.redis[0].name : null
       log_group_arn          = var.enable_cloudwatch_logs ? aws_cloudwatch_log_group.redis[0].arn : null
-      ssm_access_enabled     = var.enable_ssh_access
+      ssm_access_enabled     = var.enable_ssm_access
     } : null
 
     # Cost estimate
@@ -80,8 +80,8 @@ output "redis" {
 
     # Access instructions
     access = var.enable_ec2_redis ? {
-      ssm_session = var.enable_ssh_access ? "aws ssm start-session --target ${aws_instance.redis[0].id}" : "SSM access not enabled"
-      ssh_command = var.key_pair_name != "" ? "ssh -i /path/to/${var.key_pair_name}.pem ubuntu@${aws_instance.redis[0].private_ip}" : "SSH key not configured"
+      ssm_session = var.enable_ssm_access ? "aws ssm start-session --target ${aws_instance.redis[0].id}" : "SSM access not enabled"
+      ssh_command = var.enable_ssh_key_access ? "ssh -i /path/to/${var.key_name}.pem ubuntu@${aws_instance.redis[0].private_ip}" : "SSH key not configured"
       redis_cli   = "After connecting to instance: redis-cli${var.redis_password != "" ? " -a 'YOUR_PASSWORD'" : ""}"
 
       # Health check

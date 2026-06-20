@@ -34,7 +34,7 @@ resource "aws_iam_role" "redis" {
 
 # Attach Systems Manager policy for SSH-less access
 resource "aws_iam_role_policy_attachment" "redis_ssm" {
-  count = var.enable_ec2_redis && var.enable_ssh_access ? 1 : 0
+  count = var.enable_ec2_redis && var.enable_ssm_access ? 1 : 0
 
   role       = aws_iam_role.redis[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"

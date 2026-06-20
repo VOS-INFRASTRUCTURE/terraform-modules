@@ -101,7 +101,7 @@ resource "aws_instance" "redis" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.redis[0].id]
   iam_instance_profile   = aws_iam_instance_profile.redis[0].name
-  key_name               = var.key_pair_name != "" ? var.key_pair_name : null
+  key_name               = var.enable_ssh_key_access ? var.key_name : null
 
   monitoring = var.enable_cloudwatch_monitoring
 

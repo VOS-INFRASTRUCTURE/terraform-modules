@@ -139,10 +139,7 @@ Ubuntu 22.04 ARM64
 | `enable_cloudwatch_monitoring` | Enable detailed monitoring | `true` |
 | `enable_cloudwatch_logs` | Enable Redis logs to CloudWatch | `true` |
 | `log_retention_days` | Log retention | `7` |
-| `enable_ssh_access` | Enable SSM Session Manager | `true` |
-| `enable_automated_backups` | Enable S3 backups | `false` |
-| `backup_s3_bucket_name` | S3 bucket for backups | `""` |
-| `backup_schedule` | Cron schedule for backups | `"0 2 * * *"` |
+| `enable_ssm_access` | Enable SSM Session Manager | `true` |
 | `root_volume_size` | EBS volume size in GB | `8` |
 | `enable_ebs_encryption` | Encrypt EBS volume | `true` |
 

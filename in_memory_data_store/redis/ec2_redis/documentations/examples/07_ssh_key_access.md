@@ -21,8 +21,9 @@ module "redis_ssh" {
   subnet_id                  = "subnet-private-1a"
   allowed_security_group_ids = ["sg-app-servers"]
 
-  key_pair_name     = aws_key_pair.redis_access.key_name
-  enable_ssh_access = true
+  key_name              = aws_key_pair.redis_access.key_name
+  enable_ssh_key_access = true
+  enable_ssm_access     = true
 
   tags = {
     Access = "SSH-enabled"

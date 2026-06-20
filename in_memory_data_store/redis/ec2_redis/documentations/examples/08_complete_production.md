@@ -65,7 +65,7 @@ module "redis_production" {
   backup_s3_bucket_name    = aws_s3_bucket.redis_backups.id
   backup_schedule          = "0 */6 * * *"
 
-  enable_ssh_access = true
+  enable_ssm_access = true
 
   tags = {
     Environment = "production"

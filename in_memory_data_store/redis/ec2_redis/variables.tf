@@ -48,12 +48,6 @@ variable "ami_id" {
   default     = ""
 }
 
-variable "key_pair_name" {
-  description = "Name of EC2 key pair for SSH access (leave empty to disable SSH key access)"
-  type        = string
-  default     = ""
-}
-
 variable "root_volume_size" {
   description = "Size of root EBS volume in GB"
   type        = number
@@ -182,8 +176,24 @@ variable "log_retention_days" {
   default     = 7
 }
 
-variable "enable_ssh_access" {
-  description = "Enable SSH access via Systems Manager Session Manager (no SSH keys needed)"
+################################################################################
+# Access Configuration
+################################################################################
+
+variable "key_name" {
+  description = "EC2 key pair name for SSH access (optional if using SSM)"
+  type        = string
+  default     = ""
+}
+
+variable "enable_ssh_key_access" {
+  description = "Enable SSH key access (set to false to use only SSM Session Manager)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_ssm_access" {
+  description = "Enable Systems Manager Session Manager for SSH-less access"
   type        = bool
   default     = true
 }

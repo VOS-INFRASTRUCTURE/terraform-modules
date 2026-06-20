@@ -67,7 +67,7 @@ module "redis_host" {
   log_retention_days           = 30
 
   enable_ebs_encryption = true
-  enable_ssh_access     = true  # SSM Session Manager — no EC2 key pair needed
+  enable_ssm_access     = true  # SSM Session Manager — no EC2 key pair needed
 
   tags = {
     Environment = var.env
