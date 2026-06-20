@@ -4,7 +4,7 @@
 ################################################################################
 
 resource "aws_iam_role" "redis" {
-  count = var.enable_ec2_redis ? 1 : 0
+  count = 1
 
   name = "${var.env}-${var.project_id}-redis-role"
 
@@ -34,7 +34,7 @@ resource "aws_iam_role" "redis" {
 
 # Attach Systems Manager policy for SSH-less access
 resource "aws_iam_role_policy_attachment" "redis_ssm" {
-  count = var.enable_ec2_redis && var.enable_ssm_access ? 1 : 0
+  count = var.enable_ssm_access ? 1 : 0
 
   role       = aws_iam_role.redis[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -42,7 +42,7 @@ resource "aws_iam_role_policy_attachment" "redis_ssm" {
 
 # CloudWatch monitoring policy
 resource "aws_iam_role_policy" "redis_cloudwatch" {
-  count = var.enable_ec2_redis && (var.enable_cloudwatch_monitoring || var.enable_cloudwatch_logs) ? 1 : 0
+  count = (var.enable_cloudwatch_monitoring || var.enable_cloudwatch_logs) ? 1 : 0
 
   name = "${var.env}-${var.project_id}-redis-cloudwatch"
   role = aws_iam_role.redis[0].id
@@ -92,7 +92,7 @@ resource "aws_iam_role_policy" "redis_cloudwatch" {
 }
 
 resource "aws_iam_instance_profile" "redis" {
-  count = var.enable_ec2_redis ? 1 : 0
+  count = 1
 
   name = "${var.env}-${var.project_id}-redis-profile"
   role = aws_iam_role.redis[0].name

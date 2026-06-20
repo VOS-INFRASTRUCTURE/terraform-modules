@@ -4,7 +4,7 @@
 ################################################################################
 
 resource "aws_security_group" "redis" {
-  count = var.enable_ec2_redis ? 1 : 0
+  count = 1
 
   name        = "${var.env}-${var.project_id}-redis-sg"
   description = "Security group for Redis EC2 instance"
@@ -24,7 +24,7 @@ resource "aws_security_group" "redis" {
 
 # Allow Redis access from application security groups
 resource "aws_security_group_rule" "redis_from_app_sg" {
-  count = var.enable_ec2_redis && length(var.allowed_security_group_ids) > 0 ? length(var.allowed_security_group_ids) : 0
+  count = length(var.allowed_security_group_ids)
 
   type                     = "ingress"
   from_port                = var.redis_port
@@ -37,7 +37,7 @@ resource "aws_security_group_rule" "redis_from_app_sg" {
 
 # Allow Redis access from CIDR blocks
 resource "aws_security_group_rule" "redis_from_cidr" {
-  count = var.enable_ec2_redis && length(var.allowed_cidr_blocks) > 0 ? 1 : 0
+  count = length(var.allowed_cidr_blocks) > 0 ? 1 : 0
 
   type              = "ingress"
   from_port         = var.redis_port
@@ -50,7 +50,7 @@ resource "aws_security_group_rule" "redis_from_cidr" {
 
 # Allow all outbound traffic (for updates, CloudWatch, etc.)
 resource "aws_security_group_rule" "redis_outbound" {
-  count = var.enable_ec2_redis ? 1 : 0
+  count = 1
 
   type              = "egress"
   from_port         = 0

@@ -18,12 +18,6 @@ variable "base_name" {
   default     = "redis"
 }
 
-variable "enable_ec2_redis" {
-  description = "Whether to enable EC2 Redis instance"
-  type        = bool
-  default     = true
-}
-
 ################################################################################
 # Instance Configuration
 ################################################################################

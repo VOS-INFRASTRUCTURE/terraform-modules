@@ -31,7 +31,7 @@
 ################################################################################
 
 data "aws_ami" "ubuntu_arm64" {
-  count       = var.enable_ec2_redis && var.ami_id == "" ? 1 : 0
+  count       = var.ami_id == "" ? 1 : 0
   most_recent = true
   owners      = ["099720109477"] # Canonical (Ubuntu)
 
@@ -94,7 +94,7 @@ locals {
 ################################################################################
 
 resource "aws_instance" "redis" {
-  count = var.enable_ec2_redis ? 1 : 0
+  count = 1
 
   ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu_arm64[0].id
   instance_type          = var.instance_type
