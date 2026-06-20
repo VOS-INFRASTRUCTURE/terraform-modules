@@ -72,7 +72,7 @@ module "redis_host" {
   tags = {
     Environment = var.env
     Purpose     = "redis-per-app-host"
-    Apps        = "app1,app2"
+    Apps        = "app1 app2"
   }
 }
 

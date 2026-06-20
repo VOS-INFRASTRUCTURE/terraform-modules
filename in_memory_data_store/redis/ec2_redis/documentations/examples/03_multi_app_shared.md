@@ -34,7 +34,7 @@ module "shared_redis" {
 
   tags = {
     Shared = "true"
-    Apps   = "app1,app2,app3"
+    Apps   = "app1 app2 app3"
   }
 }
 
