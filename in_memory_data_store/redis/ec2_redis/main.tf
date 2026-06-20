@@ -8,7 +8,6 @@
 # - Installs and configures Redis server
 # - Sets up security groups
 # - Configures CloudWatch monitoring
-# - Optional: Automated backups to S3
 # - Optional: Systems Manager for SSH-less access
 #
 # Cost: ~$7-8/month for t4g.micro
@@ -22,7 +21,7 @@
 # ⚠️ Limitations:
 # - No automatic failover (single instance)
 # - Manual maintenance required
-# - You manage OS updates, Redis updates, backups
+# - You manage OS updates and Redis updates
 #
 # For production with HA, consider ElastiCache instead.
 ################################################################################

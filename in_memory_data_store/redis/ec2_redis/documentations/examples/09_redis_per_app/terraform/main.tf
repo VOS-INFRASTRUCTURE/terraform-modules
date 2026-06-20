@@ -27,6 +27,9 @@ module "redis_host" {
   env        = var.env
   project_id = var.project_id
 
+  base_name  = "central-redis-arm-db"
+
+  # ── EC2 Instance Config ─────────────────────────────────────────────────────
   # r6g.medium = 8 GB RAM, memory-optimized, no CPU burst limits.
   # Ideal for a shared Redis host serving multiple apps.
   # Cost: ~$37/month (vs t4g.small at ~$13/month for 2 GB)

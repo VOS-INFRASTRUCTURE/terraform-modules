@@ -64,13 +64,6 @@ output "redis" {
       ssm_access_enabled     = var.enable_ssh_access
     } : null
 
-    # Backup
-    backup = var.enable_ec2_redis ? {
-      enabled        = var.enable_automated_backups
-      s3_bucket      = var.backup_s3_bucket_name
-      schedule       = var.backup_schedule
-    } : null
-
     # Cost estimate
     estimated_cost = var.enable_ec2_redis ? {
       instance_type    = var.instance_type

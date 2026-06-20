@@ -147,12 +147,6 @@ locals {
                 "timezone": "UTC"
               },
               {
-                "file_path": "/var/log/redis-backup.log",
-                "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
-                "log_stream_name": "{instance_id}/backup.log",
-                "timezone": "UTC"
-              },
-              {
                 "file_path": "/var/log/syslog",
                 "log_group_name": "%{if var.enable_cloudwatch_logs}${aws_cloudwatch_log_group.redis[0].name}%{endif}",
                 "log_stream_name": "{instance_id}/syslog",
@@ -188,37 +182,6 @@ locals {
       -m ec2 \
       -s \
       -c file:/opt/aws/amazon-cloudwatch-agent/etc/cloudwatch-config.json
-    %{endif}
-
-    # Setup automated backups if enabled
-    %{if var.enable_automated_backups && var.backup_s3_bucket_name != ""}
-    cat > /usr/local/bin/redis-backup.sh <<'BACKUPSCRIPT'
-    #!/bin/bash
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    BACKUP_FILE="/tmp/redis-backup-$TIMESTAMP.rdb"
-
-    # Trigger Redis save
-    redis-cli %{if var.redis_password != ""}-a ${var.redis_password}%{endif} BGSAVE
-
-    # Wait for save to complete
-    sleep 10
-
-    # Copy RDB file
-    cp /var/lib/redis/dump.rdb $BACKUP_FILE
-
-    # Upload to S3
-    aws s3 cp $BACKUP_FILE s3://${var.backup_s3_bucket_name}/redis-backups/${var.env}/${var.project_id}/
-
-    # Cleanup
-    rm $BACKUP_FILE
-
-    echo "Backup completed: $TIMESTAMP"
-    BACKUPSCRIPT
-
-    chmod +x /usr/local/bin/redis-backup.sh
-
-    # Add cron job
-    echo "${var.backup_schedule} /usr/local/bin/redis-backup.sh >> /var/log/redis-backup.log 2>&1" | crontab -
     %{endif}
 
     echo "=== Redis setup completed at $(date) ==="

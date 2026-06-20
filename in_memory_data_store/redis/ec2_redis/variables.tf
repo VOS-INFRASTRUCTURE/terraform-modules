@@ -189,28 +189,6 @@ variable "enable_ssh_access" {
 }
 
 ################################################################################
-# Backup Configuration
-################################################################################
-
-variable "enable_automated_backups" {
-  description = "Enable automated snapshots to S3"
-  type        = bool
-  default     = false
-}
-
-variable "backup_s3_bucket_name" {
-  description = "S3 bucket name for Redis backups (required if enable_automated_backups is true)"
-  type        = string
-  default     = ""
-}
-
-variable "backup_schedule" {
-  description = "Cron expression for backup schedule (e.g., '0 2 * * *' for 2 AM daily)"
-  type        = string
-  default     = "0 2 * * *"
-}
-
-################################################################################
 # Tags
 ################################################################################
 

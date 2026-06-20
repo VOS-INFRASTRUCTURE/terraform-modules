@@ -91,32 +91,6 @@ resource "aws_iam_role_policy" "redis_cloudwatch" {
   })
 }
 
-# S3 backup policy (if backups enabled)
-resource "aws_iam_role_policy" "redis_s3_backup" {
-  count = var.enable_ec2_redis && var.enable_automated_backups && var.backup_s3_bucket_name != "" ? 1 : 0
-
-  name = "${var.env}-${var.project_id}-redis-s3-backup"
-  role = aws_iam_role.redis[0].id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          "arn:aws:s3:::${var.backup_s3_bucket_name}",
-          "arn:aws:s3:::${var.backup_s3_bucket_name}/*"
-        ]
-      }
-    ]
-  })
-}
-
 resource "aws_iam_instance_profile" "redis" {
   count = var.enable_ec2_redis ? 1 : 0
 
