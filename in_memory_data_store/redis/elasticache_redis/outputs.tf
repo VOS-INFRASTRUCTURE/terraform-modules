@@ -118,24 +118,15 @@ output "elasticache" {
       node_js = {
         package    = "ioredis"
         install    = "npm install ioredis"
-        connection = var.transit_encryption_enabled ? <<-EOF
+        connection = <<-EOF
           const Redis = require('ioredis');
           const redis = new Redis({
             host: '${var.num_cache_nodes > 1 ? aws_elasticache_replication_group.main[0].primary_endpoint_address : aws_elasticache_cluster.main[0].cache_nodes[0].address}',
             port: ${var.port},
             ${var.auth_token != "" ? "password: process.env.REDIS_PASSWORD," : ""}
-            tls: {
+            %{if var.transit_encryption_enabled}tls: {
               checkServerIdentity: () => undefined
-            },
-            retryStrategy: (times) => Math.min(times * 50, 2000)
-          });
-        EOF
-        : <<-EOF
-          const Redis = require('ioredis');
-          const redis = new Redis({
-            host: '${var.num_cache_nodes > 1 ? aws_elasticache_replication_group.main[0].primary_endpoint_address : aws_elasticache_cluster.main[0].cache_nodes[0].address}',
-            port: ${var.port},
-            ${var.auth_token != "" ? "password: process.env.REDIS_PASSWORD," : ""}
+            },%{endif}
             retryStrategy: (times) => Math.min(times * 50, 2000)
           });
         EOF
@@ -143,23 +134,14 @@ output "elasticache" {
       python = {
         package    = "redis"
         install    = "pip install redis"
-        connection = var.transit_encryption_enabled ? <<-EOF
+        connection = <<-EOF
           import redis
           r = redis.Redis(
               host='${var.num_cache_nodes > 1 ? aws_elasticache_replication_group.main[0].primary_endpoint_address : aws_elasticache_cluster.main[0].cache_nodes[0].address}',
               port=${var.port},
               ${var.auth_token != "" ? "password=os.environ['REDIS_PASSWORD']," : ""}
-              ssl=True,
-              ssl_cert_reqs=None,
-              decode_responses=True
-          )
-        EOF
-        : <<-EOF
-          import redis
-          r = redis.Redis(
-              host='${var.num_cache_nodes > 1 ? aws_elasticache_replication_group.main[0].primary_endpoint_address : aws_elasticache_cluster.main[0].cache_nodes[0].address}',
-              port=${var.port},
-              ${var.auth_token != "" ? "password=os.environ['REDIS_PASSWORD']," : ""}
+              %{if var.transit_encryption_enabled}ssl=True,
+              ssl_cert_reqs=None,%{endif}
               decode_responses=True
           )
         EOF
@@ -174,7 +156,7 @@ output "elasticache" {
     } : null
   }
 
-  sensitive = false
+  sensitive = true
 }
 
 # Separate sensitive output for auth token (if needed)
