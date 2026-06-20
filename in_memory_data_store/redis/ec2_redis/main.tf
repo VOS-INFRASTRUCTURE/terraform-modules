@@ -99,7 +99,7 @@ resource "aws_instance" "redis" {
   ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu_arm64[0].id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
-  vpc_security_group_ids = [aws_security_group.redis[0].id]
+  vpc_security_group_ids = var.security_group_ids
   iam_instance_profile   = aws_iam_instance_profile.redis[0].name
   key_name               = var.enable_ssh_key_access ? var.key_name : null
 

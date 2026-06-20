@@ -68,16 +68,9 @@ variable "subnet_id" {
   type        = string
 }
 
-variable "allowed_security_group_ids" {
-  description = "List of security group IDs allowed to access Redis (application security groups)"
+variable "security_group_ids" {
+  description = "List of security group IDs to assign to the instance"
   type        = list(string)
-  default     = []
-}
-
-variable "allowed_cidr_blocks" {
-  description = "List of CIDR blocks allowed to access Redis"
-  type        = list(string)
-  default     = []
 }
 
 variable "redis_port" {
