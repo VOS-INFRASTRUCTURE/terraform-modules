@@ -37,7 +37,7 @@ variable "instance_type" {
 }
 
 variable "ami_id" {
-  description = "AMI ID for the EC2 instance (leave empty to use latest Ubuntu 22.04 ARM64)"
+  description = "AMI ID for the EC2 instance (leave empty to use latest Ubuntu 24.04 ARM64)"
   type        = string
   default     = ""
 }
@@ -97,9 +97,9 @@ variable "redis_port" {
 ################################################################################
 
 variable "redis_version" {
-  description = "Redis version to install (6.2, 7.0, 7.2)"
+  description = "Redis version to install. The module adds the Redis.io repository automatically. Valid: 6.2, 7.0, 7.2, 7.4, 8.0"
   type        = string
-  default     = "7.2"
+  default     = "8.0"
 
   validation {
     condition     = contains(["6.2", "7.0", "7.2", "7.4", "8.0"], var.redis_version)

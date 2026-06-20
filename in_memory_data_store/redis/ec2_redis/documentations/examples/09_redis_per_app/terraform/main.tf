@@ -51,10 +51,8 @@ module "redis_host" {
   redis_max_memory        = "512mb"
   redis_max_memory_policy = "allkeys-lru"
 
-  # Redis 7.2 is reliably available via Ubuntu 22.04 apt.
-  # For 7.4 or 8.0, the user_data.tf needs to add the Redis.io repository
-  # before installing (see: https://redis.io/docs/latest/operate/oss_and_stack/install/)
-  redis_version = "7.2"
+  # The module adds the Redis.io repository automatically. Valid: 6.2, 7.0, 7.2, 7.4, 8.0
+  redis_version = "8.0"
 
   enable_redis_persistence = true
   enable_redis_aof         = true

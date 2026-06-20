@@ -18,8 +18,23 @@ locals {
     apt-get update
     apt-get upgrade -y
 
-    # Install Redis
-    apt-get install -y redis-server
+    # Add Redis.io official repository (provides versions newer than Ubuntu default)
+    apt-get install -y curl gnupg lsb-release
+    curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+    chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/redis.list
+    apt-get update
+
+    # Pin to the requested minor version (e.g. "7.4" matches 6:7.4.8-1rl1~noble1 at runtime)
+    REDIS_MINOR="${var.redis_version}"
+    PKG_VERSION=$(apt-cache show redis-server 2>/dev/null | grep "^Version:" | awk '{print $2}' | grep ":$REDIS_MINOR\." | head -1)
+    if [ -z "$PKG_VERSION" ]; then
+      echo "ERROR: Redis $REDIS_MINOR.x not found in Redis.io repository. Available:"
+      apt-cache show redis-server 2>/dev/null | grep "^Version:"
+      exit 1
+    fi
+    echo "=== Installing Redis $PKG_VERSION ==="
+    apt-get install -y redis-server=$PKG_VERSION redis-tools=$PKG_VERSION
 
     # Stop Redis to configure it
     systemctl stop redis-server
