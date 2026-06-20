@@ -60,10 +60,14 @@ data "aws_ami" "ubuntu_arm64" {
 locals {
   # Calculate max memory based on instance type (75% of RAM)
   instance_memory_map = {
-    "t4g.nano"   = "256mb"
-    "t4g.micro"  = "768mb"
-    "t4g.small"  = "1536mb"
-    "t4g.medium" = "3072mb"
+    "t4g.nano"    = "256mb"
+    "t4g.micro"   = "768mb"
+    "t4g.small"   = "1536mb"
+    "t4g.medium"  = "3072mb"
+    "r6g.medium"  = "6144mb"   # 8 GB × 75% — but for multi-app use explicit per-app budgets
+    "r6g.large"   = "12288mb"  # 16 GB × 75%
+    "r6g.xlarge"  = "24576mb"  # 32 GB × 75%
+    "r6g.2xlarge" = "49152mb"  # 64 GB × 75%
   }
 
   redis_max_memory = var.redis_max_memory == "auto" ? lookup(local.instance_memory_map, var.instance_type, "768mb") : var.redis_max_memory
