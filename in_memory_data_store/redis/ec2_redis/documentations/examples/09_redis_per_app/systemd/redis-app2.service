@@ -1,0 +1,39 @@
+# /etc/systemd/system/redis-app2.service
+#
+# Systemd unit for App 2's Redis process (port 6380).
+# App 1 is managed by the 'redis-server' unit (installed by the ec2_redis module).
+# This unit manages the second, fully isolated Redis process.
+#
+# Deploy: sudo cp redis-app2.service /etc/systemd/system/
+#         sudo systemctl daemon-reload
+#         sudo systemctl enable redis-app2
+#         sudo systemctl start  redis-app2
+#
+# (01_deploy_app2.sh does all of the above automatically.)
+
+[Unit]
+Description=Redis In-Memory Store — App 2 (port 6380)
+After=network.target
+Documentation=https://redis.io/docs
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/redis-server /etc/redis/app2.conf
+ExecStop=/usr/bin/redis-cli -p 6380 -a "${REDIS_APP2_PASSWORD}" shutdown nosave
+PIDFile=/var/run/redis/redis-app2.pid
+TimeoutStartSec=30
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+User=redis
+Group=redis
+
+# Ensure /var/run/redis exists with correct permissions before start
+RuntimeDirectory=redis
+RuntimeDirectoryMode=0755
+
+UMask=007
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
