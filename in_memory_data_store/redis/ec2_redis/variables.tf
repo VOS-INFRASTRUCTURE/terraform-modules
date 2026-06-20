@@ -12,6 +12,12 @@ variable "project_id" {
   type        = string
 }
 
+variable "base_name" {
+  description = "Base name for the Redis instance (e.g., 'redis', 'cache')"
+  type        = string
+  default     = "redis"
+}
+
 variable "enable_ec2_redis" {
   description = "Whether to enable EC2 Redis instance"
   type        = bool

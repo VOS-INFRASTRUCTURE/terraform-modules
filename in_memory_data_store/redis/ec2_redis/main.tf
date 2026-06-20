@@ -71,6 +71,9 @@ data "aws_ami" "ubuntu_arm64" {
 ################################################################################
 
 locals {
+  
+  instance_name = "${var.project_id}-${var.env}-${var.base_name}-redis"
+
   # Calculate max memory based on instance type (75% of RAM)
   instance_memory_map = {
     "t4g.nano"    = "256mb"
@@ -111,7 +114,7 @@ resource "aws_instance" "redis" {
 
     tags = merge(
       {
-        Name        = "${var.env}-${var.project_id}-redis-root"
+        Name        = "${local.instance_name}-ebs"
         Environment = var.env
         Project     = var.project_id
         ManagedBy   = "Terraform"
@@ -130,7 +133,7 @@ resource "aws_instance" "redis" {
 
   tags = merge(
     {
-      Name        = "${var.env}-${var.project_id}-redis"
+      Name        = "${local.instance_name}"
       Environment = var.env
       Project     = var.project_id
       ManagedBy   = "Terraform"
