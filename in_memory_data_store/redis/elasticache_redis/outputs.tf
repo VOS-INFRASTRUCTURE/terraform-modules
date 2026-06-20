@@ -111,9 +111,7 @@ output "elasticache" {
         "Contact AWS for pricing"
       )
       note = "Valkey is 30% cheaper than Redis OSS. Add data transfer costs if applicable."
-    } : {
-      monthly_estimate = "$0 (ElastiCache disabled)"
-    }
+    } : null
 
     # Application configuration examples
     app_config_examples = var.enable_elasticache ? {
