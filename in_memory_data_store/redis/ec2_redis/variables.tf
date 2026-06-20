@@ -23,13 +23,16 @@ variable "enable_ec2_redis" {
 ################################################################################
 
 variable "instance_type" {
-  description = "EC2 instance type for Redis server"
+  description = "EC2 instance type for Redis server (ARM64 only — t4g for burstable, r6g for memory-optimized)"
   type        = string
   default     = "t4g.micro"
 
   validation {
-    condition     = can(regex("^t4g\\.(nano|micro|small|medium)", var.instance_type))
-    error_message = "Instance type must be a t4g instance (nano, micro, small, or medium)"
+    condition = can(regex(
+      "^(t4g\\.(nano|micro|small|medium)|r6g\\.(medium|large|xlarge|2xlarge))",
+      var.instance_type
+    ))
+    error_message = "Must be a t4g (nano/micro/small/medium) or r6g (medium/large/xlarge/2xlarge) ARM64 instance."
   }
 }
 
@@ -99,8 +102,8 @@ variable "redis_version" {
   default     = "7.2"
 
   validation {
-    condition     = contains(["6.2", "7.0", "7.2"], var.redis_version)
-    error_message = "Redis version must be 6.2, 7.0, or 7.2"
+    condition     = contains(["6.2", "7.0", "7.2", "7.4", "8.0"], var.redis_version)
+    error_message = "Redis version must be one of: 6.2, 7.0, 7.2, 7.4, 8.0"
   }
 }
 

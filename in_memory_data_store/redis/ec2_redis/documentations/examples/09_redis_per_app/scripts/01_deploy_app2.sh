@@ -39,9 +39,16 @@ pidfile /var/run/redis/redis-app2.pid
 loglevel notice
 logfile /var/log/redis/app2.log
 
-maxmemory 700mb
+maxmemory 512mb
 maxmemory-policy allkeys-lru
-databases 4
+
+# DB 0  REDIS_DB=0                  Default / fallback (Laravel Redis facade)
+# DB 1  REDIS_CACHE_DB=1            Application cache
+# DB 2  REDIS_SESSION_DB=2          User sessions
+# DB 3  REDIS_QUEUE_DB=3            Queue jobs (Horizon workers)
+# DB 4  REDIS_HORIZON_DB=4          Horizon metrics, failed jobs, worker status
+# DB 5  REDIS_SCHEDULER_LOCK_DB=5   onOneServer() scheduler locks
+databases 6
 
 save 900 1
 save 300 10
@@ -127,9 +134,9 @@ fi
 
 echo ""
 echo "=== App 2 setup complete ==="
-echo "  Host:     127.0.0.1"
 echo "  Port:     6380"
 echo "  Data dir: /var/lib/redis/app2"
 echo "  Log file: /var/log/redis/app2.log"
+echo "  Databases: 6 (DB 0–5, all in active use)"
 echo ""
-echo "Next: run 02_update_cloudwatch.sh to add App 2 logs to CloudWatch."
+echo "Next: run 02_update_cloudwatch.sh to ship App 2 logs to CloudWatch."

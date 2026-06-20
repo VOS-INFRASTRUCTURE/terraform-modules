@@ -1,0 +1,28 @@
+# /etc/systemd/system/redis-appN.service
+#
+# Replace N / appN / 638N with the real values before deploying.
+# The deploy script (scripts/deploy_appN.sh) does this automatically.
+
+[Unit]
+Description=Redis In-Memory Store — App N (port 638N)
+After=network.target
+Documentation=https://redis.io/docs
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/redis-server /etc/redis/appN.conf
+ExecStop=/usr/bin/redis-cli -p 638N -a "${REDIS_APPN_PASSWORD}" shutdown nosave
+PIDFile=/var/run/redis/redis-appN.pid
+TimeoutStartSec=30
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+User=redis
+Group=redis
+RuntimeDirectory=redis
+RuntimeDirectoryMode=0755
+UMask=007
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -22,7 +22,7 @@ The `ec2_redis` module (called from `terraform/main.tf`) handles everything belo
 **This example adds on top:**
 
 - `aws_security_group_rule` for port 6380 (App 2)
-- `random_password` + Secrets Manager secret per app
+- `random_password` + Secrets Manager secret for App 1 only
 - `redis-config/app2.conf` — the Redis config for App 2
 - `systemd/redis-app2.service` — systemd unit for App 2
 - `scripts/` — post-deploy steps to bring App 2 online and update CloudWatch
@@ -38,36 +38,90 @@ The `ec2_redis` module (called from `terraform/main.tf`) handles everything belo
 │   ├── main.tf                   ← module call + SG ingress for App 2
 │   ├── variables.tf
 │   ├── outputs.tf
-│   └── passwords.tf              ← random_password + Secrets Manager for each app
+│   └── passwords.tf              ← App 1: random_password + Secrets Manager
+│                                    App 2: random_password only (no Secrets Manager)
 ├── redis-config/
 │   ├── app1.conf                 ← REFERENCE — what the module writes to /etc/redis/redis.conf
 │   └── app2.conf                 ← deploy this to /etc/redis/app2.conf on the host
 ├── systemd/
 │   └── redis-app2.service        ← deploy to /etc/systemd/system/redis-app2.service
-└── scripts/
-    ├── 01_deploy_app2.sh         ← run via SSM after terraform apply
-    ├── 02_update_cloudwatch.sh   ← add App 2 log stream to the CW agent
-    └── 03_verify.sh              ← confirm each port rejects the other app's password
+├── scripts/
+│   ├── 01_deploy_app2.sh         ← run via SSM after terraform apply
+│   ├── 02_update_cloudwatch.sh   ← add App 2 log stream to the CW agent
+│   └── 03_verify.sh              ← confirm each port rejects the other app's password
+└── add-app-template/             ← copy this to add App 3, App 4, … later
+    ├── README.md
+    ├── terraform/_snippet.tf
+    ├── redis-config/appN.conf
+    ├── systemd/redis-appN.service
+    └── scripts/deploy_appN.sh
 ```
 
 ---
 
-## Memory Layout (t4g.small — 2 GB)
+## Instance: r6g.medium (8 GB RAM)
+
+`r6g` is AWS's memory-optimized ARM64 family. Unlike `t4g`, it has no CPU burst limit —
+performance is consistent regardless of how long the processes have been running.
+
+At 512 MB per app, the memory budget looks like this:
 
 ```
-2,048 MB total RAM
-├── Ubuntu OS:            ~200 MB
-├── Redis process × 2:    ~100 MB  (50 MB idle each)
-├── Headroom:             ~148 MB
-├── App 1 maxmemory:       700 MB  (port 6379, managed by redis-server service)
-└── App 2 maxmemory:       700 MB  (port 6380, managed by redis-app2 service)
-                         ────────
-                         1,848 MB  ✅ fits in 2 GB
+r6g.medium — 8,192 MB total RAM
+├── Ubuntu OS + system:     ~350 MB
+├── Redis process × 2:      ~100 MB  (50 MB idle each)
+├── App 1 maxmemory:         512 MB  (port 6379, redis-server)
+└── App 2 maxmemory:         512 MB  (port 6380, redis-app2)
+                           ────────
+                           1,474 MB used — 6,718 MB free for additional apps
+
+At 562 MB per app (512 MB data + 50 MB process overhead):
+  2  apps →  1,474 MB used  ✅  started here
+  6  apps →  3,722 MB used  ✅
+  10 apps →  5,970 MB used  ✅
+  12 apps →  7,094 MB used  ✅  ~1.1 GB headroom
+  13 apps →  7,656 MB used  ⚠️  536 MB headroom — upgrade to r6g.large
 ```
 
-> The module's `auto` memory for `t4g.small` is `1,536 MB` (75% of 2 GB).
-> That leaves no room for a second process.
-> Always pass `redis_max_memory = "700mb"` explicitly — never use `auto` here.
+> **Why not `auto` for `redis_max_memory`?**
+> The module's `auto` for `r6g.medium` would set `6,144 MB` (75% of 8 GB) for App 1 alone,
+> leaving no memory for any other process. Always set it explicitly on a multi-app host.
+
+---
+
+## Redis Version
+
+The example uses `7.2` because the module's `user_data.tf` installs Redis via the Ubuntu 22.04
+default apt repository, which provides Redis 7.x through the Redis PPA that gets set up.
+
+Redis **7.4** and **8.0** both exist and are stable. The module validation now accepts them.
+To use a newer version, the `user_data.tf` in the parent module would need to install from
+the [Redis.io official repository](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/install-redis-on-linux/)
+rather than the Ubuntu default apt. That is a module-level change, not an example-level one.
+
+---
+
+## Database Layout (6 per app)
+
+Every app uses the same DB numbers — no cross-app coordination needed.
+
+| DB | Env var | Purpose |
+|----|---------|---------|
+| 0 | `REDIS_DB` | Default — Laravel Redis facade; fallback for queue/cache/session if no connection specified |
+| 1 | `REDIS_CACHE_DB` | Application cache — `Cache::put` / `Cache::remember` |
+| 2 | `REDIS_SESSION_DB` | User sessions — `SESSION_DRIVER=redis` |
+| 3 | `REDIS_QUEUE_DB` | Queue jobs — Horizon workers consume here |
+| 4 | `REDIS_HORIZON_DB` | Horizon metrics, failed jobs, worker status |
+| 5 | `REDIS_SCHEDULER_LOCK_DB` | `onOneServer()` distributed scheduler locks |
+
+---
+
+## Password Strategy
+
+| App | Password source | Secrets Manager | Why |
+|-----|----------------|-----------------|-----|
+| App 1 | `random_password` in Terraform | ✅ Yes | Auto-configured by module at launch; apps fetch from SM at runtime |
+| App 2+ | `random_password` in Terraform | ❌ No | Manually deployed via SSM script; operator retrieves with `terraform output -raw` |
 
 ---
 
@@ -88,27 +142,26 @@ This provisions the host with App 1 running on port 6379. App 2 is not yet runni
 
 ```bash
 APP2_PASS=$(terraform output -raw app2_redis_password)
-# All logs are under same log group, just having different stream name.
 LOG_GROUP=$(terraform output -raw redis_cloudwatch_log_group)
 SSM_CMD=$(terraform output -raw redis_host_ssm)
 ```
 
-### 3 — Upload scripts to the host, then open SSM
+### 3 — Open SSM session on the host
 
 ```bash
-# Copy scripts to S3 or use the SSM Run Document approach.
-# Simplest for a one-off: paste script contents directly in the SSM session.
 $SSM_CMD
 ```
 
 ### 4 — Run App 2 setup (inside SSM session)
 
 ```bash
-# Pass the App 2 password as the first argument
 sudo bash 01_deploy_app2.sh "$APP2_PASS"
 ```
 
 ### 5 — Add App 2 log stream to CloudWatch (inside SSM session)
+
+All logs go to the same CloudWatch log group created by the module.
+App 2 just gets its own stream name (`{instance_id}/redis-app2.log`).
 
 ```bash
 sudo bash 02_update_cloudwatch.sh "$LOG_GROUP"
@@ -125,7 +178,6 @@ bash 03_verify.sh "$APP1_PASS" "$APP2_PASS"
 
 ## Application `.env` Files
 
-Get the host IP from Terraform:
 ```bash
 terraform output -json app1_redis_connection
 terraform output -json app2_redis_connection
@@ -138,6 +190,10 @@ REDIS_PORT=6379
 REDIS_PASSWORD=<app1_redis_password output>
 REDIS_DB=0
 REDIS_CACHE_DB=1
+REDIS_SESSION_DB=2
+REDIS_QUEUE_DB=3
+REDIS_HORIZON_DB=4
+REDIS_SCHEDULER_LOCK_DB=5
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 SESSION_CONNECTION=sessions
@@ -150,23 +206,28 @@ REDIS_PORT=6380
 REDIS_PASSWORD=<app2_redis_password output>
 REDIS_DB=0
 REDIS_CACHE_DB=1
+REDIS_SESSION_DB=2
+REDIS_QUEUE_DB=3
+REDIS_HORIZON_DB=4
+REDIS_SCHEDULER_LOCK_DB=5
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 SESSION_CONNECTION=sessions
 ```
 
-Both apps use the same `REDIS_DB=0` — no DB-index juggling needed.
-A copied-wrong `.env` gets `WRONGPASS` immediately.
+Both apps use identical DB numbers. A wrong `.env` gets `WRONGPASS` — never silent data access.
 
 ---
 
-## Adding a Third App Later
+## Adding More Apps
 
-1. Add `random_password.app3_redis` + Secrets Manager secret in `passwords.tf`
-2. Add `aws_security_group_rule.app3_redis_ingress` for port 6381 in `main.tf`
-3. Add App 3 outputs to `outputs.tf`
-4. Copy `redis-config/app2.conf` → `app3.conf`, change port to 6381, dir to `app3`, password placeholder
-5. Copy `systemd/redis-app2.service` → `redis-app3.service`, update references
-6. On the host, run a variant of `01_deploy_app2.sh` with port 6381 and the App 3 password
+See [`add-app-template/`](./add-app-template/README.md) for a self-contained template.
+The short version:
 
-No changes to App 1 or App 2 are needed.
+1. Copy the Terraform snippet from `add-app-template/terraform/_snippet.tf` into `terraform/main.tf`
+   (or a new `terraform/appN.tf` file) — add the SG rule, password, and outputs for the new app.
+2. `terraform apply`
+3. `terraform output -raw appN_redis_password` to get the password.
+4. Run `add-app-template/scripts/deploy_appN.sh` via SSM with the new port and password.
+5. Run `scripts/02_update_cloudwatch.sh` to register the new log stream.
+6. Run `scripts/03_verify.sh` to confirm isolation.
