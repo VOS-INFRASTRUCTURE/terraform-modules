@@ -195,12 +195,10 @@ variable "tags" {
 variable "environment" {
   description = "Environment name (e.g., 'staging', 'production') - added to default tags"
   type        = string
-  default     = ""
 }
 
 variable "project_id" {
   description = "Project identifier - added to default tags"
   type        = string
-  default     = ""
 }
 

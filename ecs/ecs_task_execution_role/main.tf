@@ -59,7 +59,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_policy" {
 resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
   count = var.enable_secrets_access ? 1 : 0
 
-  name = "${var.env}-ecs-task-execution-secrets-policy"
+  name = "${var.role_name}-etes-policy"
   role = aws_iam_role.ecs_task_execution.id
 
   policy = jsonencode({
