@@ -39,13 +39,6 @@ output "redis" {
       password_set    = var.redis_password != ""
     }
 
-    # Security Group
-    security_group = {
-      id   = aws_security_group.redis[0].id
-      name = aws_security_group.redis[0].name
-      arn  = aws_security_group.redis[0].arn
-    }
-
     # IAM Role
     iam_role = {
       name = aws_iam_role.redis[0].name
