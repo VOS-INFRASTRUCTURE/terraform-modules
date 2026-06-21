@@ -3,7 +3,7 @@
 Redis Insight is Redis's official GUI for exploring, querying, and monitoring Redis
 instances. It runs as a local desktop app or as a Docker container with a browser-based
 UI on port **5540**.
-
+https://redis.io/docs/latest/develop/tools/insight/
 ---
 
 ## What You Can Do With It
