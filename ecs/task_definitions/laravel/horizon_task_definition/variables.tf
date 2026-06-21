@@ -193,23 +193,6 @@ variable "stop_timeout" {
   default     = 120
 }
 
-################################################################################
-# Security
-################################################################################
-
-variable "enable_readonly_root_filesystem" {
-  description = <<-EOT
-    Mount the root filesystem as read-only (Security Hub ECS.8 requirement).
-    When true, ephemeral volumes are mounted at:
-      /tmp            — temporary files
-      /var/run        — pid files
-      /run/supervisor — supervisord socket and state files
-    Ensure your Dockerfile and supervisord.conf only write to these paths.
-    Set to false if a dependency requires writes elsewhere.
-  EOT
-  type        = bool
-  default     = true
-}
 
 ################################################################################
 # Tagging

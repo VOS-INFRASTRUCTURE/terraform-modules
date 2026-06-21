@@ -52,30 +52,12 @@ resource "aws_ecs_task_definition" "task_definition" {
   execution_role_arn = var.execution_role_arn
   task_role_arn      = var.task_role_arn
 
-  # Minimal writable volumes when readonlyRootFilesystem = true.
-  # The scheduler task only needs /tmp for any transient file operations.
-  dynamic "volume" {
-    for_each = var.enable_readonly_root_filesystem ? [
-      { name = "tmp" },
-      { name = "run" },
-    ] : []
-    content {
-      name = volume.value.name
-    }
-  }
 
   container_definitions = jsonencode([
     {
       name      = var.container_name
       image     = "${var.ecr_repository_url}:${var.image_tag}"
       essential = true
-
-      readonlyRootFilesystem = var.enable_readonly_root_filesystem
-
-      mountPoints = var.enable_readonly_root_filesystem ? [
-        { sourceVolume = "tmp", containerPath = "/tmp",     readOnly = false },
-        { sourceVolume = "run", containerPath = "/var/run", readOnly = false },
-      ] : []
 
       # Override the default image entrypoint/cmd to run the scheduler.
       # The task exits when this command returns (success or failure).

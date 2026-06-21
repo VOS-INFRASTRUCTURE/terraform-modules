@@ -133,20 +133,6 @@ variable "log_stream_prefix" {
   default     = "ecs"
 }
 
-################################################################################
-# Security
-################################################################################
-
-variable "enable_readonly_root_filesystem" {
-  description = <<-EOT
-    Mount the root filesystem as read-only (Security Hub ECS.8 requirement).
-    When true, ephemeral volumes are mounted at /tmp and /var/run.
-    The scheduler command itself does not write to disk, so this is safe to enable.
-    Set to false only if an inline scheduled command writes outside /tmp.
-  EOT
-  type        = bool
-  default     = true
-}
 
 ################################################################################
 # Tagging

@@ -215,22 +215,6 @@ variable "php_fpm_health_check_command" {
   default     = "pidof php-fpm > /dev/null || exit 1"
 }
 
-################################################################################
-# Security
-################################################################################
-
-variable "enable_readonly_root_filesystem" {
-  description = <<-EOT
-    Mount the container root filesystem as read-only (Security Hub ECS.8 requirement).
-    When true, ephemeral volumes are mounted at the paths each container needs to write to:
-      nginx:   /tmp, /var/cache/nginx, /var/run
-      php-fpm: /tmp, /var/run
-    Ensure your application only writes to these paths (most Laravel apps do).
-    Set to false only if a dependency writes outside these directories.
-  EOT
-  type        = bool
-  default     = true
-}
 
 ################################################################################
 # Tagging

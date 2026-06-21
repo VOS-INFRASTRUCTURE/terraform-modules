@@ -51,21 +51,6 @@ resource "aws_ecs_task_definition" "task_definition" {
   execution_role_arn = var.execution_role_arn
   task_role_arn      = var.task_role_arn
 
-  # Ephemeral writable volumes when readonlyRootFilesystem = true.
-  # nginx needs /tmp, /var/cache/nginx, /var/run.
-  # php-fpm needs /tmp, /var/run (for pid files and temporary data).
-  dynamic "volume" {
-    for_each = var.enable_readonly_root_filesystem ? [
-      { name = "nginx-tmp"   },
-      { name = "nginx-cache" },
-      { name = "nginx-run"   },
-      { name = "php-tmp"     },
-      { name = "php-run"     },
-    ] : []
-    content {
-      name = volume.value.name
-    }
-  }
 
   container_definitions = jsonencode([
 
@@ -76,14 +61,6 @@ resource "aws_ecs_task_definition" "task_definition" {
       name      = var.container_name_nginx
       image     = var.nginx_image
       essential = true
-
-      readonlyRootFilesystem = var.enable_readonly_root_filesystem
-
-      mountPoints = var.enable_readonly_root_filesystem ? [
-        { sourceVolume = "nginx-tmp",   containerPath = "/tmp",             readOnly = false },
-        { sourceVolume = "nginx-cache", containerPath = "/var/cache/nginx", readOnly = false },
-        { sourceVolume = "nginx-run",   containerPath = "/var/run",         readOnly = false },
-      ] : []
 
       portMappings = [
         {
@@ -131,13 +108,6 @@ resource "aws_ecs_task_definition" "task_definition" {
       name      = var.container_name_php_fpm
       image     = "${var.ecr_repository_url}:${var.image_tag}"
       essential = true
-
-      readonlyRootFilesystem = var.enable_readonly_root_filesystem
-
-      mountPoints = var.enable_readonly_root_filesystem ? [
-        { sourceVolume = "php-tmp", containerPath = "/tmp",     readOnly = false },
-        { sourceVolume = "php-run", containerPath = "/var/run", readOnly = false },
-      ] : []
 
       # No portMappings — php-fpm is only reached by nginx via localhost:9000.
 

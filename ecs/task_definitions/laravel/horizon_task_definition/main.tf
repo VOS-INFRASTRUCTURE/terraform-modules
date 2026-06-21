@@ -60,32 +60,12 @@ resource "aws_ecs_task_definition" "task_definition" {
   execution_role_arn = var.execution_role_arn
   task_role_arn      = var.task_role_arn
 
-  # Writable volumes needed when readonlyRootFilesystem = true.
-  # supervisord writes PID files to /run/supervisor; php-fpm/horizon writes to /tmp.
-  dynamic "volume" {
-    for_each = var.enable_readonly_root_filesystem ? [
-      { name = "tmp"            },
-      { name = "run"            },
-      { name = "supervisor-run" },
-    ] : []
-    content {
-      name = volume.value.name
-    }
-  }
 
   container_definitions = jsonencode([
     {
       name      = var.container_name
       image     = "${var.ecr_repository_url}:${var.image_tag}"
       essential = true
-
-      readonlyRootFilesystem = var.enable_readonly_root_filesystem
-
-      mountPoints = var.enable_readonly_root_filesystem ? [
-        { sourceVolume = "tmp",            containerPath = "/tmp",            readOnly = false },
-        { sourceVolume = "run",            containerPath = "/var/run",        readOnly = false },
-        { sourceVolume = "supervisor-run", containerPath = "/run/supervisor", readOnly = false },
-      ] : []
 
       # No portMappings — Horizon pulls from Redis, no inbound connections.
 
