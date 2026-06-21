@@ -1,0 +1,33 @@
+################################################################################
+# Redis Insight + Nginx Basic Auth (Docker)
+#
+# Usage:
+#   1. Create .env with REDIS_APP1_PASSWORD and REDIS_APP2_PASSWORD
+#   2. Generate nginx/.htpasswd  (see README.md Step 2)
+#   3. docker compose up -d
+#   4. Open http://<host>:5540
+#
+# Redis Insight is NOT exposed directly — all access goes through Nginx.
+################################################################################
+
+services:
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    restart: unless-stopped
+    # 'expose' makes the port available to other containers on redis-net
+    # but does NOT bind it on the host — Nginx is the only public entry point.
+    expose:
+      - "5540:5540"
+    volumes:
+      - redis-insight-data:/data
+    networks:
+      - redis-net
+
+networks:
+  redis-net:
+    driver: bridge
+
+volumes:
+  redis-insight-data:
