@@ -108,7 +108,8 @@ locals {
 
     # Install and configure CloudWatch agent if monitoring enabled
     %{if var.enable_cloudwatch_monitoring || var.enable_cloudwatch_logs}
-    apt-get install -y amazon-cloudwatch-agent
+      wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+      dpkg -i amazon-cloudwatch-agent.deb
 
     cat > /opt/aws/amazon-cloudwatch-agent/etc/cloudwatch-config.json <<'CWCONFIG'
     {
