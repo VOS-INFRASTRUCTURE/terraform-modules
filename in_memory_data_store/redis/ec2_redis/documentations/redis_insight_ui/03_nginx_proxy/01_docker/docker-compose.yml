@@ -12,52 +12,6 @@
 
 services:
 
-  redis-app1:
-    image: redis:8.0-alpine
-    container_name: redis-app1
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-app1-data:/data
-    command: >
-      redis-server
-      --requirepass "${REDIS_APP1_PASSWORD}"
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --save ""
-      --appendonly no
-    networks:
-      - redis-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_APP1_PASSWORD}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  redis-app2:
-    image: redis:8.0-alpine
-    container_name: redis-app2
-    restart: unless-stopped
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis-app2-data:/data
-    command: >
-      redis-server
-      --requirepass "${REDIS_APP2_PASSWORD}"
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --save ""
-      --appendonly no
-    networks:
-      - redis-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_APP2_PASSWORD}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
   redis-insight:
     image: redis/redisinsight:latest
     container_name: redis-insight
@@ -68,11 +22,6 @@ services:
       - "5540"
     volumes:
       - redis-insight-data:/data
-    depends_on:
-      redis-app1:
-        condition: service_healthy
-      redis-app2:
-        condition: service_healthy
     networks:
       - redis-net
 
@@ -81,7 +30,7 @@ services:
     container_name: redis-insight-proxy
     restart: unless-stopped
     ports:
-      - "5540:80"
+      - "8080:80"
     volumes:
       - ./nginx/redis-insight.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
@@ -95,6 +44,4 @@ networks:
     driver: bridge
 
 volumes:
-  redis-app1-data:
-  redis-app2-data:
   redis-insight-data:

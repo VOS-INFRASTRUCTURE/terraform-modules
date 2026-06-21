@@ -68,7 +68,7 @@ REDIS_APP2_PASSWORD=StrongAppTwoPass!
 mkdir -p nginx
 
 docker run --rm httpd:2.4-alpine \
-  htpasswd -nbB admin 'YourStrongUIPassword!' \
+  htpasswd -nbB admin 'luuqhRvqypp4TivQ2wwQARcJvWtBDesA!' \
   > nginx/.htpasswd
 ```
 

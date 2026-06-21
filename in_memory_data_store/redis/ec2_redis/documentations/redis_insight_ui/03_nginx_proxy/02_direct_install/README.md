@@ -1,5 +1,7 @@
 # Redis Insight — Nginx Proxy (Direct Install on EC2)
 
+**NOT Recommended. Better to use docker. It depends a lot on UI environment.**
+
 Redis and Redis Insight both run as native systemd services on the same EC2 instance
 deployed by this Terraform module. Nginx (also installed natively) sits in front of
 Redis Insight and enforces Basic Auth. An Application Load Balancer (ALB) handles
@@ -74,6 +76,10 @@ Redis Insight is distributed as a Linux AppImage. The EC2 instance uses ARM64
 (t4g / r6g), so you need the `arm64` build.
 
 ```bash
+# Required package
+sudo apt update
+sudo apt install -y zlib1g-dev
+
 # Create a dedicated user (no login shell, no home dir)
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin redisinsight
 
@@ -83,7 +89,7 @@ sudo mkdir -p /var/lib/redisinsight
 
 # Download the ARM64 AppImage
 sudo wget -q \
-  https://downloads.redis.io/redis-insight/latest/redisinsight-linux-arm64.AppImage \
+  https://download.redisinsight.redis.com/latest-v3/Redis-Insight-linux-arm64.AppImage \
   -O /opt/redisinsight/redisinsight.AppImage
 
 sudo chmod +x /opt/redisinsight/redisinsight.AppImage
