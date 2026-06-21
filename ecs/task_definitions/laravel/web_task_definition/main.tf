@@ -99,6 +99,12 @@ resource "aws_ecs_task_definition" "task_definition" {
         }
       ]
 
+      # In awsvpc mode all containers in the task share a network namespace,
+      # so php-fpm is always reachable at localhost:9000.
+      environment = [
+        { name = "PHP_FPM_HOST", value = "localhost" }
+      ]
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -118,8 +124,9 @@ resource "aws_ecs_task_definition" "task_definition" {
     },
 
     # ── php-fpm container ────────────────────────────────────────────────────
-    # The Laravel application. Runs php-fpm on port 9000.
-    # nginx health check depends on this container being HEALTHY first.
+    # The Laravel application. Runs php-fpm on TCP port 9000 (no portMappings
+    # needed — nginx reaches it via localhost:9000 in the shared network namespace).
+    # nginx waits for this container to be HEALTHY before starting (dependsOn).
     {
       name      = var.container_name_php_fpm
       image     = "${var.ecr_repository_url}:${var.image_tag}"

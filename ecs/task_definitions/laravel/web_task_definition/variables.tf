@@ -64,12 +64,11 @@ variable "container_name_php_fpm" {
 variable "nginx_image" {
   description = <<-EOT
     Full Docker image URI for the nginx container.
-    In production this should be a custom image in ECR with your nginx.conf baked in.
-    For testing you can use the public 'nginx:alpine' image.
-    Example: "123456789.dkr.ecr.eu-west-2.amazonaws.com/my-nginx:latest"
+    Must be built from Dockerfile.nginx in the application repo — it bakes in the
+    nginx config template and compiled frontend assets (CSS/JS).
+    Example: "123456789.dkr.ecr.eu-west-2.amazonaws.com/my-nginx:abc1234"
   EOT
   type        = string
-  default     = "nginx:alpine"
 }
 
 ################################################################################
