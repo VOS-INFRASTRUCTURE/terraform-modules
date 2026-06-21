@@ -50,6 +50,16 @@ same host. Nginx is the only container that binds a public port. Redis Insight u
 ```
 
 ---
+## Install docker
+```bash
+
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable docker
+sudo systemctl start docker
+
+sudo apt install docker-compose
+```
 
 ## Step 1 — Create the `.env` File
 
