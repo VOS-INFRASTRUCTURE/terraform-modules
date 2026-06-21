@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
     ports:
       - "8080:80"
-      - "19999:19999"
+      - "8081:19999"
     volumes:
       - ./nginx/redis-insight.conf:/etc/nginx/conf.d/redis-insight.conf:ro
       - ./nginx/netdata.conf:/etc/nginx/conf.d/netdata.conf:ro
