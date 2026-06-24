@@ -220,6 +220,115 @@ These are different origins. Cookies from Pool A are invisible to Pool B.
 
 ---
 
+## Shared Pool — How Does ALB Know Which Callback URL to Use?
+
+The ALB constructs the `redirect_uri` dynamically from the **host header of the original request**.
+You registered two callback URLs on the App Client, but the ALB only ever sends one of them
+per request — whichever domain the user came from.
+
+```
+User visits redis-insight.x.com
+──────────────────────────────────────────────────────────────────
+  1. ALB receives request, sees: Host: redis-insight.x.com
+  2. No ALB session cookie → redirect to Cognito, attaching:
+       redirect_uri = https://redis-insight.x.com/oauth2/idpresponse
+  3. Cognito checks: is this redirect_uri in the App Client's allowed list?
+       callback_urls = [
+         "https://redis-insight.x.com/oauth2/idpresponse",  ✓ match
+         "https://netdata.x.com/oauth2/idpresponse",
+       ]
+  4. Cognito proceeds, sends auth code back to redis-insight.x.com/oauth2/idpresponse
+  5. ALB receives the code at that URL, exchanges it for tokens, sets cookie
+
+User visits netdata.x.com
+──────────────────────────────────────────────────────────────────
+  1. ALB receives request, sees: Host: netdata.x.com
+  2. No ALB session cookie → redirect to Cognito, attaching:
+       redirect_uri = https://netdata.x.com/oauth2/idpresponse
+  3. Cognito checks: is this redirect_uri in the App Client's allowed list?
+       callback_urls = [
+         "https://redis-insight.x.com/oauth2/idpresponse",
+         "https://netdata.x.com/oauth2/idpresponse",         ✓ match
+       ]
+  4. Cognito proceeds, sends auth code back to netdata.x.com/oauth2/idpresponse
+  5. ALB sets cookie for netdata.x.com
+```
+
+The two entries in `callback_urls` are not alternatives for the ALB to pick from —
+they are a **whitelist** that Cognito validates against. The ALB always picks the one
+that matches the current domain automatically. Cognito just confirms it is allowed.
+
+If you removed `netdata.x.com/oauth2/idpresponse` from the App Client, the Cognito
+auth for Netdata would fail with an "invalid redirect_uri" error even though
+Redis Insight still works fine.
+
+---
+
+## Different Pools — How Does ALB Know Which Pool to Use?
+
+There is no dynamic lookup. **Each ALB listener rule hard-codes its own pool.**
+
+```hcl
+# Rule 1 — redis-insight: uses Pool A explicitly
+resource "aws_lb_listener_rule" "redis_insight_rule" {
+  action {
+    type = "authenticate-cognito"
+    authenticate_cognito {
+      user_pool_arn       = aws_cognito_user_pool.redis_insight.arn   # Pool A
+      user_pool_client_id = aws_cognito_user_pool_client.redis_insight_alb.id
+      user_pool_domain    = aws_cognito_user_pool_domain.redis_insight.domain
+    }
+  }
+  action { type = "forward" ... }
+}
+
+# Rule 2 — netdata: uses Pool B explicitly
+resource "aws_lb_listener_rule" "netdata_rule" {
+  action {
+    type = "authenticate-cognito"
+    authenticate_cognito {
+      user_pool_arn       = aws_cognito_user_pool.netdata.arn          # Pool B
+      user_pool_client_id = aws_cognito_user_pool_client.netdata_alb.id
+      user_pool_domain    = aws_cognito_user_pool_domain.netdata.domain
+    }
+  }
+  action { type = "forward" ... }
+}
+```
+
+```
+Request: Host: redis-insight.x.com
+  │
+  ▼
+ALB evaluates rules top-down
+  │
+  ├── Rule 1 condition matches (host header = redis-insight.x.com)
+  │   authenticate-cognito block says: use Pool A ARN
+  │   → redirect to Pool A hosted UI
+  │
+  └── Rule 2 never evaluated for this request
+
+Request: Host: netdata.x.com
+  │
+  ▼
+ALB evaluates rules top-down
+  │
+  ├── Rule 1 condition does NOT match
+  │
+  ├── Rule 2 condition matches (host header = netdata.x.com)
+  │   authenticate-cognito block says: use Pool B ARN
+  │   → redirect to Pool B hosted UI
+  │
+  └── Pool A is never contacted
+```
+
+The ALB does not inspect the domain at runtime to decide which pool to use.
+The mapping is compiled into the rules at `terraform apply` time.
+This is why the split-pool design requires two separate Terraform rule blocks —
+there is no "auto-detect pool from domain" feature.
+
+---
+
 ## Decision Guide
 
 ```
