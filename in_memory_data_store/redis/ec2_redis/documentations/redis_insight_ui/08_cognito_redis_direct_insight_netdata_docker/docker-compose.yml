@@ -25,7 +25,7 @@ services:
     container_name: redis-insight
     restart: unless-stopped
     ports:
-      - "5540:5540"
+      - "8080:5540"
     extra_hosts:
       # Allows the container to reach Redis on the EC2 host at localhost:6379.
       # host.docker.internal resolves to the Docker bridge gateway (host IP).
@@ -59,7 +59,7 @@ services:
     # pid: host allows Netdata to see all host processes (for per-process metrics).
     pid: host
     ports:
-      - "19999:19999"
+      - "8081:19999"
     cap_add:
       - SYS_PTRACE
       - SYS_ADMIN
