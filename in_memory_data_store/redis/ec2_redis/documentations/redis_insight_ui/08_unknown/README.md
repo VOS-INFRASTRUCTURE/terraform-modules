@@ -22,9 +22,10 @@ Use this setup when:
 | File | What It Covers |
 |------|---------------|
 | [01_multi_account_overview.md](01_multi_account_overview.md) | Full org diagram — how all accounts relate |
-| [02_identity_center.md](02_identity_center.md) | Management account: Identity Center users and federation |
+| [02_identity_center.md](02_identity_center.md) | Management account: Identity Center users and federation into Cognito |
 | [03_cognito_alb.md](03_cognito_alb.md) | Per-account Cognito setup and ALB authentication action |
 | [04_ec2_stack.md](04_ec2_stack.md) | EC2: Redis direct install + Docker Compose (Redis Insight + Netdata) |
+| [05_saml_group_restriction.md](05_saml_group_restriction.md) | How SAML group attributes travel from Identity Center → Cognito → Lambda to restrict access to specific groups |
 | [docker-compose.yml](docker-compose.yml) | Redis Insight + Netdata stack (Redis on host, not in Docker) |
 
 ---

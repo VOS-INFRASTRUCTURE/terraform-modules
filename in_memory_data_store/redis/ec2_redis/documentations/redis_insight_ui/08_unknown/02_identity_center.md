@@ -217,7 +217,17 @@ Identity Center → Applications → Redis Insight Prod1 → Assign users
 → Add redis-admins group
 ```
 
-Only users in `redis-admins` will be able to log into Redis Insight via Identity Center.
+This controls the **Identity Center federated path only**. When a user who is NOT
+assigned clicks "Login with Identity Center", Identity Center refuses to issue a
+SAML assertion and shows "You don't have access to this application."
+
+Local Cognito users (email + password) bypass Identity Center entirely and can
+always log in — the IC assignment only controls the "Login with Identity Center"
+path. This is by design: local accounts are useful for contractors or service
+accounts that don't have Identity Center access.
+
+For a full breakdown of how both login paths work and where each is enforced,
+see → **[05_saml_group_restriction.md](05_saml_group_restriction.md)**
 
 ---
 
