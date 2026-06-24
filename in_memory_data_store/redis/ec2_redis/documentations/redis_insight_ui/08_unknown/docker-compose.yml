@@ -1,17 +1,21 @@
 ################################################################################
-# Redis Insight + AWS Cognito Auth (Docker)
+# Redis Insight + Netdata (Docker)
+#
+# Redis is NOT in this compose file — it runs as a systemd service directly
+# on the EC2 host. See 04_ec2_stack.md for Redis installation steps.
+#
+# Redis Insight connects to the host-installed Redis via host.docker.internal.
 #
 # Usage:
-#   1. Create .env  (see README.md Step 1)
-#   2. docker compose up -d
-#   3. Open http://<HOST_IP>:5540  — redirects to Cognito login
+#   1. Install Redis on the host   (04_ec2_stack.md Step 3–4)
+#   2. Create .env with REDIS_PASSWORD
+#   3. docker compose up -d
+#   4. Access via ALB  →  https://redis.prod1.company.io
+#      (ALB handles Cognito auth — no auth prompt in the browser)
 #
-# Auth flow:
-#   Browser → oauth2-proxy (5540) → Cognito Hosted UI
-#           → callback → oauth2-proxy sets session cookie
-#           → proxy to Redis Insight (internal)
-#
-# Redis Insight is NOT exposed directly — all access goes through oauth2-proxy.
+# Ports:
+#   5540  — Redis Insight  (ALB target group: insight-tg)
+#   19999 — Netdata        (ALB target group: netdata-tg)
 ################################################################################
 
 services:
@@ -20,61 +24,76 @@ services:
     image: redis/redisinsight:latest
     container_name: redis-insight
     restart: unless-stopped
-    # 'expose' makes the port reachable by other containers on redis-net only.
-    # oauth2-proxy is the only entry point from outside.
-    expose:
-      - "5540"
+    ports:
+      - "5540:5540"
+    extra_hosts:
+      # Allows the container to reach Redis on the EC2 host at localhost:6379.
+      # host.docker.internal resolves to the Docker bridge gateway (host IP).
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Pre-configure the Redis connection so engineers don't need to add it manually.
+      # Redis Insight reads these on first start if no database is already configured.
+      RI_REDIS_HOST: host.docker.internal
+      RI_REDIS_PORT: "6379"
+      RI_REDIS_PASSWORD: "${REDIS_PASSWORD}"
     volumes:
       - redis-insight-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5540/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
-      - redis-net
+      - monitoring-net
 
-  redis-insight-proxy:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.9.0
-    container_name: redis-insight-proxy
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
     restart: unless-stopped
+    # pid: host allows Netdata to see all host processes (for per-process metrics).
+    pid: host
     ports:
-      - "5540:4180"
+      - "19999:19999"
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata-config:/etc/netdata
+      - netdata-lib:/var/lib/netdata
+      - netdata-cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      # ── OIDC / Cognito ────────────────────────────────────────────────────
-      OAUTH2_PROXY_PROVIDER: oidc
-      OAUTH2_PROXY_OIDC_ISSUER_URL: "https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}"
-      OAUTH2_PROXY_CLIENT_ID: "${COGNITO_CLIENT_ID}"
-      OAUTH2_PROXY_CLIENT_SECRET: "${COGNITO_CLIENT_SECRET}"
-
-      # ── Callback & upstream ───────────────────────────────────────────────
-      # Callback URL must exactly match what is registered in the Cognito app client.
-      OAUTH2_PROXY_REDIRECT_URL: "http://${HOST_IP}:5540/oauth2/callback"
-      OAUTH2_PROXY_UPSTREAMS: "http://redis-insight:5540"
-
-      # ── Session cookie ────────────────────────────────────────────────────
-      # Generate with: openssl rand -base64 32
-      OAUTH2_PROXY_COOKIE_SECRET: "${OAUTH2_COOKIE_SECRET}"
-      OAUTH2_PROXY_COOKIE_SECURE: "false"    # set to true when using HTTPS
-      OAUTH2_PROXY_COOKIE_NAME: "_redis_insight_session"
-
-      # ── Token scopes ──────────────────────────────────────────────────────
-      OAUTH2_PROXY_SCOPE: "openid email profile"
-
-      # ── Access control ────────────────────────────────────────────────────
-      # "*" allows any email domain. Restrict to e.g. "yourcompany.com" if needed.
-      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
-
-      # ── Network ───────────────────────────────────────────────────────────
-      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
-
-      # ── Logging ───────────────────────────────────────────────────────────
-      OAUTH2_PROXY_STANDARD_LOGGING: "true"
-      OAUTH2_PROXY_AUTH_LOGGING: "true"
-      OAUTH2_PROXY_REQUEST_LOGGING: "false"   # set true to log every proxied request
-    depends_on:
-      - redis-insight
+      # Disable Netdata Cloud sign-up nag
+      NETDATA_CLAIM_TOKEN: ""
+      NETDATA_CLAIM_ROOMS: ""
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
-      - redis-net
+      - monitoring-net
 
 networks:
-  redis-net:
+  monitoring-net:
     driver: bridge
 
 volumes:
   redis-insight-data:
+  netdata-config:
+  netdata-lib:
+  netdata-cache:
