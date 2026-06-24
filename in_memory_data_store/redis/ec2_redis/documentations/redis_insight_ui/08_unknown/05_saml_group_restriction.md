@@ -146,6 +146,106 @@ the Identity Center login path.
 
 ---
 
+## How Cognito Decides Which Path to Use
+
+Cognito does **not** automatically check local accounts first and then fall back to
+Identity Center, or vice versa. The user explicitly chooses their path by which
+button they click on the login page.
+
+```
+  Cognito Hosted Login Page
+  ┌──────────────────────────────────────────────────────────┐
+  │                                                          │
+  │  Email _______________  Password _______________         │
+  │  [              Log In              ]  ◄── local path   │
+  │                                                          │
+  │  ──────────────────── or ────────────────────────        │
+  │                                                          │
+  │  [ Login with Identity Center ]  ◄── federated path     │
+  │                                                          │
+  └──────────────────────────────────────────────────────────┘
+         │                              │
+         ▼                              ▼
+  Cognito local user pool        Identity Center SAML
+  (checks password only)         (checks IC assignment only)
+  Never touches IC               Never touches local pool
+```
+
+The two paths are completely independent. Cognito does not cross-check them.
+
+---
+
+## What Happens When the Same Email Exists on Both
+
+This is the most common confusion. If alice@company.io has both a local Cognito
+account AND an Identity Center account, Cognito stores them as **two separate records**:
+
+```
+  Cognito User Pool
+  ┌────────────────────────────────────────────────────────────────────┐
+  │                                                                    │
+  │  Record 1 — LOCAL                                                  │
+  │  ┌──────────────────────────────────────────────────────────────┐  │
+  │  │  username:  alice@company.io                                 │  │
+  │  │  email:     alice@company.io                                 │  │
+  │  │  type:      local                                            │  │
+  │  │  password:  (hashed)                                         │  │
+  │  └──────────────────────────────────────────────────────────────┘  │
+  │                                                                    │
+  │  Record 2 — FEDERATED (created on first IC login)                  │
+  │  ┌──────────────────────────────────────────────────────────────┐  │
+  │  │  username:  IdentityCenter_a3f7c2b1-...  ← Cognito generates │  │
+  │  │  email:     alice@company.io             ← same email        │  │
+  │  │  type:      federated / SAML             ← different type    │  │
+  │  │  password:  none                                             │  │
+  │  └──────────────────────────────────────────────────────────────┘  │
+  │                                                                    │
+  │  These are TWO separate identities in Cognito's eyes.             │
+  │  Same email, different records, different sessions.               │
+  └────────────────────────────────────────────────────────────────────┘
+```
+
+**What this means in practice:**
+
+- Alice uses the email+password form → gets a local session (Record 1)
+- Alice uses the IC button → gets a federated session (Record 2)
+- Both sessions are valid at the same time in different browser tabs
+- Redis Insight cannot tell them apart — both have the same email attribute
+
+This is usually fine for Redis Insight access since both paths allow access.
+The only concern is if you care about a single unified profile per person.
+
+---
+
+## Account Linking (Optional — Single Identity Per Person)
+
+If you want both paths to resolve to the **same Cognito identity**, you use
+Cognito's account linking feature. This merges the federated record into the
+local record so alice always has one profile regardless of how she logged in.
+
+```
+  Without linking:                With linking:
+  ┌────────────────────┐          ┌────────────────────────────────────┐
+  │  local record      │          │  local record (primary)            │
+  │  alice@company.io  │          │  alice@company.io                  │
+  │                    │          │  linked providers:                 │
+  │  federated record  │          │    ├─ local (email+password)       │
+  │  IdentityCenter_.. │  ────►   │    └─ IdentityCenter_a3f7c2..     │
+  └────────────────────┘          │                                    │
+  2 separate records              │  ONE record, two login methods     │
+                                  └────────────────────────────────────┘
+```
+
+Account linking is done via a **Pre-SignUp Lambda trigger** that fires the first
+time a federated user authenticates. The Lambda calls `adminLinkProviderForUser`
+to merge the new federated identity into the existing local record.
+
+For Redis Insight access this is optional — both separate records work fine.
+Linking is useful if you have per-user preferences or bookmarks stored in the
+Cognito profile that you want shared across both login methods.
+
+---
+
 ## When Would You Actually Need a Lambda?
 
 Only if you want Cognito to enforce group restrictions on **local users** as well —
