@@ -194,7 +194,7 @@ output "redis_insight_cognito" {
 - [ ] **2.3** — Note the outputs
 
   ```bash
-  terraform output redis_insight_cognito
+  terraform output redis_management_cognito
   ```
 
   You need the `acs_url` and `audience_uri` values for the next phase.
@@ -250,9 +250,9 @@ to add `authenticate-cognito` before the `forward` action.
       type  = "authenticate-cognito"
       order = 1
       authenticate_cognito {
-        user_pool_arn       = aws_cognito_user_pool.redis_insight.arn
-        user_pool_client_id = aws_cognito_user_pool_client.redis_insight_alb.id
-        user_pool_domain    = aws_cognito_user_pool_domain.redis_insight.domain
+        user_pool_arn       = aws_cognito_user_pool.redis_management.arn
+        user_pool_client_id = aws_cognito_user_pool_client.redis_management_alb.id
+        user_pool_domain    = aws_cognito_user_pool_domain.redis_management.domain
         on_unauthenticated_request = "authenticate"
         session_cookie_name        = "AWSELBAuthSession"
         session_timeout            = 86400  # 24 hours
@@ -286,9 +286,9 @@ to add `authenticate-cognito` before the `forward` action.
       type  = "authenticate-cognito"
       order = 1
       authenticate_cognito {
-        user_pool_arn       = aws_cognito_user_pool.redis_insight.arn
-        user_pool_client_id = aws_cognito_user_pool_client.redis_insight_alb.id
-        user_pool_domain    = aws_cognito_user_pool_domain.redis_insight.domain
+        user_pool_arn       = aws_cognito_user_pool.redis_management.arn
+        user_pool_client_id = aws_cognito_user_pool_client.redis_management_alb.id
+        user_pool_domain    = aws_cognito_user_pool_domain.redis_management.domain
         on_unauthenticated_request = "authenticate"
         session_cookie_name        = "AWSELBAuthSession"
         session_timeout            = 86400
