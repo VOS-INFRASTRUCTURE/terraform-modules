@@ -1,13 +1,17 @@
 ################################################################################
-# Redis Insight + Nginx Basic Auth (Docker)
+# Redis Insight + AWS Cognito Auth (Docker)
 #
 # Usage:
-#   1. Create .env with REDIS_APP1_PASSWORD and REDIS_APP2_PASSWORD
-#   2. Generate nginx/.htpasswd  (see README.md Step 2)
-#   3. docker compose up -d
-#   4. Open http://<host>:5540
+#   1. Create .env  (see README.md Step 1)
+#   2. docker compose up -d
+#   3. Open http://<HOST_IP>:5540  — redirects to Cognito login
 #
-# Redis Insight is NOT exposed directly — all access goes through Nginx.
+# Auth flow:
+#   Browser → oauth2-proxy (5540) → Cognito Hosted UI
+#           → callback → oauth2-proxy sets session cookie
+#           → proxy to Redis Insight (internal)
+#
+# Redis Insight is NOT exposed directly — all access goes through oauth2-proxy.
 ################################################################################
 
 services:
@@ -16,12 +20,55 @@ services:
     image: redis/redisinsight:latest
     container_name: redis-insight
     restart: unless-stopped
-    # 'expose' makes the port available to other containers on redis-net
-    # but does NOT bind it on the host — Nginx is the only public entry point.
+    # 'expose' makes the port reachable by other containers on redis-net only.
+    # oauth2-proxy is the only entry point from outside.
     expose:
-      - "5540:5540"
+      - "5540"
     volumes:
       - redis-insight-data:/data
+    networks:
+      - redis-net
+
+  redis-insight-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.9.0
+    container_name: redis-insight-proxy
+    restart: unless-stopped
+    ports:
+      - "5540:4180"
+    environment:
+      # ── OIDC / Cognito ────────────────────────────────────────────────────
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}"
+      OAUTH2_PROXY_CLIENT_ID: "${COGNITO_CLIENT_ID}"
+      OAUTH2_PROXY_CLIENT_SECRET: "${COGNITO_CLIENT_SECRET}"
+
+      # ── Callback & upstream ───────────────────────────────────────────────
+      # Callback URL must exactly match what is registered in the Cognito app client.
+      OAUTH2_PROXY_REDIRECT_URL: "http://${HOST_IP}:5540/oauth2/callback"
+      OAUTH2_PROXY_UPSTREAMS: "http://redis-insight:5540"
+
+      # ── Session cookie ────────────────────────────────────────────────────
+      # Generate with: openssl rand -base64 32
+      OAUTH2_PROXY_COOKIE_SECRET: "${OAUTH2_COOKIE_SECRET}"
+      OAUTH2_PROXY_COOKIE_SECURE: "false"    # set to true when using HTTPS
+      OAUTH2_PROXY_COOKIE_NAME: "_redis_insight_session"
+
+      # ── Token scopes ──────────────────────────────────────────────────────
+      OAUTH2_PROXY_SCOPE: "openid email profile"
+
+      # ── Access control ────────────────────────────────────────────────────
+      # "*" allows any email domain. Restrict to e.g. "yourcompany.com" if needed.
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+
+      # ── Network ───────────────────────────────────────────────────────────
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+
+      # ── Logging ───────────────────────────────────────────────────────────
+      OAUTH2_PROXY_STANDARD_LOGGING: "true"
+      OAUTH2_PROXY_AUTH_LOGGING: "true"
+      OAUTH2_PROXY_REQUEST_LOGGING: "false"   # set true to log every proxied request
+    depends_on:
+      - redis-insight
     networks:
       - redis-net
 
