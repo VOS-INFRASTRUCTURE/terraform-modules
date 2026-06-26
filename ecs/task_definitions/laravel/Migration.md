@@ -1,6 +1,12 @@
 - Redis App
     - Ensure redis is setup on AWS and running
     - Ensure monitoring and dashboard are setup and running
+    - Create Application for this Account on the IC
+        - Name: Redis Management Staging Cerpac Cognito
+        - Description: Protects Redis Insight & Netdata on the aws account  SAML 2.0 application
+        - Copy its metadata and use on your icognitor terraform configuration
+    -   Add the domains to the identity centers
+
 
 - Laravel App
     - Ensure ENVS are set and ENV examples are structured and updated

@@ -55,3 +55,15 @@ Use this setup when:
 ```
 
 Start with [01_multi_account_overview.md](01_multi_account_overview.md).
+
+---
+## Install docker
+```bash
+
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable docker
+sudo systemctl start docker
+
+sudo apt install docker-compose
+```
