@@ -34,3 +34,5 @@
     - Create Horizon Service
     - Create Scheduler EventBridge
     - Create AutoScaling
+    
+    - Fill up the parameters in secret managers
