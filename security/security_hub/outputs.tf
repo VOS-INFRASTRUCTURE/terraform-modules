@@ -18,7 +18,7 @@ output "security_hub" {
     # ──────────────────────────────────────────────────────────────────────
     hub = var.enable_security_hub ? {
       account_id = data.aws_caller_identity.current.account_id
-      region     = data.aws_region.current.name
+      region     = data.aws_region.current.region
       enabled    = true
 
       # Standards subscribed (only shows enabled standards)

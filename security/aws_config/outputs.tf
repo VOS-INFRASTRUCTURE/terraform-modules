@@ -75,7 +75,7 @@ output "config" {
     # ──────────────────────────────────────────────────────────────────────
     account = {
       account_id = data.aws_caller_identity.current.account_id # AWS account ID
-      region     = data.aws_region.current.name                # AWS region
+      region     = data.aws_region.current.region                # AWS region
     }
 
     # ──────────────────────────────────────────────────────────────────────

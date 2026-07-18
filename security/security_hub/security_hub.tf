@@ -56,7 +56,7 @@ resource "aws_securityhub_standards_subscription" "aws_foundational" {
 
   # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::standards/aws-foundational-security-best-practices/v/1.0.0
-  standards_arn = "arn:aws:securityhub:${data.aws_region.current.name}::standards/aws-foundational-security-best-practices/v/1.0.0"
+  standards_arn = "arn:aws:securityhub:${data.aws_region.current.region}::standards/aws-foundational-security-best-practices/v/1.0.0"
 }
 
 # CIS AWS Foundations Benchmark v5.0.0
@@ -65,7 +65,7 @@ resource "aws_securityhub_standards_subscription" "cis_v500" {
 
   # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::standards/cis-aws-foundations-benchmark/v/5.0.0
-  standards_arn = "arn:aws:securityhub:${data.aws_region.current.name}::standards/cis-aws-foundations-benchmark/v/5.0.0"
+  standards_arn = "arn:aws:securityhub:${data.aws_region.current.region}::standards/cis-aws-foundations-benchmark/v/5.0.0"
 }
 
 # AWS Resource Tagging Standard v1.0.0
@@ -74,7 +74,7 @@ resource "aws_securityhub_standards_subscription" "resource_tagging" {
 
   # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::standards/aws-resource-tagging-standard/v/1.0.0
-  standards_arn = "arn:aws:securityhub:${data.aws_region.current.name}::standards/aws-resource-tagging-standard/v/1.0.0"
+  standards_arn = "arn:aws:securityhub:${data.aws_region.current.region}::standards/aws-resource-tagging-standard/v/1.0.0"
 }
 
 ################################################################################
@@ -88,5 +88,5 @@ resource "aws_securityhub_product_subscription" "guardduty" {
 
   # Security Hub must be enabled manually before this works
   # arn:aws:securityhub:<region>::product/aws/guardduty
-  product_arn = "arn:aws:securityhub:${data.aws_region.current.name}::product/aws/guardduty"
+  product_arn = "arn:aws:securityhub:${data.aws_region.current.region}::product/aws/guardduty"
 }

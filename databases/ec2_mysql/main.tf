@@ -52,7 +52,10 @@ resource "aws_instance" "mysql_ec2" {
   # Note: Even if instance is terminated, EBS snapshots persist independently
   disable_api_termination = var.enable_termination_protection
 
-  user_data = base64encode(local.user_data)
+  # User data - Terraform automatically base64 encodes this
+  # For large scripts, we use user_data_replace_on_change to avoid the 16KB limit
+  user_data                   = local.user_data
+  user_data_replace_on_change = false # Don't replace instance if user_data changes
 
   metadata_options {
     http_endpoint               = "enabled"

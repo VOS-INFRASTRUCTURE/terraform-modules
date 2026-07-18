@@ -25,7 +25,7 @@
 resource "aws_ssm_service_setting" "block_public_sharing" {
   count = var.enable_ssm_public_sharing_block ? 1 : 0
 
-  setting_id    = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:servicesetting/ssm/documents/console/public-sharing-permission"
+  setting_id    = "arn:aws:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:servicesetting/ssm/documents/console/public-sharing-permission"
   setting_value = "Disable"
 }
 #

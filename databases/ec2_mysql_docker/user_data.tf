@@ -149,13 +149,13 @@ fi
 echo "Retrieving MySQL passwords from Secrets Manager..."
 MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 
 MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 
@@ -187,13 +187,13 @@ docker rm mysql-server 2>/dev/null || true
 # Retrieve secrets from Secrets Manager
 MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 
 MYSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.mysql_user_password.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 
@@ -236,7 +236,7 @@ echo "Starting MySQL backup at $(date)"
 # Get root password from Secrets Manager
 MYSQL_ROOT_PASSWORD=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.mysql_root_password.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 

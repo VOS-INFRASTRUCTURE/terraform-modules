@@ -147,9 +147,9 @@ output "s3_interface_endpoint" {
     }
     # Usage instructions
     usage = {
-      aws_cli_example   = "aws s3 ls s3://your-bucket/ --region ${data.aws_region.current.name}"
+      aws_cli_example   = "aws s3 ls s3://your-bucket/ --region ${data.aws_region.current.region}"
       python_example    = "boto3.client('s3').list_objects_v2(Bucket='your-bucket')"
-      dns_note          = "Private DNS enabled - s3.${data.aws_region.current.name}.amazonaws.com resolves to endpoint private IP"
+      dns_note          = "Private DNS enabled - s3.${data.aws_region.current.region}.amazonaws.com resolves to endpoint private IP"
       requirements      = [
         "Resource must be in VPC with subnets connected to this endpoint",
         "Resource security group must allow outbound HTTPS (443)",

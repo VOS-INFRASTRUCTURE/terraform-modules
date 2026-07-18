@@ -30,7 +30,7 @@ data "aws_caller_identity" "current" {
 }
 
 locals {
-  region     = var.aws_region != "" ? var.aws_region : data.aws_region.current[0].name
+  region     = var.aws_region != "" ? var.aws_region : data.aws_region.current[0].region
   account_id = var.aws_account_id != "" ? var.aws_account_id : data.aws_caller_identity.current[0].account_id
 }
 

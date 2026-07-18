@@ -61,10 +61,10 @@ output "ecr_endpoints" {
 
     # Usage instructions
     usage = {
-      docker_pull_example     = "docker pull {account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/{repo}:{tag}"
-      ecr_login_example       = "aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin {account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"
-      list_images_example     = "aws ecr list-images --repository-name {repo} --region ${data.aws_region.current.name}"
-      ecs_image_format        = "{account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/{repo}:{tag}"
+      docker_pull_example     = "docker pull {account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com/{repo}:{tag}"
+      ecr_login_example       = "aws ecr get-login-password --region ${data.aws_region.current.region} | docker login --username AWS --password-stdin {account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com"
+      list_images_example     = "aws ecr list-images --repository-name {repo} --region ${data.aws_region.current.region}"
+      ecs_image_format        = "{account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com/{repo}:{tag}"
       requirements = [
         "Resource must be in same VPC as endpoint",
         "Resource security group must allow outbound HTTPS (443) to VPC CIDR",

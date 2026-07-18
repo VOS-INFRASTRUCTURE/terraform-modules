@@ -83,9 +83,9 @@
 locals {
   # ECR service names for the current region
   # AWS-managed service endpoints following standard naming pattern
-  ecr_api_service_name = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
-  ecr_dkr_service_name = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
-  s3_service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  ecr_api_service_name = "com.amazonaws.${data.aws_region.current.region}.ecr.api"
+  ecr_dkr_service_name = "com.amazonaws.${data.aws_region.current.region}.ecr.dkr"
+  s3_service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
 
   # VPC ID discovered from provided subnet
   vpc_id = data.aws_subnet.any_subnet.vpc_id

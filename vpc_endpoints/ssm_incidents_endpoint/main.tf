@@ -95,7 +95,7 @@
 locals {
   # SSM Incidents service name for the current region
   # AWS-managed service endpoint following standard naming pattern
-  ssm_incidents_service_name = "com.amazonaws.${data.aws_region.current.name}.ssm-incidents"
+  ssm_incidents_service_name = "com.amazonaws.${data.aws_region.current.region}.ssm-incidents"
 
   # VPC ID discovered from provided subnet
   # Only computed when endpoint is enabled to avoid unnecessary data lookups

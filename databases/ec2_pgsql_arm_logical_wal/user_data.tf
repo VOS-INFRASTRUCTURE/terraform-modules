@@ -32,7 +32,7 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/aws.zi
 unzip -q /tmp/aws.zip -d /tmp && /tmp/aws/install && rm -rf /tmp/aws*
 
 # Get PostgreSQL postgres password
-POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} --region ${data.aws_region.current.name} --query SecretString --output text)
+POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} --region ${data.aws_region.current.region} --query SecretString --output text)
 
 # Stop PostgreSQL
 systemctl stop postgresql
@@ -71,7 +71,7 @@ sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$POSTGRES_PASSWORD'
 sudo -u postgres psql -c "CREATE DATABASE ${var.pgsql_database};"
 
 # Create application user
-PGSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.name} --region ${data.aws_region.current.name} --query SecretString --output text)
+PGSQL_USER_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.pgsql_user_password.name} --region ${data.aws_region.current.region} --query SecretString --output text)
 sudo -u postgres psql -c "CREATE USER ${var.pgsql_user} WITH PASSWORD '$PGSQL_USER_PASSWORD';"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${var.pgsql_database} TO ${var.pgsql_user};"
 sudo -u postgres psql -d ${var.pgsql_database} -c "GRANT ALL ON SCHEMA public TO ${var.pgsql_user};"
@@ -103,7 +103,7 @@ TIME=$(date +"%H%M%S")
 # Get Postgres password from AWS Secrets Manager
 POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value \
     --secret-id ${aws_secretsmanager_secret.pgsql_postgres_password.name} \
-    --region ${data.aws_region.current.name} \
+    --region ${data.aws_region.current.region} \
     --query SecretString --output text)
 
 export PGPASSWORD="$POSTGRES_PASSWORD"

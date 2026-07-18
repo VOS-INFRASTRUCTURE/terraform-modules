@@ -61,9 +61,9 @@
 locals {
   # Session Manager service names for the current region
   # These are AWS-managed service endpoints that follow a standard naming pattern
-  ssm_service_name         = "com.amazonaws.${data.aws_region.current.name}.ssm"
-  ssmmessages_service_name = "com.amazonaws.${data.aws_region.current.name}.ssmmessages"
-  ec2messages_service_name = "com.amazonaws.${data.aws_region.current.name}.ec2messages"
+  ssm_service_name         = "com.amazonaws.${data.aws_region.current.region}.ssm"
+  ssmmessages_service_name = "com.amazonaws.${data.aws_region.current.region}.ssmmessages"
+  ec2messages_service_name = "com.amazonaws.${data.aws_region.current.region}.ec2messages"
   # VPC ID discovered from provided subnet
   # Only computed when endpoints are enabled to avoid unnecessary data lookups
   ssm_vpc_id = var.enable_session_manager_endpoints ? data.aws_subnet.any_subnet.vpc_id : ""

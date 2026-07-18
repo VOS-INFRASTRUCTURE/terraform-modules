@@ -34,7 +34,7 @@ output "ssm_incidents_endpoint" {
 
     # Usage instructions
     usage = {
-      aws_cli_example = "aws ssm-incidents list-incident-records --region ${data.aws_region.current.name}"
+      aws_cli_example = "aws ssm-incidents list-incident-records --region ${data.aws_region.current.region}"
       python_example  = "boto3.client('ssm-incidents').list_incident_records()"
       nodejs_example  = "new AWS.SSMIncidents().listIncidentRecords({}).promise()"
       requirements = [

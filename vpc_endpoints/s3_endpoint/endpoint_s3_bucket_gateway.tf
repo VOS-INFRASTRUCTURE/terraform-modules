@@ -111,7 +111,7 @@ output "s3_gateway_endpoint" {
     }
     # Usage instructions
     usage = {
-      aws_cli_example    = "aws s3 ls s3://your-bucket/ --region ${data.aws_region.current.name}"
+      aws_cli_example    = "aws s3 ls s3://your-bucket/ --region ${data.aws_region.current.region}"
       python_example     = "boto3.client('s3').list_objects_v2(Bucket='your-bucket')"
       terraform_example  = "aws_s3_bucket.example.id"
       requirements       = [

@@ -119,7 +119,7 @@ fi
 echo "Retrieving Qdrant API key from Secrets Manager..."
 QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.qdrant_api_key.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 
@@ -231,7 +231,7 @@ SNAPSHOT_DIR="/var/lib/qdrant/snapshots"
 # Get API key from Secrets Manager
 QDRANT_API_KEY=$(aws secretsmanager get-secret-value \
   --secret-id ${aws_secretsmanager_secret.qdrant_api_key.name} \
-  --region ${data.aws_region.current.name} \
+  --region ${data.aws_region.current.region} \
   --query SecretString \
   --output text)
 

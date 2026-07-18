@@ -31,7 +31,7 @@
 ################################################################################
 locals {
   # S3 service name for the current region
-  s3_service_name = "com.amazonaws.${data.aws_region.current.name}.s3"
+  s3_service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
   # VPC CIDR block for endpoint security group egress rules
   vpc_cidr_block = data.aws_vpc.target_vpc.cidr_block
   # Determine which endpoint types to create

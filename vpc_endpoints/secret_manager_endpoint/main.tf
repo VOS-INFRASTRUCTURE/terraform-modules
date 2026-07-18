@@ -62,7 +62,7 @@
 locals {
   # Secrets Manager service name for the current region
   # AWS-managed service endpoint following standard naming pattern
-  secretsmanager_service_name = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
+  secretsmanager_service_name = "com.amazonaws.${data.aws_region.current.region}.secretsmanager"
   # VPC ID discovered from provided subnet
   # Only computed when endpoint is enabled to avoid unnecessary data lookups
   secretsmanager_vpc_id = var.enable_secretsmanager_endpoint ? data.aws_subnet.any_subnet.vpc_id : ""

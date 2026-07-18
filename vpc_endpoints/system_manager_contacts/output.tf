@@ -34,7 +34,7 @@ output "ssm_contacts_endpoint" {
 
     # Usage instructions
     usage = {
-      aws_cli_example = "aws ssm-contacts list-contacts --region ${data.aws_region.current.name}"
+      aws_cli_example = "aws ssm-contacts list-contacts --region ${data.aws_region.current.region}"
       python_example  = "boto3.client('ssm-contacts').list_contacts()"
       nodejs_example  = "new AWS.SSMContacts().listContacts({}).promise()"
       requirements = [

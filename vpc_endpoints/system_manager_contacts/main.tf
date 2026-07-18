@@ -79,7 +79,7 @@
 locals {
   # SSM Contacts service name for the current region
   # AWS-managed service endpoint following standard naming pattern
-  ssm_contacts_service_name = "com.amazonaws.${data.aws_region.current.name}.ssm-contacts"
+  ssm_contacts_service_name = "com.amazonaws.${data.aws_region.current.region}.ssm-contacts"
 
   # VPC ID discovered from provided subnet
   # Only computed when endpoint is enabled to avoid unnecessary data lookups
