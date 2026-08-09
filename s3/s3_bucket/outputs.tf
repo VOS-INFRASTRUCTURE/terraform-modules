@@ -6,5 +6,4 @@ output "bucket_details" {
     region      = var.region
     full_url    = "https://${aws_s3_bucket.bucket.bucket}.s3.${var.region}.amazonaws.com"
   }
-  sensitive = true
 }
