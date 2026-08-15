@@ -66,7 +66,7 @@ variable "security_alerts_sns_topic_arn" {
 ################################################################################
 
 variable "enable_cloudtrail_infra_alarms" {
-  description = "Enable infrastructure change detection alarms (security groups, VPC changes, S3 bucket policy changes). Requires security_alerts_sns_topic_arn to be set."
+  description = "Enable infrastructure change detection alarms (security groups, NACL, network gateway, route table, VPC, and S3 bucket policy changes - CIS 4.8/4.10/4.11/4.12/4.13/4.14, Security Hub CloudWatch.8/10/11/12/13/14). Requires security_alerts_sns_topic_arn to be set."
   type        = bool
   default     = true
 }
@@ -76,7 +76,7 @@ variable "enable_cloudtrail_infra_alarms" {
 ################################################################################
 
 variable "enable_cloudtrail_security_alarms" {
-  description = "Enable CloudTrail security metric filters and alarms for CIS benchmark compliance (unauthorized API calls, root usage, MFA, IAM changes, CloudTrail changes). Requires security_alerts_sns_topic_arn to be set."
+  description = "Enable CloudTrail security metric filters and alarms for CIS benchmark compliance (unauthorized API calls, root usage, console MFA/auth failures, IAM policy changes, CloudTrail changes, CMK disable/deletion, AWS Config changes - CIS 4.1/4.3/4.4/4.5/4.6/4.7/4.9, Security Hub CloudWatch.1-7/9). Requires security_alerts_sns_topic_arn to be set."
   type        = bool
   default     = true
 }

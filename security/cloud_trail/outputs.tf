@@ -66,14 +66,17 @@ output "cloudtrail" {
       sns_topic_arn = var.security_alerts_sns_topic_arn != "" ? var.security_alerts_sns_topic_arn : null
 
       security = var.enable_alarms && var.enable_cloudtrail_security_alarms ? {
-        count = 5  # Number of security alarms configured
+        count = 8  # Number of security alarms configured (CIS/Security Hub CloudWatch.1,2,3,4,5,6,7,9)
 
         alarms = {
-          unauthorized_api_calls = aws_cloudwatch_metric_alarm.unauthorized_api_calls[0].alarm_name
-          root_account_usage     = aws_cloudwatch_metric_alarm.root_account_usage[0].alarm_name
-          console_login_no_mfa   = aws_cloudwatch_metric_alarm.console_login_no_mfa[0].alarm_name
-          iam_policy_changes     = aws_cloudwatch_metric_alarm.iam_policy_changes[0].alarm_name
-          cloudtrail_changes     = aws_cloudwatch_metric_alarm.cloudtrail_changes[0].alarm_name
+          unauthorized_api_calls  = aws_cloudwatch_metric_alarm.unauthorized_api_calls[0].alarm_name
+          root_account_usage      = aws_cloudwatch_metric_alarm.root_account_usage[0].alarm_name
+          console_login_no_mfa    = aws_cloudwatch_metric_alarm.console_login_no_mfa[0].alarm_name
+          iam_policy_changes      = aws_cloudwatch_metric_alarm.iam_policy_changes[0].alarm_name
+          cloudtrail_changes      = aws_cloudwatch_metric_alarm.cloudtrail_changes[0].alarm_name
+          console_auth_failures   = aws_cloudwatch_metric_alarm.console_auth_failures[0].alarm_name
+          cmk_disable_or_deletion = aws_cloudwatch_metric_alarm.cmk_disable_or_deletion[0].alarm_name
+          aws_config_changes      = aws_cloudwatch_metric_alarm.aws_config_changes[0].alarm_name
         }
 
         metrics_namespace = "${upper(var.project_id)}/Security"
@@ -81,12 +84,15 @@ output "cloudtrail" {
 
       # Infrastructure change alarms
       infrastructure = var.enable_alarms && var.enable_cloudtrail_infra_alarms ? {
-        count = 3  # Number of infrastructure alarms configured
+        count = 6  # Number of infrastructure alarms configured (CIS/Security Hub CloudWatch.8,10,11,12,13,14)
 
         alarms = {
-          security_group_changes = aws_cloudwatch_metric_alarm.security_group_changes[0].alarm_name
-          vpc_changes            = aws_cloudwatch_metric_alarm.vpc_changes[0].alarm_name
-          s3_policy_changes      = aws_cloudwatch_metric_alarm.s3_policy_changes[0].alarm_name
+          security_group_changes  = aws_cloudwatch_metric_alarm.security_group_changes[0].alarm_name
+          network_acl_changes     = aws_cloudwatch_metric_alarm.network_acl_changes[0].alarm_name
+          network_gateway_changes = aws_cloudwatch_metric_alarm.network_gateway_changes[0].alarm_name
+          route_table_changes     = aws_cloudwatch_metric_alarm.route_table_changes[0].alarm_name
+          vpc_changes             = aws_cloudwatch_metric_alarm.vpc_changes[0].alarm_name
+          s3_policy_changes       = aws_cloudwatch_metric_alarm.s3_policy_changes[0].alarm_name
         }
 
         metrics_namespace = "${upper(var.project_id)}/Infra"
@@ -117,8 +123,8 @@ output "cloudtrail" {
       force_destroy      = var.force_destroy                 # Bucket force destroy setting
 
       total_alarms                   = (
-      (var.enable_cloudtrail_security_alarms ? 5 : 0) +
-      (var.enable_cloudtrail_infra_alarms ? 3 : 0)
+      (var.enable_cloudtrail_security_alarms ? 8 : 0) +
+      (var.enable_cloudtrail_infra_alarms ? 6 : 0)
       )
     }
   }
