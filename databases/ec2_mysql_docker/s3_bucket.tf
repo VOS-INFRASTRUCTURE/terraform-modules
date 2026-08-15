@@ -102,9 +102,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "mysql_backups" {
     id     = "delete-old-backups"
     status = "Enabled"
 
-    filter {
-      prefix = "mysql-backups/"
-    }
+    filter {}
 
     expiration {
       days = var.backup_retention_days
