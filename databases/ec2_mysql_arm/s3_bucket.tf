@@ -109,13 +109,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "mysql_backups" {
   bucket = aws_s3_bucket.mysql_backups[0].id
 
   # Rule 1: Delete old backup files after retention period
+  # No prefix filter: backups are uploaded to date-based prefixes (e.g. 2026-08-14/),
+  # not "mysql-backups/", so this rule must apply bucket-wide to actually match them.
   rule {
     id     = "delete-old-backups"
     status = "Enabled"
 
-    filter {
-      prefix = "mysql-backups/"
-    }
+    filter {}
 
     expiration {
       days = var.backup_retention_days
