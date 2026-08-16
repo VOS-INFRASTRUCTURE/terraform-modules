@@ -30,12 +30,15 @@
 # ❌ Configure Security Hub capabilities (Essential, Threat Analytics, etc.)
 # ❌ Configure cross-region aggregation
 #
+# Important: enable Security Hub without default standards. Default subscriptions
+# can re-add legacy standards such as CIS AWS Foundations Benchmark v1.2.0,
+# while this module intentionally manages only the explicit standards below.
+#
 # To check if Security Hub is enabled:
 #   aws securityhub describe-hub --region <your-region>
 #
 # To enable via AWS CLI (if you prefer):
 #   aws securityhub enable-security-hub \
-#     --enable-default-standards \
 #     --region <your-region>
 ################################################################################
 

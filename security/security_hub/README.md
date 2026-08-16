@@ -42,6 +42,8 @@ security_hub/
 
 **Before using this module**, you MUST manually enable Security Hub in your AWS account:
 
+Do not enable default standards during this step. This module manages standards subscriptions explicitly, and AWS defaults can add legacy subscriptions such as CIS AWS Foundations Benchmark v1.2.0.
+
 #### Steps to Enable Security Hub:
 
 1. **Go to AWS Console** → Security Hub
@@ -56,9 +58,9 @@ security_hub/
 #### Alternative: Enable via AWS CLI
 
 ```bash
-# Enable Security Hub with default standards
+# Enable Security Hub without default standards.
+# Terraform will subscribe only the standards declared by this module.
 aws securityhub enable-security-hub \
-  --enable-default-standards \
   --region <your-region>
 
 # Verify Security Hub is enabled
