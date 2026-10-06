@@ -104,7 +104,7 @@ resource "aws_ecs_task_definition" "task_definition" {
     # The Laravel application. Runs php-fpm on TCP port 9000 (no portMappings
     # needed — nginx reaches it via localhost:9000 in the shared network namespace).
     # nginx waits for this container to be HEALTHY before starting (dependsOn).
-    {
+    merge({
       name      = var.container_name_php_fpm
       image     = "${var.ecr_repository_url}:${var.image_tag}"
       essential = true
@@ -134,7 +134,10 @@ resource "aws_ecs_task_definition" "task_definition" {
         retries     = var.health_check_retries
         startPeriod = var.health_check_start_period
       }
-    }
+      },
+      # Only emitted when set, so existing consumers render unchanged JSON.
+      length(var.environment_files) > 0 ? { environmentFiles = var.environment_files } : {}
+    )
   ])
 
   # Prevents Terraform from reverting image tags that CI/CD has updated.

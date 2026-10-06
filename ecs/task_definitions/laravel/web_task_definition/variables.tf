@@ -137,6 +137,26 @@ variable "environment_variables" {
   default = []
 }
 
+variable "environment_files" {
+  description = <<-EOT
+    S3-hosted .env files loaded into the php-fpm container at startup.
+    Format: [{ type = "s3", value = "arn:aws:s3:::my-config-bucket/app.env" }]
+    The execution role needs s3:GetObject on the object and
+    s3:GetBucketLocation on the bucket. Values in `secrets` and
+    `environment_variables` take precedence over values from these files.
+  EOT
+  type = list(object({
+    type  = string
+    value = string
+  }))
+  default = []
+
+  validation {
+    condition     = length(var.environment_files) <= 10
+    error_message = "ECS allows at most 10 environment files per container."
+  }
+}
+
 ################################################################################
 # Logging
 ################################################################################
