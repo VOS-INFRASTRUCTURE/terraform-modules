@@ -21,7 +21,7 @@
 ################################################################################
 
 locals {
-  instance_name = "${var.project_id}-${var.env}-${var.base_name}"
+  instance_name = coalesce(var.name, "${var.project_id}-${var.env}-${var.base_name}")
 }
 
 ################################################################################
@@ -46,19 +46,20 @@ resource "aws_instance" "ec2_x86_docker" {
 
   # User data - Terraform automatically base64 encodes this
   # For large scripts, we use user_data_replace_on_change to avoid the 16KB limit
-  user_data                   = local.user_data
+  # var.user_data replaces the built-in Ubuntu/Docker setup script entirely
+  user_data                   = coalesce(var.user_data, local.user_data)
   user_data_replace_on_change = false # Don't replace instance if user_data changes
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"  # Enforce IMDSv2
+    http_tokens                 = "required" # Enforce IMDSv2
     http_put_response_hop_limit = 1
   }
 
   root_block_device {
-    volume_size           = var.storage_size
-    volume_type           = var.storage_type
-    encrypted             = var.enable_ebs_encryption
+    volume_size = var.storage_size
+    volume_type = var.storage_type
+    encrypted   = var.enable_ebs_encryption
     # Delete volume when instance is terminated (safe - EBS snapshots persist independently)
     delete_on_termination = true
 

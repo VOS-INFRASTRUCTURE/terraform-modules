@@ -18,6 +18,12 @@ variable "base_name" {
   default     = "mysql"
 }
 
+variable "name" {
+  description = "Full instance name override (defaults to <project_id>-<env>-<base_name>)"
+  type        = string
+  default     = null
+}
+
 ################################################################################
 # Instance Configuration
 ################################################################################
@@ -25,7 +31,7 @@ variable "base_name" {
 variable "ami_id" {
   description = "The AMI ID to use for the instance (Ubuntu 22.04 recommended)"
   type        = string
-  default = "ami-05c172c7f0d3aed00" # Canonical, Ubuntu, 24.04, amd64 image
+  default     = "ami-05c172c7f0d3aed00" # Canonical, Ubuntu, 24.04, amd64 image
 }
 
 variable "instance_type" {
@@ -116,6 +122,12 @@ variable "install_nginx" {
   description = "Install Nginx on the EC2 instance. Useful for reverse proxy or static file serving."
   type        = bool
   default     = false
+}
+
+variable "user_data" {
+  description = "Custom user data (shell script or cloud-config). Replaces the built-in Ubuntu/Docker setup script, so install_docker, install_nginx and the CloudWatch agent install are skipped."
+  type        = string
+  default     = null
 }
 
 variable "enable_cloudwatch_monitoring" {
