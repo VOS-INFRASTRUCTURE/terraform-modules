@@ -163,12 +163,13 @@ variable "log_retention_days" {
   default     = 7
 }
 
-variable "log_group_name" {
+variable "name_prefix" {
   description = <<-EOT
-    CloudWatch log group name. Leave empty for the default
-    "/aws/ec2/<env>-<project_id>-redis". Set it when a project runs more than
-    one Redis host — the default doesn't include base_name, so a second host
-    in the same env/project collides with the first (ResourceAlreadyExists).
+    Prefix for the IAM role, instance profile, CloudWatch policy and log group
+    names. Leave empty for the default "<env>-<project_id>-redis". Set it when a
+    project runs more than one Redis host — the default doesn't include
+    base_name, so a second host in the same env/project collides with the first
+    (EntityAlreadyExists / ResourceAlreadyExists).
   EOT
   type        = string
   default     = ""

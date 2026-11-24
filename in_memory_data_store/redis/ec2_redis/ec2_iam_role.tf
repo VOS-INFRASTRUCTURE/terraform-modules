@@ -6,7 +6,7 @@
 resource "aws_iam_role" "redis" {
   count = 1
 
-  name = "${var.env}-${var.project_id}-redis-role"
+  name = "${local.name_prefix}-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -44,7 +44,7 @@ resource "aws_iam_role_policy_attachment" "redis_ssm" {
 resource "aws_iam_role_policy" "redis_cloudwatch" {
   count = (var.enable_cloudwatch_monitoring || var.enable_cloudwatch_logs) ? 1 : 0
 
-  name = "${var.env}-${var.project_id}-redis-cloudwatch"
+  name = "${local.name_prefix}-cloudwatch"
   role = aws_iam_role.redis[0].id
 
   policy = jsonencode({
@@ -94,7 +94,7 @@ resource "aws_iam_role_policy" "redis_cloudwatch" {
 resource "aws_iam_instance_profile" "redis" {
   count = 1
 
-  name = "${var.env}-${var.project_id}-redis-profile"
+  name = "${local.name_prefix}-profile"
   role = aws_iam_role.redis[0].name
 
   tags = merge(

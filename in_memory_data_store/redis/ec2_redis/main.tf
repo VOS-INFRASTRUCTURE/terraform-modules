@@ -36,7 +36,7 @@ data "aws_ami" "ubuntu_arm64" {
   owners      = ["099720109477"] # Canonical (Ubuntu)
 
   filter {
-    name   = "name"
+    name = "name"
     values = [
       "ubuntu/images/hvm-ssd/ubuntu-noble-24.04-arm64-server-*",
       "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*",
@@ -70,8 +70,11 @@ data "aws_ami" "ubuntu_arm64" {
 ################################################################################
 
 locals {
-  
+
   instance_name = "${var.project_id}-${var.env}-${var.base_name}-redis"
+
+  # Default kept as-is (no base_name) so existing hosts keep their names.
+  name_prefix = var.name_prefix != "" ? var.name_prefix : "${var.env}-${var.project_id}-redis"
 
   # Calculate max memory based on instance type (75% of RAM)
   instance_memory_map = {
@@ -79,10 +82,10 @@ locals {
     "t4g.micro"   = "768mb"
     "t4g.small"   = "1536mb"
     "t4g.medium"  = "3072mb"
-    "r6g.medium"  = "6144mb"   # 8 GB × 75% — but for multi-app use explicit per-app budgets
-    "r6g.large"   = "12288mb"  # 16 GB × 75%
-    "r6g.xlarge"  = "24576mb"  # 32 GB × 75%
-    "r6g.2xlarge" = "49152mb"  # 64 GB × 75%
+    "r6g.medium"  = "6144mb"  # 8 GB × 75% — but for multi-app use explicit per-app budgets
+    "r6g.large"   = "12288mb" # 16 GB × 75%
+    "r6g.xlarge"  = "24576mb" # 32 GB × 75%
+    "r6g.2xlarge" = "49152mb" # 64 GB × 75%
   }
 
   redis_max_memory = var.redis_max_memory == "auto" ? lookup(local.instance_memory_map, var.instance_type, "768mb") : var.redis_max_memory
